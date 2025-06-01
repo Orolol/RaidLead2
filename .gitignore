@@ -1,0 +1,32 @@
+# Godot 4+ specific ignores
+.godot/
+!.godot/imported/
+
+# Godot 3 specific ignores (if applicable, keep for compatibility or remove if not needed)
+.import/
+export.cfg
+export_presets.cfg
+
+# General ignores
+*.translation
+*.translation.remap
+
+# Cache files
+*.cache
+*.optimize
+
+# Logs and backups
+*.log
+*.log.*
+*.tmp
+*.bak
+*.bck
+
+# Build artifacts (optional, depends on your export process)
+# build/
+# bin/
+# export/
+
+# OS-specific files
+.DS_Store
+Thumbs.db 

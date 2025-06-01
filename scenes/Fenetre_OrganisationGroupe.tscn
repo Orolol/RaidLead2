@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cbavbg8v3cwdm"]
+
+[ext_resource type="Script" uid="uid://dgqluqx8d85fe" path="res://scripts/ui/windows/fenetre_organisation_groupe.gd" id="1_5ar6j"]
+
+[node name="root" type="PanelContainer"]
+script = ExtResource("1_5ar6j")
