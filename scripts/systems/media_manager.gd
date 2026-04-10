@@ -1,0 +1,131 @@
+extends Node
+
+## Gere le systeme de streaming et medias de la guilde.
+## Les membres celebres peuvent devenir streamers, generant revenus et conflits.
+
+signal streamer_started(member_name: String)
+signal streamer_stopped(member_name: String)
+signal media_incident(member_name: String, incident_type: String, description: String)
+
+const STREAMER_CELEBRITY_THRESHOLD := 40.0
+const STREAMER_CHANCE := 0.10  # 10% chance par semaine si eligible
+const STREAMING_VS_RAID_CHANCE := 0.05
+const STRATEGY_LEAK_CHANCE := 0.03
+const LIVE_INCIDENT_CHANCE := 0.02
+const AUDIENCE_GROWTH_RATE := 500  # par semaine si actif
+const AUDIENCE_DECAY_RATE := 200  # par semaine si inactif
+const REVENUE_PER_AUDIENCE := 0.01  # or par audience par semaine
+
+func _ready() -> void:
+	if GameTime.has_signal("week_changed"):
+		GameTime.week_changed.connect(_on_week_changed)
+
+func _on_week_changed(_week: int, _year: int) -> void:
+	_update_streamers()
+	_check_media_events()
+
+func _update_streamers() -> void:
+	"""Met a jour le statut des streamers et leur audience."""
+	for member in GuildManager.guild_members:
+		if not member.has_meta("is_streamer"):
+			member.set_meta("is_streamer", false)
+			member.set_meta("audience_size", 0)
+			member.set_meta("stream_revenue", 0.0)
+
+		var is_streamer: bool = member.get_meta("is_streamer")
+		var celebrity: float = member.get_meta("celebrity_level") if member.has_meta("celebrity_level") else 0.0
+
+		if not is_streamer:
+			# Chance de devenir streamer
+			if celebrity >= STREAMER_CELEBRITY_THRESHOLD and _has_social_tag(member):
+				if randf() < STREAMER_CHANCE:
+					member.set_meta("is_streamer", true)
+					member.set_meta("audience_size", randi_range(100, 1000))
+					streamer_started.emit(member.nom)
+		else:
+			# Croissance/decroissance audience
+			var audience: int = member.get_meta("audience_size")
+			if member.is_online:
+				audience += randi_range(0, AUDIENCE_GROWTH_RATE)
+				audience += int(celebrity * 10)  # celebrity boost
+			else:
+				audience = maxi(0, audience - AUDIENCE_DECAY_RATE)
+			member.set_meta("audience_size", audience)
+
+			# Revenus
+			var revenue: float = float(audience) * REVENUE_PER_AUDIENCE
+			member.set_meta("stream_revenue", revenue)
+
+func _check_media_events() -> void:
+	"""Verifie les evenements mediatiques potentiels."""
+	for member in GuildManager.guild_members:
+		if not member.get_meta("is_streamer", false):
+			continue
+
+		# Streaming vs Raid
+		if randf() < STREAMING_VS_RAID_CHANCE:
+			media_incident.emit(member.nom, "streaming_vs_raid",
+				"%s a rate un raid pour streamer" % member.nom)
+
+		# Fuite de strategie
+		if randf() < STRATEGY_LEAK_CHANCE:
+			media_incident.emit(member.nom, "strategy_leak",
+				"%s a divulgue une strategie en live" % member.nom)
+
+		# Incident en live
+		if randf() < LIVE_INCIDENT_CHANCE:
+			media_incident.emit(member.nom, "live_incident",
+				"%s a provoque un incident en live" % member.nom)
+
+func _has_social_tag(member) -> bool:
+	"""Verifie si le membre a un tag social."""
+	if member.has_method("has_tag"):
+		return member.has_tag("social") or member.has_tag("drama_queen")
+	if "tags_comportement" in member:
+		return "social" in member.tags_comportement or "drama_queen" in member.tags_comportement
+	return randf() < 0.3  # fallback
+
+func get_total_audience() -> int:
+	"""Retourne l'audience totale de tous les streamers."""
+	var total: int = 0
+	for member in GuildManager.guild_members:
+		if member.get_meta("is_streamer", false):
+			total += member.get_meta("audience_size", 0)
+	return total
+
+func get_total_weekly_revenue() -> float:
+	"""Retourne les revenus hebdomadaires totaux du streaming."""
+	var total: float = 0.0
+	for member in GuildManager.guild_members:
+		if member.get_meta("is_streamer", false):
+			total += member.get_meta("stream_revenue", 0.0)
+	return total
+
+func get_streamers() -> Array:
+	"""Retourne la liste des streamers actifs."""
+	var streamers: Array = []
+	for member in GuildManager.guild_members:
+		if member.get_meta("is_streamer", false):
+			streamers.append(member)
+	return streamers
+
+func serialize() -> Dictionary:
+	var streamers_data: Array = []
+	for member in GuildManager.guild_members:
+		if member.get_meta("is_streamer", false):
+			streamers_data.append({
+				"nom": member.nom,
+				"audience_size": member.get_meta("audience_size", 0),
+				"stream_revenue": member.get_meta("stream_revenue", 0.0),
+			})
+	return {"streamers": streamers_data}
+
+func deserialize(data: Dictionary) -> void:
+	var streamers_data: Array = data.get("streamers", [])
+	for s in streamers_data:
+		for member in GuildManager.guild_members:
+			if member.nom == s.get("nom", ""):
+				member.set_meta("is_streamer", true)
+				member.set_meta("audience_size", s.get("audience_size", 0))
+				member.set_meta("stream_revenue", s.get("stream_revenue", 0.0))
+				break

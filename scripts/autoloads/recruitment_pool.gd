@@ -305,3 +305,133 @@ func get_player_info(player: SimulatedPlayer) -> Dictionary:
 		"expected_activity": player.get_meta("expected_activity", {}),
 		"difficulty": player.get_meta("recruitment_difficulty", 0.5)
 	}
+
+# --- Phase Nationale : Recrutement etendu ---
+
+func is_national_phase() -> bool:
+	"""Verifie si on est en phase nationale ou superieure."""
+	if PhaseManager and PhaseManager.has_method("get_current_phase"):
+		return PhaseManager.get_current_phase() >= 2  # NATIONAL = 2
+	return false
+
+func _create_national_player() -> SimulatedPlayer:
+	"""Cree un joueur de niveau national (haute qualite)."""
+	var player := SimulatedPlayer.new()
+
+	# Forcer niveau 55-60
+	player.personnage_niveau = randi_range(55, 60)
+
+	# Skill eleve
+	player.skill = randi_range(60, 90)
+
+	# Exigences salariales
+	player.salary_demand = randi_range(10, 100)
+
+	# Agent (20% de chance)
+	if randf() < 0.2:
+		player.set_meta("has_agent", true)
+		player.set_meta("agent_commission", player.salary_demand * 2)
+	else:
+		player.set_meta("has_agent", false)
+		player.set_meta("agent_commission", 0)
+
+	# Motivations nationales
+	var national_motivations: Array[String] = [
+		"Cherche une guilde top serveur",
+		"Veut progresser au niveau national",
+		"Ambitionne l'esport a terme",
+		"Recherche un environnement semi-pro",
+		"Veut rejoindre une guilde avec sponsors",
+	]
+	player.set_meta("recruitment_motivation", national_motivations[randi() % national_motivations.size()])
+	player.set_meta("expected_activity", _generate_expected_activity())
+	player.set_meta("recruitment_difficulty", _calculate_recruitment_difficulty(player))
+	player.set_meta("is_national", true)
+
+	return player
+
+func attempt_national_recruitment(player: SimulatedPlayer, offered_salary: int) -> Dictionary:
+	"""Tente de recruter un joueur national avec negociation salariale."""
+	if player not in available_players:
+		return {"success": false, "reason": "Joueur non disponible", "step": "error"}
+
+	var demand: int = player.salary_demand
+	if demand <= 0:
+		# Pas d'exigence salariale, recrutement normal
+		return attempt_recruitment(player, _get_guild_data())
+
+	# Etape 1 : Verifier si l'offre est acceptable
+	var ratio: float = float(offered_salary) / float(demand)
+
+	if ratio >= 1.0:
+		# Offre >= demande : acceptation directe
+		available_players.erase(player)
+		player_recruited.emit(player)
+		return {"success": true, "player": player, "salary": offered_salary, "step": "accepted"}
+	elif ratio >= 0.7:
+		# Contre-proposition
+		var counter: int = int(demand * randf_range(0.85, 1.1))
+		return {"success": false, "reason": "Contre-proposition", "counter_offer": counter, "step": "counter"}
+	else:
+		# Offre trop basse
+		return {"success": false, "reason": "Offre insuffisante (%d/%d or)" % [offered_salary, demand], "step": "rejected"}
+
+func accept_counter_offer(player: SimulatedPlayer, salary: int) -> Dictionary:
+	"""Accepte la contre-proposition d'un joueur national."""
+	if player not in available_players:
+		return {"success": false, "reason": "Joueur non disponible"}
+
+	available_players.erase(player)
+	player_recruited.emit(player)
+
+	# Commission agent
+	var agent_cost: int = 0
+	if player.get_meta("has_agent", false):
+		agent_cost = player.get_meta("agent_commission", 0)
+
+	return {"success": true, "player": player, "salary": salary, "agent_cost": agent_cost}
+
+func scout_player(player: SimulatedPlayer) -> Dictionary:
+	"""Scoute un joueur pour reveler ses stats cachees. Coute de la reputation."""
+	if GuildManager.guild:
+		GuildManager.guild.lose_reputation(2.0, "Scouting de %s" % player.nom)
+
+	# Reveler quelques tags caches
+	var revealed_tags: Array = []
+	for tag in player.tags_caches:
+		if randf() < 0.5:
+			revealed_tags.append(tag)
+			if tag not in player.tags_comportement:
+				player.tags_comportement.append(tag)
+
+	return {
+		"skill": player.skill,
+		"revealed_tags": revealed_tags,
+		"salary_demand": player.salary_demand,
+		"has_agent": player.get_meta("has_agent", false),
+	}
+
+func _get_guild_data() -> Dictionary:
+	"""Retourne les donnees de guilde pour le recrutement."""
+	var data: Dictionary = {"guild_size": GuildManager.guild_members.size()}
+	if GuildManager.guild:
+		data["reputation"] = GuildManager.guild.reputation
+		data["recent_raid_success"] = false
+		data["hardcore"] = false
+	return data
+
+func _generate_initial_pool_override():
+	"""Override pour generer un pool mixte en phase nationale."""
+	if not is_national_phase():
+		return
+
+	# Ajouter des joueurs nationaux au pool existant
+	var national_count: int = randi_range(10, 20)
+	for i in range(national_count):
+		available_players.append(_create_national_player())
+
+	# Agrandir le pool
+	while available_players.size() < 50:
+		available_players.append(_create_random_player())
+
+	pool_refreshed.emit()

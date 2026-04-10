@@ -156,7 +156,7 @@ func _handle_loot_drop(boss_name: String, boss_index: int):
 		
 		# Attribution du loot
 		var chosen_member = eligible_members[randi() % eligible_members.size()]
-		
+
 		# Vérifier les comportements spéciaux
 		if chosen_member.has_tag("ninja_looter") and randf() < 0.3:
 			# 30% de chance qu'un ninja looter vole un loot supplémentaire
@@ -164,9 +164,14 @@ func _handle_loot_drop(boss_name: String, boss_index: int):
 			for other_member in group_members:
 				if other_member != chosen_member:
 					other_member.trigger_loot_conflict()
-		
-		# Équiper l'objet
-		chosen_member.equip_item(looted_item)
+
+		# Équiper l'objet avec auto-equip
+		chosen_member.try_auto_equip(looted_item)
+
+		# Ajouter à l'historique de loot
+		var guild_manager_node = Engine.get_main_loop().root.get_node_or_null("/root/GuildManager") if Engine.get_main_loop() else null
+		if guild_manager_node:
+			guild_manager_node.add_loot_entry(looted_item, chosen_member.nom, instance_data.get("name", ""), boss_name)
 		
 		if not loot_collected.has(chosen_member.nom):
 			loot_collected[chosen_member.nom] = []

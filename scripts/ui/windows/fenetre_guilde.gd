@@ -17,6 +17,9 @@ var selected_member = null
 var guild_manager: Node
 var right_clicked_member_index: int = -1
 
+# Historique de loot
+var loot_history_container: VBoxContainer
+
 # Labels pour les infos de guilde
 var guild_level_label: Label
 var guild_xp_label: Label
@@ -88,49 +91,67 @@ func _setup_header(parent: VBoxContainer):
 
 func _setup_content(parent: VBoxContainer):
 	# Panel d'informations de guilde
-	var guild_info_panel = PanelContainer.new()
+	var guild_info_panel: PanelContainer = PanelContainer.new()
 	guild_info_panel.custom_minimum_size = Vector2(0, 80)
 	parent.add_child(guild_info_panel)
-	
-	var guild_info_vbox = VBoxContainer.new()
+
+	var guild_info_vbox: VBoxContainer = VBoxContainer.new()
 	guild_info_panel.add_child(guild_info_vbox)
-	
+
 	_setup_guild_info(guild_info_vbox)
-	
-	var hsplit = HSplitContainer.new()
+
+	# TabContainer pour Membres / Historique
+	var tab_container: TabContainer = TabContainer.new()
+	tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(tab_container)
+
+	# --- Onglet Membres ---
+	var members_tab: VBoxContainer = VBoxContainer.new()
+	members_tab.name = "Membres"
+	tab_container.add_child(members_tab)
+
+	var hsplit: HSplitContainer = HSplitContainer.new()
 	hsplit.split_offset = 300
-	parent.add_child(hsplit)
-	
-	var left_panel = PanelContainer.new()
+	hsplit.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	members_tab.add_child(hsplit)
+
+	var left_panel: PanelContainer = PanelContainer.new()
 	hsplit.add_child(left_panel)
-	
-	var left_vbox = VBoxContainer.new()
+
+	var left_vbox: VBoxContainer = VBoxContainer.new()
 	left_panel.add_child(left_vbox)
-	
-	var list_label = Label.new()
+
+	var list_label: Label = Label.new()
 	list_label.text = "Membres de la Guilde"
 	list_label.add_theme_font_size_override("font_size", 16)
 	left_vbox.add_child(list_label)
-	
+
 	members_list = ItemList.new()
 	members_list.custom_minimum_size = Vector2(300, 500)
 	members_list.item_selected.connect(_on_member_selected)
 	members_list.gui_input.connect(_on_members_list_gui_input)
 	left_vbox.add_child(members_list)
-	
-	var right_panel = PanelContainer.new()
+
+	var right_panel: PanelContainer = PanelContainer.new()
 	hsplit.add_child(right_panel)
-	
-	var scroll_container = ScrollContainer.new()
+
+	var scroll_container: ScrollContainer = ScrollContainer.new()
 	scroll_container.custom_minimum_size = Vector2(600, 500)
 	right_panel.add_child(scroll_container)
-	
+
 	member_details = VBoxContainer.new()
 	member_details.add_theme_constant_override("separation", 8)
-	member_details.custom_minimum_size = Vector2(580, 0)  # Largeur fixe pour éviter le redimensionnement
+	member_details.custom_minimum_size = Vector2(580, 0)
 	scroll_container.add_child(member_details)
-	
+
 	_setup_member_details()
+
+	# --- Onglet Historique ---
+	var history_tab: VBoxContainer = VBoxContainer.new()
+	history_tab.name = "Historique"
+	tab_container.add_child(history_tab)
+
+	_setup_loot_history_tab(history_tab)
 
 func _setup_member_details():
 	var details_label = Label.new()
@@ -154,7 +175,9 @@ func _refresh_member_list():
 	# Synchroniser avec le GuildManager au cas où de nouveaux membres auraient été ajoutés
 	if guild_manager:
 		guild_members = guild_manager.guild_members.duplicate()
-	
+
+	_refresh_loot_history()
+
 	members_list.clear()
 	for member in guild_members:
 		var status = "[Hors ligne]"
@@ -353,6 +376,86 @@ func _update_member_details():
 			hint_label.modulate = Color(0.7, 0.7, 0.5)
 			hint_label.add_theme_font_size_override("font_size", 12)
 			member_details.add_child(hint_label)
+
+func _setup_loot_history_tab(parent: VBoxContainer):
+	var title_label_hist: Label = Label.new()
+	title_label_hist.text = "Historique des Loots"
+	title_label_hist.add_theme_font_size_override("font_size", 16)
+	parent.add_child(title_label_hist)
+
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 400)
+	parent.add_child(scroll)
+
+	loot_history_container = VBoxContainer.new()
+	loot_history_container.add_theme_constant_override("separation", 4)
+	loot_history_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(loot_history_container)
+
+	_refresh_loot_history()
+
+func _refresh_loot_history():
+	if not loot_history_container:
+		return
+
+	for child in loot_history_container.get_children():
+		child.queue_free()
+
+	if not guild_manager:
+		return
+
+	var history: Array = guild_manager.loot_history
+	if history.is_empty():
+		var empty_label: Label = Label.new()
+		empty_label.text = "Aucun loot enregistré pour le moment."
+		empty_label.modulate = Color(0.6, 0.6, 0.6)
+		loot_history_container.add_child(empty_label)
+		return
+
+	# Afficher du plus récent au plus ancien
+	for i in range(history.size() - 1, -1, -1):
+		var entry: Dictionary = history[i]
+		var hbox: HBoxContainer = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 8)
+		loot_history_container.add_child(hbox)
+
+		# Timestamp
+		var ts: Dictionary = entry.get("timestamp", {})
+		var ts_text: String = "J%d S%d" % [ts.get("day", 0), ts.get("week", 0)]
+		var ts_label: Label = Label.new()
+		ts_label.text = ts_text
+		ts_label.custom_minimum_size = Vector2(60, 0)
+		ts_label.add_theme_font_size_override("font_size", 12)
+		ts_label.modulate = Color(0.6, 0.6, 0.6)
+		hbox.add_child(ts_label)
+
+		# Nom du membre
+		var member_label: Label = Label.new()
+		member_label.text = entry.get("member_name", "?")
+		member_label.custom_minimum_size = Vector2(140, 0)
+		member_label.add_theme_font_size_override("font_size", 12)
+		hbox.add_child(member_label)
+
+		# Nom de l'item coloré par rareté
+		var item = entry.get("item", null)
+		var item_label: Label = Label.new()
+		if item and item is Item:
+			item_label.text = "%s (iLvl %d)" % [item.name, item.ilvl]
+			item_label.modulate = item.get_rarity_color()
+		else:
+			item_label.text = "Item inconnu"
+			item_label.modulate = Color(0.5, 0.5, 0.5)
+		item_label.custom_minimum_size = Vector2(200, 0)
+		item_label.add_theme_font_size_override("font_size", 12)
+		hbox.add_child(item_label)
+
+		# Donjon
+		var dungeon_label: Label = Label.new()
+		dungeon_label.text = entry.get("dungeon_name", "")
+		dungeon_label.add_theme_font_size_override("font_size", 12)
+		dungeon_label.modulate = Color(0.7, 0.7, 0.7)
+		hbox.add_child(dungeon_label)
 
 func _add_detail_row(parent: GridContainer, label_text: String, value_text: String):
 	var label = Label.new()

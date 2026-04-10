@@ -25,6 +25,7 @@ func save_game() -> bool:
 		"ai_guilds": AIGuildManager.save_ai_guilds_data(),
 		"guild": _serialize_guild(),
 		"members": _serialize_members(),
+		"loot_history": _serialize_loot_history(),
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
@@ -84,6 +85,8 @@ func load_game() -> bool:
 		_deserialize_guild(data.guild)
 	if data.has("members"):
 		_deserialize_members(data.members)
+	if data.has("loot_history"):
+		_deserialize_loot_history(data.loot_history)
 
 	print("SaveManager: chargement réussi (version %d)" % data.save_version)
 	load_completed.emit(true)
@@ -278,3 +281,33 @@ func _deserialize_item(data: Dictionary) -> Item:
 		data.get("agility", 0),
 		data.get("intelligence", 0),
 	)
+
+# --- Sérialisation Loot History ---
+
+func _serialize_loot_history() -> Array:
+	var entries: Array = []
+	for entry in GuildManager.loot_history:
+		var serialized: Dictionary = {
+			"member_name": entry.get("member_name", ""),
+			"dungeon_name": entry.get("dungeon_name", ""),
+			"boss_name": entry.get("boss_name", ""),
+			"timestamp": entry.get("timestamp", {}),
+		}
+		var item = entry.get("item", null)
+		if item:
+			serialized["item"] = _serialize_item(item)
+		entries.append(serialized)
+	return entries
+
+func _deserialize_loot_history(data: Array) -> void:
+	GuildManager.loot_history.clear()
+	for entry_data in data:
+		var entry: Dictionary = {
+			"member_name": entry_data.get("member_name", ""),
+			"dungeon_name": entry_data.get("dungeon_name", ""),
+			"boss_name": entry_data.get("boss_name", ""),
+			"timestamp": entry_data.get("timestamp", {}),
+		}
+		if entry_data.has("item") and entry_data.item is Dictionary:
+			entry["item"] = _deserialize_item(entry_data.item)
+		GuildManager.loot_history.append(entry)

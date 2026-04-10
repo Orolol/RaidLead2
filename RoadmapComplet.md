@@ -232,17 +232,17 @@
 
 - ✅ **Stats détaillées** : Force/Agilité/Intelligence générées sur chaque loot, affichées dans l'UI et cumulées par membre
 - ✅ **Interface de loot** : Fenêtre dédiée après les donjons avec récap des objets, stats et gagnants
-- 📋 **Historique** : Journal des objets obtenus par la guilde
-- 📋 **Comparaison** : Outils pour évaluer les upgrades potentiels
-- 📋 **Auto-équipement** : Gestion automatique des upgrades évidents
+- ✅ **Historique** : Journal des objets obtenus par la guilde (onglet Historique dans Fenetre_Guilde, 200 entrées max, sauvegardé)
+- ✅ **Comparaison** : Deltas de stats colorés (vert/rouge) dans la fenêtre d'équipement
+- ✅ **Auto-équipement** : Gestion automatique des upgrades basée sur préférences de classe (FOR/AGI/INT)
 - 📋 **Équilibrage stats** : Ajuster les multiplicateurs de génération selon slots/raretés après premiers tests
 - 📋 **Filtres loot** : Ajouter filtres (joueur/rareté) et export dans la nouvelle fenêtre de butin
 
 ### 1.2 Mécaniques de Gameplay Manquantes
 **Temps estimé : 2-3 jours**
 
-- 📋 **Preferences équipement** : IA pour que NPCs privilégient certains stats
-- 📋 **Conflits de loot** : Gestion des disputes pour objets rares
+- ✅ **Preferences équipement** : Préférences de stats par classe (FOR/AGI/INT) avec scoring automatique
+- ✅ **Conflits de loot** : Popup de résolution pour items rares+ avec choix du joueur, impact moral des perdants
 - 📋 **Système d'enchantement** : Amélioration objets existants (basique)
 - 📋 **Sets d'équipement** : Bonus quand plusieurs pièces équipées
 

@@ -63,6 +63,10 @@ const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.
 # Système d'effets
 @export var active_effects: Array = []  # Array[EffectInstance] - duck typing pour éviter dépendance circulaire
 
+# Phase Nationale - Celebrite et Medias
+@export var celebrity_level: float = 0.0  # 0-100
+@export var salary_demand: int = 0  # or/semaine pour recrues nationales (0 = pas d'exigence)
+
 # Propriétés pour la compatibilité
 
 func _init():
@@ -337,6 +341,96 @@ func get_equipment_stats_summary() -> String:
 		if summary != "":
 			return summary
 	return "Aucune statistique d'équipement"
+
+const STAT_PREFERENCES: Dictionary = {
+	"Guerrier": "strength", "Paladin": "strength",
+	"Voleur": "agility", "Chasseur": "agility",
+	"Mage": "intelligence", "Prêtre": "intelligence",
+	"Démoniste": "intelligence", "Chaman": "intelligence",
+	"Druide": "intelligence",
+}
+
+func get_preferred_stat() -> String:
+	"""Retourne la stat préférée selon la classe"""
+	return STAT_PREFERENCES.get(personnage_classe, "strength")
+
+func calculate_item_score(item: Item) -> float:
+	"""Calcule le score d'un item selon les préférences de classe"""
+	var preferred: String = get_preferred_stat()
+	var stat_value: int = 0
+	match preferred:
+		"strength":
+			stat_value = item.strength
+		"agility":
+			stat_value = item.agility
+		"intelligence":
+			stat_value = item.intelligence
+	return item.ilvl * 1.0 + stat_value * 0.3
+
+func try_auto_equip(item: Item) -> Dictionary:
+	"""Tente d'équiper automatiquement un item s'il est meilleur que l'actuel.
+	Retourne {equipped: bool, old_item: Item ou null}"""
+	if not equipment:
+		equipment = EquipmentScript.new()
+
+	var current_item: Item = equipment.get_item_in_slot(item.slot)
+
+	if current_item == null:
+		# Slot vide, toujours équiper
+		equipment.equip_item(item)
+		print("%s a équipé %s (slot vide)" % [nom, item.get_display_name()])
+		return {"equipped": true, "old_item": null}
+
+	var new_score: float = calculate_item_score(item)
+	var current_score: float = calculate_item_score(current_item)
+
+	if new_score > current_score:
+		var old_item: Item = equipment.equip_item(item)
+		print("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
+		return {"equipped": true, "old_item": old_item}
+	else:
+		return {"equipped": false, "old_item": null}
+
+func would_be_upgrade(item: Item) -> bool:
+	"""Vérifie si un item serait une amélioration sans l'équiper"""
+	if not equipment:
+		return true
+
+	var current_item: Item = equipment.get_item_in_slot(item.slot)
+	if current_item == null:
+		return true
+
+	return calculate_item_score(item) > calculate_item_score(current_item)
+
+func trigger_loot_conflict() -> void:
+	"""Appele quand le joueur perd un conflit de loot."""
+	loot_conflicts += 1
+
+# --- Celebrite ---
+
+func update_celebrity(delta: float) -> void:
+	"""Modifie le niveau de celebrite."""
+	celebrity_level = clampf(celebrity_level + delta, 0.0, 100.0)
+
+func get_celebrity_bonus_recruitment() -> float:
+	"""Bonus de recrutement lie a la celebrite."""
+	if celebrity_level > 30.0:
+		return 0.1
+	return 0.0
+
+func get_celebrity_poaching_risk() -> float:
+	"""Risque supplementaire de debauchage."""
+	if celebrity_level > 60.0:
+		return 0.2
+	return 0.0
+
+func tick_celebrity_weekly() -> void:
+	"""Mise a jour hebdomadaire de la celebrite."""
+	# Decroissance naturelle
+	update_celebrity(-1.0)
+	# Bonus si haut skill
+	if skill > 80:
+		update_celebrity(0.5)
 
 func equip_item(item) -> bool:
 	"""Fait équiper un objet au joueur"""

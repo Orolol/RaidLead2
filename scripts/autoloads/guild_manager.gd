@@ -11,8 +11,10 @@ signal guild_level_changed(new_level)
 signal guild_perk_unlocked(perk_name)
 signal member_leveled_up(player, new_level)
 signal member_recruited(player)
+signal loot_conflict_occurred(conflict)
 
 var guild_members: Array = []
+var loot_history: Array = []
 var guild: Guild
 var activity_manager
 var game_time: Node
@@ -322,6 +324,24 @@ func _on_personal_event(player, event: Dictionary):
 	if event.has("message"):
 		var message = event.message.replace("{player}", player.nom)
 		print("📅 " + message)
+
+func add_loot_entry(item: Item, member_name: String, dungeon_name: String, boss_name: String) -> void:
+	"""Ajoute une entrée à l'historique de loot"""
+	var entry: Dictionary = {
+		"item": item,
+		"member_name": member_name,
+		"dungeon_name": dungeon_name,
+		"boss_name": boss_name,
+		"timestamp": {
+			"day": GameTime.current_day,
+			"week": GameTime.current_week,
+			"year": GameTime.current_year,
+		}
+	}
+	loot_history.append(entry)
+	# Limiter à 200 entrées
+	while loot_history.size() > 200:
+		loot_history.pop_front()
 
 func _on_burnout_changed(player, new_level: int):
 	"""Gère les changements de niveau de burnout"""

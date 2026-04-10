@@ -265,27 +265,64 @@ func _check_group_composition(required_comp: Dictionary) -> float:
 	return penalty
 
 func _on_boss_defeated() -> void:
-	var boss_name = dungeon_data.bosses[current_boss_index]
-	
+	var boss_name: String = dungeon_data.bosses[current_boss_index]
+
 	# Vérifier si le boss drop du loot
-	var is_heroic = DungeonDataScript.is_heroic_dungeon(dungeon_id)
-	var loot_chance = LootTables.get_boss_loot_chance(current_boss_index, dungeon_data.bosses.size(), is_heroic)
-	
-	var loot_winner = null
-	var looted_item = null
-	
+	var is_heroic: bool = DungeonDataScript.is_heroic_dungeon(dungeon_id)
+	var loot_chance: float = LootTables.get_boss_loot_chance(current_boss_index, dungeon_data.bosses.size(), is_heroic)
+
+	var loot_winner: SimulatedPlayer = null
+	var looted_item: Item = null
+
 	if randf() < loot_chance:
 		# Générer un objet
 		looted_item = LootTables.generate_item_for_level(dungeon_data.equipment_reward_level, is_heroic)
-		
-		# Choisir qui reçoit l'objet (pour l'instant aléatoire)
-		loot_winner = group_members.pick_random() if group_members.size() > 0 else null
-		
-		if loot_winner and looted_item:
-			loot_winner.equip_item(looted_item)
-			# Émettre le signal de distribution de loot pour le chat
-			loot_distributed.emit(loot_winner, looted_item)
-	
+
+		if looted_item and group_members.size() > 0:
+			var d_name: String = dungeon_data.get("name", "")
+
+			# Vérifier les conflits de loot pour les items rares+
+			if looted_item.rarity >= Item.Rarity.RARE:
+				var eligible_members: Array[SimulatedPlayer] = []
+				for member in group_members:
+					if member.would_be_upgrade(looted_item):
+						eligible_members.append(member)
+
+				if eligible_members.size() >= 2:
+					# Conflit de loot - laisser le joueur décider
+					var conflict: Dictionary = {
+						"item": looted_item,
+						"candidates": eligible_members,
+						"dungeon_name": d_name,
+						"boss_name": boss_name,
+					}
+					GuildManager.loot_conflict_occurred.emit(conflict)
+					# Ne pas distribuer maintenant, le signal gère la suite
+					boss_defeated.emit(current_boss_index, boss_name, null, looted_item)
+
+					# Continuer la progression normalement
+					wipe_count = 0
+					current_boss_index += 1
+					is_fighting_boss = false
+					if current_boss_index > 0 and current_boss_index - 1 < boss_positions.size():
+						current_position = boss_positions[current_boss_index - 1]
+					if current_boss_index >= dungeon_data.bosses.size():
+						_complete_dungeon()
+					else:
+						var current_time: float = get_elapsed_time(game_time_node) - time_lost_to_wipes
+						var next_boss_time: float = expected_boss_times[current_boss_index]
+						time_to_next_boss = max(30.0, next_boss_time - current_time)
+					return
+
+			# Distribution normale (pas de conflit)
+			loot_winner = group_members.pick_random()
+
+			if loot_winner and looted_item:
+				loot_winner.try_auto_equip(looted_item)
+				GuildManager.add_loot_entry(looted_item, loot_winner.nom, d_name, boss_name)
+				# Émettre le signal de distribution de loot pour le chat
+				loot_distributed.emit(loot_winner, looted_item)
+
 	boss_defeated.emit(current_boss_index, boss_name, loot_winner, looted_item)
 	
 	# Réinitialiser le compteur de wipes pour ce boss

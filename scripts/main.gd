@@ -32,6 +32,7 @@ func _ready():
 	_register_windows()
 	_connect_window_signals()
 	_connect_event_system()
+	_connect_loot_conflict_system()
 	_setup_player_systems()
 
 	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
@@ -377,6 +378,106 @@ func _on_event_choice_selected(choice: EventChoiceResource):
 
 func _on_event_popup_closed():
 	event_popup = null
+
+func _connect_loot_conflict_system():
+	var gm: Node = GuildManager
+	if gm:
+		gm.loot_conflict_occurred.connect(_on_loot_conflict)
+
+func _on_loot_conflict(conflict: Dictionary):
+	"""Affiche un popup pour résoudre un conflit de loot"""
+	var item: Item = conflict.get("item", null)
+	var candidates: Array = conflict.get("candidates", [])
+	var dungeon_name: String = conflict.get("dungeon_name", "")
+	var boss_name: String = conflict.get("boss_name", "")
+
+	if not item or candidates.is_empty():
+		return
+
+	# Pause le jeu pour la décision
+	var game_time_node: Node = GameTime
+	var was_paused: bool = false
+	if game_time_node:
+		was_paused = game_time_node.is_paused
+		if not was_paused:
+			game_time_node.toggle_pause()
+
+	# Créer le popup de sélection
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = "Conflit de Loot!"
+	dialog.exclusive = true
+	dialog.get_ok_button().hide()  # On utilise nos propres boutons
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	dialog.add_child(vbox)
+
+	# Infos sur l'item
+	var item_label: Label = Label.new()
+	item_label.text = "%s (iLvl %d) - %s" % [item.name, item.ilvl, item.get_rarity_name()]
+	item_label.modulate = item.get_rarity_color()
+	item_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(item_label)
+
+	var stats_label: Label = Label.new()
+	stats_label.text = item.get_stat_summary(true)
+	stats_label.add_theme_font_size_override("font_size", 13)
+	vbox.add_child(stats_label)
+
+	var context_label: Label = Label.new()
+	context_label.text = "Drop de %s dans %s" % [boss_name, dungeon_name]
+	context_label.modulate = Color(0.7, 0.7, 0.7)
+	context_label.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(context_label)
+
+	vbox.add_child(HSeparator.new())
+
+	var instruction_label: Label = Label.new()
+	instruction_label.text = "Choisissez qui reçoit l'objet :"
+	instruction_label.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(instruction_label)
+
+	# Boutons pour chaque candidat
+	for candidate in candidates:
+		var btn: Button = Button.new()
+		var current_item: Item = candidate.equipment.get_item_in_slot(item.slot) if candidate.equipment else null
+		var current_ilvl_text: String = " (actuel: iLvl %d)" % current_item.ilvl if current_item else " (slot vide)"
+		btn.text = "%s - %s Niv.%d%s" % [candidate.nom, candidate.personnage_classe, candidate.personnage_niveau, current_ilvl_text]
+		btn.custom_minimum_size = Vector2(400, 35)
+		var member_ref: SimulatedPlayer = candidate
+		btn.pressed.connect(func():
+			_resolve_loot_conflict(item, member_ref, candidates, dungeon_name, boss_name)
+			dialog.queue_free()
+			# Reprendre le jeu
+			if game_time_node and not was_paused:
+				game_time_node.toggle_pause()
+		)
+		vbox.add_child(btn)
+
+	add_child(dialog)
+	dialog.popup_centered(Vector2(500, 300))
+
+func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Array, dungeon_name: String, boss_name: String):
+	"""Résout un conflit de loot en attribuant l'item au gagnant"""
+	# Équiper l'item au gagnant
+	winner.try_auto_equip(item)
+
+	# Ajouter à l'historique
+	GuildManager.add_loot_entry(item, winner.nom, dungeon_name, boss_name)
+
+	# Réduire la satisfaction des perdants
+	for candidate in candidates:
+		if candidate != winner:
+			candidate.mood = max(0, candidate.mood - 5)
+			candidate.trigger_loot_conflict()
+
+	# Notification
+	var notification_manager: Node = get_node_or_null("/root/NotificationManager")
+	if notification_manager:
+		notification_manager.show_info(
+			"%s a reçu %s" % [winner.nom, item.name],
+			"Loot attribué"
+		)
 
 func _setup_player_systems():
 	"""Configure les systèmes spécifiques au joueur"""
