@@ -39,7 +39,7 @@ func show_event(event: RandomEventResource):
 	_setup_ui()
 	
 	# Pause du jeu
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		game_time.pause()
 		print("EventPopup: Jeu mis en pause")
@@ -105,7 +105,7 @@ func _setup_choices():
 		button.queue_free()
 	choice_buttons.clear()
 	
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	var player_data = {}
 	var guild_data = {}
 	
@@ -217,7 +217,7 @@ func _on_choice_selected(choice: EventChoiceResource):
 	await tween.finished
 	
 	# Reprendre le jeu
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		game_time.resume()
 	
@@ -238,7 +238,7 @@ func _on_close_requested():
 	await tween.finished
 	
 	# Reprendre le jeu
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		game_time.resume()
 	

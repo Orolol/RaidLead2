@@ -15,7 +15,7 @@ var start_time: Dictionary = {}
 var fast_forward_speed: float = 2400.0  # Très rapide pour le fast-forward
 
 func _ready():
-	game_time = get_node("/root/GameTime")
+	game_time = GameTime
 	if not game_time:
 		print("ERREUR: FastForwardManager ne peut pas trouver GameTime")
 
@@ -66,7 +66,7 @@ func start_fast_forward(target_hour: int, target_minute: int = 0, forced: bool =
 	game_time.set_time_speed(fast_forward_speed)
 	
 	# Mettre en pause les événements pendant le fast-forward
-	var event_manager = get_node("/root/EventManager")
+	var event_manager = EventManager
 	if event_manager:
 		event_manager.pause_events()
 	
@@ -135,7 +135,7 @@ func _complete_fast_forward():
 	game_time.set_time_speed(60.0)
 	
 	# Reprendre les événements
-	var event_manager = get_node("/root/EventManager")
+	var event_manager = EventManager
 	if event_manager:
 		event_manager.resume_events()
 	
@@ -172,7 +172,7 @@ func cancel_fast_forward():
 	game_time.set_time_speed(60.0)
 	
 	# Reprendre les événements
-	var event_manager = get_node("/root/EventManager")
+	var event_manager = EventManager
 	if event_manager:
 		event_manager.resume_events()
 	

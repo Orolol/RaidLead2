@@ -27,12 +27,12 @@ func _ready():
 	guild.level_up.connect(_on_guild_level_up)
 	guild.perk_unlocked.connect(_on_guild_perk_unlocked)
 	
-	activity_manager = get_node("/root/ActivityManager")
+	activity_manager = ActivityManager
 	
 	# Créer le système de comportement
 	_init_behavior_system()
 	
-	game_time = get_node("/root/GameTime")
+	game_time = GameTime
 	if game_time:
 		# Se connecter aussi au signal minute_changed pour plus de granularité
 		game_time.minute_changed.connect(_on_minute_changed)
@@ -54,8 +54,8 @@ func _ready():
 	# Créer le personnage du joueur
 	_create_player_character()
 	
-	# Créer 10 membres initiaux pour faciliter les tests
-	_create_initial_guild_members()
+	# Créer les membres initiaux
+	GuildInitializer.create_initial_members()
 
 func _on_minute_changed(_minute: int, _hour: int):
 	# Le BehaviorSystem gère maintenant les connexions/déconnexions granulaires
@@ -267,220 +267,17 @@ func is_player_online() -> bool:
 	"""Vérifie si le joueur est connecté"""
 	return player_character != null and player_character.is_online
 
-func _create_initial_guild_members():
-	# Noms de membres pour la guilde
-	var member_names = [
-		"Thorin", "Legolas", "Gimli", "Aragorn", "Gandalf",
-		"Frodo", "Sam", "Merry", "Pippin", "Boromir"
-	]
-	
-	var classes = ["Guerrier", "Prêtre", "Mage", "Voleur", "Chasseur", "Druide", "Démoniste", "Paladin", "Chaman"]
-	var roles_by_class = {
-		"Guerrier": "Tank",
-		"Prêtre": "Healer",
-		"Mage": "DPS",
-		"Voleur": "DPS",
-		"Chasseur": "DPS",
-		"Druide": ["Tank", "Healer", "DPS"],  # Peut faire plusieurs rôles
-		"Démoniste": "DPS",
-		"Paladin": ["Tank", "Healer", "DPS"],  # Peut faire plusieurs rôles
-		"Chaman": ["Healer", "DPS"]  # Peut faire plusieurs rôles
-	}
-	
-	# S'assurer d'avoir une bonne composition
-	var required_tanks = 1
-	var required_healers = 1
-	var created_tanks = 0
-	var created_healers = 0
-	
-	for i in range(10):
-		var member = SimulatedPlayer.new()
-		member.nom = member_names[i]
-		
-		# Assigner une classe en fonction des besoins de composition
-		var chosen_class = ""
-		if created_tanks < required_tanks:
-			# Besoin de tanks
-			chosen_class = ["Guerrier", "Druide", "Paladin"].pick_random()
-			member.personnage_role = "Tank"
-			created_tanks += 1
-		elif created_healers < required_healers:
-			# Besoin de healers
-			chosen_class = ["Prêtre", "Druide", "Paladin", "Chaman"].pick_random()
-			member.personnage_role = "Healer"
-			created_healers += 1
-		else:
-			# Le reste en DPS
-			chosen_class = classes.pick_random()
-			var role_options = roles_by_class[chosen_class]
-			if role_options is Array:
-				member.personnage_role = "DPS"  # Toujours DPS pour le reste
-			else:
-				member.personnage_role = role_options
-		
-		member.personnage_classe = chosen_class
-		
-		# Niveau 1 pour tous
-		member.personnage_niveau = 1
-		
-		# L'équipement de départ est géré par SimulatedPlayer
-		
-		# Skill entre 40 et 80
-		member.skill = randi_range(40, 80)
-		
-		# Stats initiales
-		member.energy = randi_range(60, 100)
-		member.mood = randi_range(50, 90)
-		member.integration = randi_range(20, 60)  # Déjà un peu intégrés
-		member.days_in_guild = randi_range(7, 30)  # Dans la guilde depuis 1-4 semaines
-		
-		# Planning varié - copier le planning du joueur modifié
-		member.planning = {
-			"lundi": {"soir": randf() > 0.3},
-			"mardi": {"soir": randf() > 0.3},
-			"mercredi": {"soir": randf() > 0.3},
-			"jeudi": {"soir": randf() > 0.3},
-			"vendredi": {"soir": randf() > 0.3},
-			"samedi": {"apres_midi": randf() > 0.2, "soir": randf() > 0.1},
-			"dimanche": {"apres_midi": randf() > 0.2, "soir": randf() > 0.2}
-		}
-		
-		# Tags comportementaux variés
-		if randf() > 0.5:
-			member.tags_comportement = [["social", "patient"].pick_random()]
-		else:
-			member.tags_comportement = []
-		
-		# Certains membres ont de l'or initial
-		if randf() < 0.3:
-			member.or_actuel = randi_range(50, 200)
-		
-		# Ajouter le membre à la guilde
-		add_member(member)
-		
-		print("Membre initial créé: %s - %s %s Niv.%d" % [
-			member.nom, 
-			member.personnage_role,
-			member.personnage_classe, 
-			member.personnage_niveau
-		])
+# Gestion des tentatives de débauchage — déléguée au PoachingHandler
+var poaching_handler: Node
 
-# Gestion des tentatives de débauchage
-
-func _connect_to_ai_guild_manager():
-	"""Se connecte au AIGuildManager une fois qu'il est prêt"""
-	var ai_guild_manager = get_node_or_null("/root/AIGuildManager")
-	if ai_guild_manager:
-		ai_guild_manager.connect("poaching_attempt", _on_poaching_attempt)
-		print("GuildManager connecté au AIGuildManager")
-
-func _on_poaching_attempt(target_member, source_guild: AIGuild, success: bool):
-	"""Gère les tentatives de débauchage par les guildes IA"""
-	# Vérifier si le membre ciblé est dans notre guilde
-	if target_member not in guild_members:
-		return
-	
-	# Ne pas traiter les tentatives sur le personnage du joueur
-	if target_member.get_meta("is_player", false):
-		return
-	
-	if success:
-		print("🚨 ALERTE DE DÉBAUCHAGE: %s tente de recruter %s !" % [source_guild.name, target_member.nom])
-		_show_poaching_popup(target_member, source_guild)
-	else:
-		print("🛡️ Tentative de débauchage échouée: %s a refusé l'offre de %s" % [target_member.nom, source_guild.name])
-
-func _show_poaching_popup(member, source_guild: AIGuild):
-	"""Affiche le popup de gestion de débauchage"""
-	# Créer le popup
-	var poaching_popup_scene = load("res://scripts/ui/windows/poaching_popup.gd")
-	var popup = Window.new()
-	popup.set_script(poaching_popup_scene)
-	
-	get_tree().root.add_child(popup)
-	
-	# Connecter les signaux
-	popup.connect("counter_offer_made", _on_counter_offer_made)
-	popup.connect("member_released", _on_member_released_to_poaching)
-	popup.connect("poaching_ignored", _on_poaching_ignored)
-	
-	# Générer une offre fictive basée sur la stratégie de la guilde
-	var offer = _generate_poaching_offer(source_guild, member)
-	
-	# Afficher le popup
-	popup.show_poaching_attempt(member, source_guild, offer)
-
-func _generate_poaching_offer(source_guild: AIGuild, member) -> Dictionary:
-	"""Génère une offre de débauchage réaliste"""
-	var offer = {}
-	
-	# Bonus d'équipement basé sur la stratégie
-	match source_guild.ai_strategy:
-		AIGuild.Strategy.HARDCORE:
-			offer["equipment_bonus"] = randi_range(20, 50)
-		AIGuild.Strategy.AGGRESSIVE:
-			offer["equipment_bonus"] = randi_range(15, 40)
-		AIGuild.Strategy.BALANCED:
-			offer["equipment_bonus"] = randi_range(10, 25)
-		_:
-			offer["equipment_bonus"] = randi_range(5, 20)
-	
-	# Place garantie en raid pour les guildes agressives
-	offer["guaranteed_raid_spot"] = source_guild.ai_strategy in [AIGuild.Strategy.HARDCORE, AIGuild.Strategy.AGGRESSIVE]
-	
-	# Rôle de leadership pour les très bons joueurs
-	offer["leadership_role"] = member.skill > 85 and randf() < 0.3
-	
-	# Message personnalisé selon la stratégie
-	match source_guild.ai_strategy:
-		AIGuild.Strategy.HARDCORE:
-			offer["message"] = "Rejoignez l'élite et prouvez votre valeur !"
-		AIGuild.Strategy.AGGRESSIVE:
-			offer["message"] = "Nous offrons ce que votre guilde actuelle ne peut pas."
-		AIGuild.Strategy.BALANCED:
-			offer["message"] = "Venez progresser dans un environnement équilibré."
-		AIGuild.Strategy.DEFENSIVE:
-			offer["message"] = "Nous valorisons la stabilité et la loyauté."
-		AIGuild.Strategy.CASUAL:
-			offer["message"] = "Rejoignez une guilde détendue et amicale."
-	
-	return offer
-
-func _on_counter_offer_made(member, counter_offer: Dictionary):
-	"""Gère les contre-offres du joueur"""
-	print("Contre-offre envoyée pour %s: %s" % [member.nom, str(counter_offer)])
-	
-	# Appliquer immédiatement certains bénéfices pour montrer notre engagement
-	if counter_offer.get("equipment_bonus", 0) > 0:
-		# TODO: Avec le nouveau système, donner des objets spécifiques plutôt qu'un bonus général
-		# member.personnage_equipement += counter_offer.equipment_bonus
-		print("Équipement de %s amélioré de +%d" % [member.nom, counter_offer.equipment_bonus])
-	
-	if counter_offer.get("salary_increase", 0) > 0:
-		# Augmenter le moral pour représenter la prime
-		member.mood = min(100.0, member.mood + 10.0)
-		print("Prime de fidélité accordée à %s" % member.nom)
-
-func _on_member_released_to_poaching(member):
-	"""Gère le départ d'un membre suite à un débauchage"""
-	print("💔 %s quitte la guilde suite au débauchage" % member.nom)
-	
-	# Supprimer le membre de la guilde (départ non volontaire = débauchage)
-	remove_member(member, false)
-	
-	# Impact sur le moral des autres membres
-	for other_member in guild_members:
-		if other_member != member and not other_member.get_meta("is_player", false):
-			other_member.mood = max(0.0, other_member.mood - 5.0)
-			# Légère baisse d'intégration par peur d'être la prochaine cible
-			other_member.integration = max(0.0, other_member.integration - 3.0)
-	
-	print("Le moral de l'équipe a été affecté par le départ de %s" % member.nom)
-
-func _on_poaching_ignored():
-	"""Gère l'ignorance d'une tentative de débauchage"""
-	print("Tentative de débauchage ignorée")
-	# Les conséquences sont gérées dans le popup
+func _connect_to_ai_guild_manager() -> void:
+	"""Initialise le PoachingHandler qui gère les tentatives de débauchage"""
+	var handler_script = load("res://scripts/systems/poaching_handler.gd")
+	poaching_handler = Node.new()
+	poaching_handler.set_script(handler_script)
+	poaching_handler.name = "PoachingHandler"
+	add_child(poaching_handler)
+	print("GuildManager connecté au AIGuildManager")
 
 func _init_behavior_system():
 	"""Initialise le système de comportement dynamique"""

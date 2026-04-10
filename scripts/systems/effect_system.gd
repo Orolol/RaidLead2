@@ -14,7 +14,7 @@ signal effect_stack_changed(target, effect_instance: EffectInstanceResource, new
 
 func _ready():
 	# S'abonner aux signaux de GameTime pour mettre à jour les effets
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		game_time.hour_changed.connect(_on_hour_changed)
 

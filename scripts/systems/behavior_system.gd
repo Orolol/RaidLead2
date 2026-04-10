@@ -21,8 +21,8 @@ var last_cache_update: int = -1
 var player_scheduled_times: Dictionary = {}  # player -> {next_connection: int, next_disconnection: int}
 
 func _ready():
-	game_time = get_node("/root/GameTime")
-	guild_manager = get_node("/root/GuildManager")
+	game_time = GameTime
+	guild_manager = GuildManager
 	
 	# Le social_dynamics sera créé après
 	call_deferred("_init_social_dynamics")

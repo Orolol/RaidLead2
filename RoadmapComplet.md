@@ -1,15 +1,16 @@
 # Roadmap Complète - RaidLead
-*Document unifié - État au 15 août 2025*
+*Document unifié - État au 10 avril 2026*
 
 ## Vue d'ensemble du projet
 
-**RaidLead** est un jeu de gestion de guilde MMORPG développé avec **Godot Engine 4.4** et **GDScript**. Le joueur manage une guilde d'élite à travers 4 phases de progression : Leveling (0) → Serveur (1) → National (2) → Esport (3).
+**RaidLead** est un jeu de gestion de guilde MMORPG développé avec **Godot Engine 4.5** et **GDScript**. Le joueur manage une guilde d'élite à travers 4 phases de progression : Leveling (0) → Serveur (1) → National (2) → Esport (3).
 
 ### État actuel
 - ✅ **Phase active** : Phase 0 "Leveling" 
 - ✅ **Compilation** : Sans erreurs, jeu fonctionnel
 - ✅ **Systèmes core** : Tous implémentés et opérationnels
-- 🎯 **Progression** : ~45% du projet total terminé
+- ✅ **Refactoring majeur** : WindowManager, GuildManager, autoloads, save/load
+- 🎯 **Progression** : ~55% du projet total terminé
 
 ---
 
@@ -550,13 +551,16 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~50% terminé *(+15% avec Phase 2 Interactions)*
+- **Global** : ~55% terminé *(+5% refactoring architecture, save/load, tooling)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
 - **Milestone 2** : 100% ✅
 - **Infrastructure UI Phase 1** : 100% ✅ *(Phase 1 - Fondations)*
 - **Infrastructure UI Phase 2** : 100% ✅ *(Phase 2 - Interactions)*
+- **Refactoring Architecture** : 100% ✅ *(WindowManager, GuildManager, autoloads, positions)*
+- **Système Save/Load** : 100% ✅ *(SaveManager autoload, JSON, F5 manual save)*
+- **Tooling Claude Code** : 100% ✅ *(Godot 4.5, MCP Pro, LSP, godot-docs)*
 - **Infrastructure UI Phase 3** : 0% 📋 *(Phase 3 - Polish)*
 - **Milestone 3** : 0% 📋
 - **Milestone 4** : 0% 📋

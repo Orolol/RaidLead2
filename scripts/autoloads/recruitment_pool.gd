@@ -28,7 +28,7 @@ var competitor_guilds = [
 ]
 
 func _ready():
-	game_time = get_node("/root/GameTime")
+	game_time = GameTime
 	if game_time:
 		game_time.day_changed.connect(_on_day_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
@@ -61,7 +61,7 @@ func _get_current_pool_limits() -> Dictionary:
 		base_max = min(pool_size + 10, BASE_MAX_POOL_SIZE)
 	
 	# Ajouter le bonus de perks de guilde
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	if guild_manager and guild_manager.guild:
 		var bonus = guild_manager.guild.get_recruitment_pool_bonus()
 		base_min += bonus

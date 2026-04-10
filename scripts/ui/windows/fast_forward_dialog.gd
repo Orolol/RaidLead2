@@ -332,7 +332,7 @@ func _on_forced_rest_accepted():
 		var hours = int(hour_slider.value)
 		
 		# Calculer l'heure de retour
-		var game_time = get_node("/root/GameTime")
+		var game_time = GameTime
 		var return_hour = (game_time.current_hour + hours) % 24
 		
 		# Émettre le signal
@@ -390,7 +390,7 @@ func _on_confirmed():
 		var hours = int(hour_slider.value)
 		
 		# Calculer l'heure de retour
-		var game_time = get_node("/root/GameTime")
+		var game_time = GameTime
 		var return_hour = (game_time.current_hour + hours) % 24
 		
 		# Émettre le signal

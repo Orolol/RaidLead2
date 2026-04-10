@@ -11,9 +11,6 @@ const PlayerControlPanelScript = preload("res://scripts/ui/components/player_con
 var window_manager: Node
 var menu_bar: Control
 
-var fenetre_guilde: PanelContainer = null
-var fenetre_monde: PanelContainer = null
-var fenetre_organisation: PanelContainer = null
 var chat_panel: ChatPanel = null
 var event_popup: EventPopupWindow = null
 
@@ -33,9 +30,15 @@ func _ready():
 	_setup_debug_menu()
 	_connect_menu_signals()
 	_register_windows()
-	_connect_windows()
+	_connect_window_signals()
 	_connect_event_system()
 	_setup_player_systems()
+
+	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
+	get_tree().create_timer(0.2).timeout.connect(func():
+		if SaveManager.has_save():
+			SaveManager.load_game()
+	)
 	
 
 
@@ -50,23 +53,37 @@ func _setup_time_display():
 	var time_display_scene = load("res://scenes/TimeDisplay.tscn")
 	var time_display = time_display_scene.instantiate()
 	add_child(time_display)
-	time_display.position = Vector2(970, 10)  # Coin supérieur droit
+	# Ancrage top-center pour supporter toutes les résolutions
+	time_display.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	time_display.offset_left = -time_display.custom_minimum_size.x / 2
+	time_display.offset_top = 10
+	time_display.offset_right = time_display.custom_minimum_size.x / 2
+	time_display.offset_bottom = 10 + time_display.custom_minimum_size.y
 
 func _setup_chat_panel():
 	var chat_scene = load("res://scenes/ChatPanel.tscn")
 	chat_panel = chat_scene.instantiate()
 	add_child(chat_panel)
 	
-	# Positionner le chat en bas à droite
-	chat_panel.position = Vector2(1920 - 420, 1080 - 250)  # 20px de marge
+	# Ancrage bottom-right pour supporter toutes les résolutions
 	chat_panel.custom_minimum_size = Vector2(400, 230)
+	chat_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	chat_panel.offset_left = -420
+	chat_panel.offset_top = -250
+	chat_panel.offset_right = -20
+	chat_panel.offset_bottom = -20
 	chat_panel.z_index = 10  # Au-dessus du background mais sous les fenêtres
 
 func _setup_debug_menu():
 	# Créer un conteneur pour le menu debug
 	var debug_container = PanelContainer.new()
-	debug_container.position = Vector2(10, 80)
 	debug_container.custom_minimum_size = Vector2(150, 30)
+	# Ancrage top-left pour supporter toutes les résolutions
+	debug_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	debug_container.offset_left = 10
+	debug_container.offset_top = 80
+	debug_container.offset_right = 10 + 150
+	debug_container.offset_bottom = 80 + 30
 	
 	var menu_button = MenuButton.new()
 	menu_button.text = "Debug"
@@ -126,49 +143,45 @@ func _register_windows():
 	window_manager.register_window("monde", "res://scenes/Fenetre_Monde.tscn")
 	window_manager.register_window("organisation", "res://scenes/Fenetre_OrganisationGroupe.tscn")
 
-func _connect_windows():
-	await get_tree().process_frame
-	
-	var guilde_scene = load("res://scenes/Fenetre_Guilde.tscn")
-	fenetre_guilde = guilde_scene.instantiate()
-	window_manager.add_child(fenetre_guilde)
-	fenetre_guilde.hide()
-	window_manager.windows["guilde"]["instance"] = fenetre_guilde
-	
-	var monde_scene = load("res://scenes/Fenetre_Monde.tscn")
-	fenetre_monde = monde_scene.instantiate()
-	window_manager.add_child(fenetre_monde)
-	fenetre_monde.hide()
-	window_manager.windows["monde"]["instance"] = fenetre_monde
-	
-	var organisation_scene = load("res://scenes/Fenetre_OrganisationGroupe.tscn")
-	fenetre_organisation = organisation_scene.instantiate()
-	window_manager.add_child(fenetre_organisation)
-	fenetre_organisation.hide()
-	window_manager.windows["organisation"]["instance"] = fenetre_organisation
-	
-	fenetre_monde.player_recruited.connect(_on_player_recruited)
-	
-	# Utilise le GuildManager pour initialiser les membres
-	var guild_manager = get_node("/root/GuildManager")
-	if guild_manager:
-		fenetre_organisation.set_guild_members(guild_manager.guild_members)
-	
-	# Afficher la fenêtre Personnage par défaut au démarrage
-	window_manager.show_window("personnage")
+func _connect_window_signals():
+	# Écouter l'ouverture des fenêtres pour connecter leurs signaux
+	window_manager.window_opened.connect(_on_window_opened)
 
-func _on_player_recruited(player: SimulatedPlayer):
-	# Utilise le GuildManager pour ajouter le membre
-	var guild_manager = get_node("/root/GuildManager")
-	if guild_manager:
-		guild_manager.add_member(player)
-		# Actualise les fenêtres
-		fenetre_guilde._refresh_member_list()
-		fenetre_organisation.set_guild_members(guild_manager.guild_members)
+	# Ouvrir la fenêtre Personnage par défaut après que le tree soit stabilisé
+	get_tree().create_timer(0.1).timeout.connect(func():
+		window_manager.show_window("personnage")
+	)
+
+func _on_window_opened(window_name: String) -> void:
+	# Connecter les signaux spécifiques quand une fenêtre est ouverte
+	var instance: Control = window_manager._get_existing_instance(window_name)
+	if not instance:
+		return
+
+	match window_name:
+		"monde":
+			if not instance.player_recruited.is_connected(_on_player_recruited):
+				instance.player_recruited.connect(_on_player_recruited)
+		"organisation":
+			var guild_manager_node: Node = GuildManager
+			if guild_manager_node:
+				instance.set_guild_members(guild_manager_node.guild_members)
+
+func _on_player_recruited(player: SimulatedPlayer) -> void:
+	var guild_manager_node: Node = GuildManager
+	if guild_manager_node:
+		guild_manager_node.add_member(player)
+		# Rafraîchir les fenêtres ouvertes via leurs instances dans le WindowManager
+		var guilde_inst: Control = window_manager._get_existing_instance("guilde")
+		if guilde_inst:
+			guilde_inst._refresh_member_list()
+		var org_inst: Control = window_manager._get_existing_instance("organisation")
+		if org_inst:
+			org_inst.set_guild_members(guild_manager_node.guild_members)
 
 func _on_debug_menu_pressed(id: int):
 	print("Debug menu pressed - Option ID: %d" % id)
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager:
 		print("ERREUR: GuildManager non trouvé")
 		return
@@ -208,7 +221,7 @@ func _on_debug_menu_pressed(id: int):
 			print("Debug: +10 équipement à tous les membres")
 			
 		6: # Forcer mise à jour serveur
-			var server_version = get_node("/root/ServerVersion")
+			var server_version = ServerVersion
 			if server_version:
 				server_version._check_version_update()
 				print("Debug: Vérification de mise à jour serveur forcée")
@@ -219,13 +232,13 @@ func _on_debug_menu_pressed(id: int):
 				print("Debug: Simulation de donjon complété (+100 XP)")
 		
 		8: # Déclencher événement test
-			var event_manager = get_node("/root/EventManager")
+			var event_manager = EventManager
 			if event_manager:
 				event_manager.force_event("member_dispute")
 				print("Debug: Événement 'dispute entre membres' forcé")
 		
 		9: # Afficher stats événements
-			var event_manager = get_node("/root/EventManager")
+			var event_manager = EventManager
 			if event_manager:
 				var stats = event_manager.get_event_stats()
 				print("=== STATS ÉVÉNEMENTS ===")
@@ -236,43 +249,44 @@ func _on_debug_menu_pressed(id: int):
 				print("========================")
 				
 		10: # Test notification INFO
-			var notification_manager = get_node("/root/NotificationManager")
+			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_info("Ceci est un test de notification info", "Test Info")
 				print("Debug: Test notification INFO")
 				
 		11: # Test notification SUCCESS
-			var notification_manager = get_node("/root/NotificationManager")
+			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_success("Ceci est un test de notification succès", "Test Success")
 				print("Debug: Test notification SUCCESS")
 				
 		12: # Test notification WARNING
-			var notification_manager = get_node("/root/NotificationManager")
+			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_warning("Ceci est un test de notification avertissement", "Test Warning")
 				print("Debug: Test notification WARNING")
 				
 		13: # Test notification ERROR
-			var notification_manager = get_node("/root/NotificationManager")
+			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_error("Ceci est un test de notification erreur", "Test Error")
 				print("Debug: Test notification ERROR")
 				
 		14: # Test notification ACHIEVEMENT
-			var notification_manager = get_node("/root/NotificationManager")
+			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_achievement("Ceci est un test de notification achievement", "Test Achievement")
 				print("Debug: Test notification ACHIEVEMENT")
 	
-	# Rafraîchir les fenêtres si elles sont ouvertes
-	if fenetre_guilde and fenetre_guilde.visible:
-		fenetre_guilde._refresh_member_list()
-		fenetre_guilde._update_guild_info()
+	# Rafraîchir la fenêtre guilde si elle est ouverte
+	var guilde_inst: Control = window_manager._get_existing_instance("guilde")
+	if guilde_inst and guilde_inst.visible:
+		guilde_inst._refresh_member_list()
+		guilde_inst._update_guild_info()
 
 func _process(delta: float) -> void:
 	# Mettre à jour les donjons actifs via l'ActivityManager
-	var activity_manager = get_node("/root/ActivityManager")
+	var activity_manager = ActivityManager
 	if activity_manager:
 		activity_manager.update_dungeons(delta)
 
@@ -293,7 +307,7 @@ func _input(event: InputEvent) -> void:
 				if Input.is_key_pressed(KEY_CTRL):
 					menu_bar._on_organisation_groupe_pressed()
 			KEY_SPACE:  # Espace pour pause
-				var game_time_node = get_node("/root/GameTime")
+				var game_time_node = GameTime
 				if game_time_node:
 					game_time_node.toggle_pause()
 			KEY_ESCAPE:  # Échap pour fermer la fenêtre active
@@ -304,10 +318,12 @@ func _input(event: InputEvent) -> void:
 			KEY_F2:  # F2 pour afficher les stats
 				print("F2 pressed - Affichage des stats")
 				_on_debug_menu_pressed(9)  # ID 9 = Afficher stats événements
+			KEY_F5:  # F5 pour sauvegarder
+				SaveManager.save_game()
 
 func _connect_event_system():
 	print("Main: Connexion du système d'événements")
-	var event_manager = get_node("/root/EventManager")
+	var event_manager = EventManager
 	if event_manager:
 		event_manager.event_triggered.connect(_on_event_triggered)
 		print("Main: Signal event_triggered connecté")
@@ -341,7 +357,7 @@ func show_event_popup(event: RandomEventResource):
 	event_popup.show_event(event)
 
 func _on_event_choice_selected(choice: EventChoiceResource):
-	var event_manager = get_node("/root/EventManager")
+	var event_manager = EventManager
 	if event_manager and event_manager.pending_event:
 		event_manager.resolve_event(event_manager.pending_event, choice)
 	
@@ -356,7 +372,7 @@ func _setup_player_systems():
 	await get_tree().process_frame
 	await get_tree().process_frame
 	
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager:
 		print("ERREUR: GuildManager non trouvé pour _setup_player_systems")
 		return
@@ -376,14 +392,17 @@ func _setup_player_control_panel():
 	player_control_panel = control_panel_scene.instantiate()
 	add_child(player_control_panel)
 	
-	# Positionner en haut à gauche
-	player_control_panel.position = Vector2(20, 20)
+	# Ancrage top-left pour supporter toutes les résolutions
+	player_control_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	player_control_panel.offset_left = 20
+	player_control_panel.offset_top = 20
+	player_control_panel.offset_right = 20 + player_control_panel.custom_minimum_size.x
+	player_control_panel.offset_bottom = 20 + player_control_panel.custom_minimum_size.y
 	player_control_panel.z_index = 15  # Au-dessus des autres éléments
-	
+
 	# Configurer avec le personnage du joueur
-	var guild_manager = get_node("/root/GuildManager")
-	if guild_manager and guild_manager.get_player_character():
-		player_control_panel.set_player_character(guild_manager.get_player_character())
+	if GuildManager and GuildManager.get_player_character():
+		player_control_panel.set_player_character(GuildManager.get_player_character())
 
 # func _setup_fast_forward_manager():  # Supprimé - système simplifié
 
@@ -394,7 +413,7 @@ func _connect_player_systems():
 		player_control_panel.activity_changed.connect(_on_player_activity_changed)
 	
 	# Connecter le signal de déconnexion forcée du joueur
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	if guild_manager and guild_manager.get_player_character():
 		player_character = guild_manager.get_player_character()
 		player_character.forced_disconnect_requested.connect(_on_player_forced_disconnect)
@@ -439,7 +458,7 @@ func execute_forced_rest():
 	print("Jeu repris pour le fast-forward")
 	
 	# 5. Fast-forward direct sans FastForwardManager
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		game_time.set_time_speed(2400.0)  # Vitesse maximum
 		print("Vitesse mise au maximum (2400x)")

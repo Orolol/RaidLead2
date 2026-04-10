@@ -172,7 +172,7 @@ func _process(delta: float) -> void:
 
 func _update_display() -> void:
 	# Mettre à jour le temps
-	var game_time = get_node("/root/GameTime") if has_node("/root/GameTime") else null
+	var game_time = GameTime
 	var elapsed = current_instance.get_elapsed_time(game_time)
 	var minutes = int(elapsed) / 60
 	var seconds = int(elapsed) % 60

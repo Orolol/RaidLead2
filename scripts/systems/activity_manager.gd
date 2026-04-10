@@ -25,7 +25,7 @@ var leveling_zones = {
 }
 
 func _ready():
-	game_time = get_node("/root/GameTime")
+	game_time = GameTime
 	if game_time:
 		# Se connecter au signal minute_changed pour une mise à jour plus granulaire
 		game_time.minute_changed.connect(_on_minute_changed)
@@ -199,7 +199,7 @@ func _decide_next_activity(player):
 					if player.personnage_niveau >= 60:
 						weight *= 0.1
 				"FARMING":
-					var guild_manager = get_node("/root/GuildManager")
+					var guild_manager = GuildManager
 					if not guild_manager or not guild_manager.guild.has_farming():
 						weight = 0
 				"DUNGEON", "RAID":

@@ -70,8 +70,7 @@ func _setup_notification_container():
 	notification_container.z_index = 1000  # Au-dessus de tout
 	
 	# Ajouter au tree root pour être toujours visible
-	get_tree().root.add_child(notification_container)
-	get_tree().root.move_child(notification_container, -1)  # En dernier = au-dessus
+	get_tree().root.add_child.call_deferred(notification_container)
 
 func _connect_to_game_events():
 	"""Connecte aux événements du jeu pour afficher automatiquement des notifications"""

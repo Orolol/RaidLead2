@@ -7,9 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 RaidLead is a guild management simulation game built with Godot Engine. Players manage a high-level guild in a fictional MMORPG world, inspired by sports management games like Football Manager.
 
 **Key Technologies:**
-- Engine: Godot Engine (4.x expected)
-- Primary Language: GDScript
+- Engine: Godot Engine 4.5 (stable)
+- Primary Language: GDScript (static typing systématique)
+- Renderer: Compatibility / OpenGL3 (obligatoire en WSL2)
 - Platform: PC (Steam distribution planned)
+- Dev Environment: WSL2 / Ubuntu
 - Documentation Language: French (GameIdea.md, Implementation.md)
 
 ## Project Structure
@@ -25,26 +27,64 @@ RaidLead is a guild management simulation game built with Godot Engine. Players 
 
 ### Running the Game
 ```bash
-# In Godot Editor:
-# F5 - Run project
-# F6 - Run current scene
-# Ctrl+S - Save scenes/scripts
+# IMPORTANT: Toujours utiliser --rendering-driver opengl3 en WSL2
+# Lancer l'éditeur
+godot --rendering-driver opengl3 --path . -e
 
-# Command line (if Godot is in PATH):
-godot                    # Open editor
-godot --headless         # Run without window
+# Lancer le jeu
+godot --rendering-driver opengl3 --path .
+
+# Lancer une scène spécifique
+godot --rendering-driver opengl3 --path . --scene res://scenes/Main.tscn
+
+# Valider la syntaxe sans lancer
+godot --rendering-driver opengl3 --path . --check-only --headless
+
+# E2E silencieux (pas de fenêtre visible)
+xvfb-run --auto-servernum godot --rendering-driver opengl3 --path . -s res://tests/e2e_main.gd
 ```
 
 ### Building/Exporting
 ```bash
 # Through Godot Editor: Project → Export
 # Command line:
-godot --export "Windows Desktop" build/game.exe
-godot --export "Linux/X11" build/game.x86_64
+godot --rendering-driver opengl3 --export "Windows Desktop" build/game.exe
+godot --rendering-driver opengl3 --export "Linux/X11" build/game.x86_64
 ```
 
 ### Testing
 No test framework is currently set up. When implementing tests, consider using GUT (Godot Unit Test) framework.
+
+## MCP Servers & Tooling
+
+Ce projet utilise plusieurs MCP servers pour le workflow agentique :
+
+- **godot-mcp-pro** : Contrôle de l'éditeur Godot (167 outils) — manipulation de scènes/nodes/scripts, exécution du jeu, screenshots, input simulation, runtime inspection. **À privilégier pour toute action sur le projet Godot.**
+- **godot-docs** : Documentation API Godot à jour. **À utiliser systématiquement avant d'écrire du code utilisant une classe ou méthode Godot inconnue, pour éviter les hallucinations.**
+- **LSP GDScript** : Plugin `claude-code-gdscript` pour diagnostics temps réel, go-to-definition, completions, hover sur fichiers `.gd`.
+
+### Workflow recommandé pour toute tâche de code
+1. Lire ce CLAUDE.md pour le contexte.
+2. Si tâche sur une classe Godot non familière : interroger `godot-docs` d'abord.
+3. Lire les fichiers concernés du projet.
+4. Écrire le code en respectant les conventions.
+5. Valider via LSP (diagnostics) et `--check-only`.
+6. Si changement visuel : lancer le jeu via le MCP, prendre un screenshot, vérifier.
+
+## Rendu WSL2 — piège critique
+
+Ce projet tourne en WSL2. Le driver Vulkan `dzn` de Mesa n'est PAS conforme et provoque des crashes.
+- **Toujours** lancer Godot avec `--rendering-driver opengl3`.
+- **Jamais** utiliser `--headless` si tu veux des screenshots — utiliser `xvfb-run` à la place.
+- Variable d'environnement requise : `GALLIUM_DRIVER=d3d12`.
+
+## Interdictions strictes
+
+1. **Ne jamais lancer Godot sans `--rendering-driver opengl3`** dans ce projet (WSL2).
+2. **Ne jamais utiliser de variables non typées.** GDScript 4 est typé, utilise-le.
+3. **Ne jamais utiliser de pattern Godot 3.x.** (`yield`, `tool`, connexions par string, etc.)
+4. **Ne jamais utiliser `get_node("../../../Other")`.** Utiliser des signaux ou un autoload.
+5. **`_ready()` n'est pas rappelé lors d'un hot reload** — le code change, l'état persiste.
 
 ## Architecture Overview
 
@@ -113,7 +153,7 @@ Simulated players have:
 
 1. The project has core systems implemented - UI, time, NPCs, activities, dungeons, recruitment
 2. Documentation (GameIdea.md, Implementation.md) is in French
-3. Godot 4.4 is being used with GDScript
+3. Godot 4.5 is being used with GDScript (static typing)
 4. Follow Godot's scene-based architecture patterns
 5. Use GDScript naming conventions (snake_case for variables/functions, PascalCase for classes)
 

@@ -40,13 +40,13 @@ func _load_events():
 	print("Événements chargés: %d" % event_pool.size())
 
 func _connect_time_signals():
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		game_time.hour_changed.connect(_on_hour_changed)
 		game_time.day_changed.connect(_on_day_changed)
 
 func _initialize_system():
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		last_check = game_time.get_current_timestamp()
 		last_day_count = game_time.current_day
@@ -66,7 +66,7 @@ func _check_for_events():
 		print("EventManager: Événement en attente, pas de nouveau tirage")
 		return
 	
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if not game_time:
 		return
 	
@@ -152,7 +152,7 @@ func _is_event_eligible(event: RandomEventResource, game_state: Dictionary) -> b
 	
 	# Vérifier le cooldown
 	if event.cooldown > 0:
-		var game_time = get_node("/root/GameTime")
+		var game_time = GameTime
 		var time_since_last = (game_time.get_current_timestamp() - history.last_triggered) / 3600.0
 		if time_since_last < event.cooldown:
 			return false
@@ -172,7 +172,7 @@ func _calculate_event_weight(event: RandomEventResource) -> float:
 	var history = event_history.get(event.id, {"last_triggered": 0.0, "occurrence_count": 0})
 	
 	# Réduire le poids des événements récemment déclenchés
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	var time_since_last = (game_time.get_current_timestamp() - history.last_triggered) / 3600.0
 	
 	if time_since_last < 24.0:  # Moins de 24h
@@ -191,7 +191,7 @@ func _trigger_event(event: RandomEventResource):
 	print("EventManager: ID de l'événement: %s" % event.id)
 	
 	# Mettre à jour l'historique
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	event_history[event.id] = {
 		"last_triggered": game_time.get_current_timestamp(),
 		"occurrence_count": event_history.get(event.id, {"occurrence_count": 0}).occurrence_count + 1
@@ -267,8 +267,8 @@ func _trigger_follow_up_event(event: RandomEventResource, timer: Timer):
 	_trigger_event(event)
 
 func _apply_consequences(consequences: Dictionary):
-	var guild_manager = get_node("/root/GuildManager")
-	var effect_system = get_node("/root/EffectSystem")
+	var guild_manager = GuildManager
+	var effect_system = EffectSystem
 	
 	if not guild_manager:
 		print("EventManager: GuildManager non trouvé")
@@ -328,8 +328,8 @@ func _find_event_by_id(event_id: String):
 	return null
 
 func _get_game_state() -> Dictionary:
-	var guild_manager = get_node("/root/GuildManager")
-	var game_time = get_node("/root/GameTime")
+	var guild_manager = GuildManager
+	var game_time = GameTime
 	
 	var state = {}
 	

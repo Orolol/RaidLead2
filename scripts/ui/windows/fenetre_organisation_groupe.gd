@@ -439,7 +439,7 @@ func _launch_fun_activity():
 		return
 	
 	# Lance l'activité fun via l'ActivityManager
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	if guild_manager and guild_manager.activity_manager:
 		for member in participants:
 			guild_manager.activity_manager.start_activity(
@@ -468,7 +468,7 @@ func _launch_dungeon_or_raid():
 		group.append(slot.member)
 	
 	# Utiliser le nouveau système de donjons via l'ActivityManager
-	var activity_manager = get_node("/root/ActivityManager")
+	var activity_manager = ActivityManager
 	if activity_manager:
 		var dungeon_instance = activity_manager.start_dungeon(selected_instance, group)
 		if dungeon_instance:

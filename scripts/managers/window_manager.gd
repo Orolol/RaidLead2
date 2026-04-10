@@ -100,14 +100,13 @@ func open_window(window_name: String, force_new: bool = false) -> Control:
 	if not windows.has(window_name):
 		push_error("Window not registered: " + window_name)
 		return null
-	
+
 	var window_config = windows[window_name]
-	
+
 	# Vérifier si on peut ouvrir une nouvelle instance
 	if not window_config.allow_multiple and not force_new:
 		var existing_instance = _get_existing_instance(window_name)
 		if existing_instance:
-			# Amener la fenêtre existante au premier plan
 			bring_to_front(window_name)
 			return existing_instance
 	
@@ -123,9 +122,12 @@ func open_window(window_name: String, force_new: bool = false) -> Control:
 	# Configurer l'instance
 	_setup_window_instance(instance, window_name, instance_id, window_config)
 	
-	# Ajouter au tree
-	get_parent().add_child(instance)
-	
+	# Ajouter au tree (enfant du WindowManager, pas du parent)
+	add_child(instance)
+
+	# Appliquer le layout (position/taille) après que la fenêtre soit dans le tree
+	_apply_window_layout.call_deferred(instance, window_name, window_config)
+
 	# Enregistrer l'instance
 	if not open_windows.has(window_name):
 		open_windows[window_name] = []
@@ -138,16 +140,12 @@ func open_window(window_name: String, force_new: bool = false) -> Control:
 	
 	# Mettre à jour le z-order
 	_add_to_z_order(window_name, instance_id)
-	
-	# Animation d'ouverture
-	if use_animations:
-		_animate_window_open(instance)
-	
+
 	# Mettre comme fenêtre active
 	active_window = window_name
-	
-	# Émettre le signal
-	window_opened.emit(window_name)
+
+	# Émettre le signal (deferred car l'instance n'est pas encore dans le tree)
+	window_opened.emit.call_deferred(window_name)
 	window_focused.emit(window_name)
 	
 	return instance
@@ -438,27 +436,46 @@ func close_all_instances(window_name: String):
 
 func _setup_window_instance(instance: Control, window_name: String, instance_id: String, config: Dictionary):
 	"""Configure une instance de fenêtre"""
-	# Position et taille
-	if config.default_position != Vector2(-1, -1):
-		instance.position = config.default_position
-	else:
-		_center_window(instance)
-	
-	if config.default_size != Vector2.ZERO:
-		instance.size = config.default_size
-	
-	# Restaurer position sauvegardée si disponible
-	if window_positions.has(window_name):
-		var saved = window_positions[window_name]
-		instance.position = saved.position
-		instance.size = saved.size
-	
 	# Z-index
 	instance.z_index = max_z_index
 	max_z_index += 1
-	
+
 	# Connecter les signaux si la fenêtre les supporte
 	_connect_window_signals(instance, window_name, instance_id)
+
+func _apply_window_layout(instance: Control, window_name: String, config: Dictionary) -> void:
+	"""Applique position/taille après que la fenêtre soit dans le tree et _ready() terminé.
+	Appelé via call_deferred depuis open_window pour garantir que les anchors des fenêtres
+	sont déjà appliqués et qu'on peut les override."""
+	# Forcer le layout en position absolue (pas d'anchors)
+	instance.anchor_left = 0
+	instance.anchor_top = 0
+	instance.anchor_right = 0
+	instance.anchor_bottom = 0
+	instance.offset_left = 0
+	instance.offset_top = 0
+	instance.offset_right = 0
+	instance.offset_bottom = 0
+
+	# Taille
+	if config.default_size != Vector2.ZERO:
+		instance.size = config.default_size
+
+	# Position
+	if window_positions.has(window_name):
+		var saved: Dictionary = window_positions[window_name]
+		instance.position = saved.get("position", Vector2.ZERO)
+		instance.size = saved.get("size", config.default_size)
+	elif config.default_position != Vector2(-1, -1):
+		instance.position = config.default_position
+	else:
+		_center_window(instance)
+
+	# S'assurer que la fenêtre est visible et déclencher l'animation
+	instance.visible = true
+	instance.show()
+	if use_animations:
+		_animate_window_open(instance)
 
 func _connect_window_signals(instance: Control, window_name: String, instance_id: String):
 	"""Connecte les signaux d'une fenêtre"""

@@ -224,16 +224,16 @@ func _on_dungeon_completed(total_time: float, gold_reward: int):
 	add_message(msg, "dungeon")
 	
 	# Notification toast pour succès de donjon
-	if has_node("/root/NotificationManager"):
-		var notification_manager = get_node("/root/NotificationManager")
+	if NotificationManager != null:
+		var notification_manager = NotificationManager
 		notification_manager.show_success("Donjon complété avec succès !", "Victoire")
 
 func _on_loot_distributed(member, item):
 	add_loot_notification(member.nom, item)
 	
 	# Notification toast pour loot rare/épique
-	if item.rarity >= item.Rarity.RARE and has_node("/root/NotificationManager"):
-		var notification_manager = get_node("/root/NotificationManager")
+	if item.rarity >= item.Rarity.RARE and NotificationManager != null:
+		var notification_manager = NotificationManager
 		var message = "%s a obtenu %s" % [member.nom, item.name]
 		notification_manager.show_success(message, "Loot Rare")
 

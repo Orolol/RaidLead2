@@ -22,9 +22,9 @@ func _ready():
 	custom_minimum_size = Vector2(900, 600)
 	
 	# Récupère les références aux autoloads
-	recruitment_pool = get_node("/root/RecruitmentPool")
-	guild_manager = get_node("/root/GuildManager")
-	guild_ranking = get_node("/root/GuildRanking")
+	recruitment_pool = RecruitmentPool
+	guild_manager = GuildManager
+	guild_ranking = GuildRanking
 	
 	var vbox = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 10)

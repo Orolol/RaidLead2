@@ -216,8 +216,8 @@ func unlock_next_phase() -> bool:
 	phase_changed.emit(current_phase, old_phase)
 	
 	# Notification via NotificationManager
-	if has_node("/root/NotificationManager"):
-		var notification_manager = get_node("/root/NotificationManager")
+	if NotificationManager != null:
+		var notification_manager = NotificationManager
 		var message = "Passage de %s à %s !" % [get_phase_name(old_phase), get_phase_name(current_phase)]
 		notification_manager.show_achievement(message, "Nouvelle Phase")
 	
@@ -266,8 +266,8 @@ func complete_heroic_dungeon(dungeon_name: String = ""):
 	add_achievement(achievement_name, description)
 	
 	# Notification via NotificationManager
-	if has_node("/root/NotificationManager"):
-		var notification_manager = get_node("/root/NotificationManager")
+	if NotificationManager != null:
+		var notification_manager = NotificationManager
 		if heroic_dungeons_completed == 1:
 			notification_manager.show_success("Premier donjon héroïque terminé !", "Achievement")
 		else:

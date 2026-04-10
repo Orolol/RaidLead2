@@ -43,7 +43,7 @@ func _ready():
 	_setup_content(vbox)
 	_setup_context_menu()
 	
-	guild_manager = get_node("/root/GuildManager")
+	guild_manager = GuildManager
 	if guild_manager:
 		guild_manager.member_activity_changed.connect(_on_member_activity_changed)
 		guild_manager.member_connected.connect(_on_member_status_changed)

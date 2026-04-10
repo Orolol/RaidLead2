@@ -43,7 +43,7 @@ class Clique:
 	var preferred_activities: Array = []
 
 func _ready():
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		game_time.day_changed.connect(_on_day_changed)
 		game_time.week_changed.connect(_on_week_changed)
@@ -375,7 +375,7 @@ func _get_relations_of_type(player, type: int) -> Array:
 
 func _get_player_by_id(id: int):
 	"""Retrouve un joueur par son ID"""
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	if guild_manager:
 		for member in guild_manager.guild_members:
 			if member.get_instance_id() == id:
@@ -384,7 +384,7 @@ func _get_player_by_id(id: int):
 
 func _get_current_day() -> int:
 	"""Obtient le jour actuel du jeu"""
-	var game_time = get_node("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		return game_time.current_day
 	return 0
@@ -443,7 +443,7 @@ func _check_clique_cohesion():
 
 func _evaluate_clique_formations():
 	"""Évalue si de nouvelles cliques peuvent se former"""
-	var guild_manager = get_node("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager:
 		return
 	

@@ -13,8 +13,8 @@ var server_version: Node
 
 func _ready():
 	# On récupérera l'instance de GameTime depuis l'autoload
-	game_time = get_node("/root/GameTime") if has_node("/root/GameTime") else null
-	server_version = get_node("/root/ServerVersion") if has_node("/root/ServerVersion") else null
+	game_time = GameTime
+	server_version = ServerVersion
 	
 	if game_time:
 		# Connecte les signaux
