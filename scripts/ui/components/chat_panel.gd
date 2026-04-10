@@ -1,0 +1,273 @@
+extends PanelContainer
+class_name ChatPanel
+
+@onready var chat_display: RichTextLabel = $VBoxContainer/ScrollContainer/ChatDisplay
+@onready var scroll_container: ScrollContainer = $VBoxContainer/ScrollContainer
+
+const MAX_MESSAGES = 100
+const MESSAGE_COLORS = {
+	"info": Color(0.8, 0.8, 0.8),      # Gris clair
+	"connect": Color(0.4, 1.0, 0.4),    # Vert
+	"disconnect": Color(1.0, 0.4, 0.4), # Rouge
+	"levelup": Color(1.0, 1.0, 0.4),    # Jaune
+	"activity": Color(0.4, 0.8, 1.0),   # Bleu clair
+	"dungeon": Color(1.0, 0.6, 0.2),    # Orange
+	"loot": Color(0.8, 0.4, 1.0),       # Violet
+	"warning": Color(1.0, 0.8, 0.3),    # Jaune orangé
+	"error": Color(1.0, 0.3, 0.3)       # Rouge vif
+}
+
+var messages: Array = []
+var auto_scroll: bool = true
+
+func _ready():
+	custom_minimum_size = Vector2(400, 200)
+	
+	# Créer la structure si elle n'existe pas dans la scène
+	if not has_node("VBoxContainer"):
+		_create_ui_structure()
+	
+	# S'assurer que le RichTextLabel est configuré correctement
+	if chat_display:
+		chat_display.bbcode_enabled = true
+		chat_display.scroll_following = true
+		chat_display.selection_enabled = true
+		
+	# Ajouter un message de bienvenue
+	add_message("Bienvenue dans RaidLead!", "info")
+	add_message("Le chat de guilde est maintenant actif.", "info")
+	
+	# Connecter aux signaux des autoloads
+	_connect_to_guild_events()
+	_connect_to_activity_events()
+
+func _create_ui_structure():
+	var vbox = VBoxContainer.new()
+	vbox.name = "VBoxContainer"
+	add_child(vbox)
+	
+	# Titre
+	var title = Label.new()
+	title.text = "Chat de Guilde"
+	title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(title)
+	
+	# Séparateur
+	var sep = HSeparator.new()
+	vbox.add_child(sep)
+	
+	# ScrollContainer
+	var scroll = ScrollContainer.new()
+	scroll.name = "ScrollContainer"
+	scroll.custom_minimum_size = Vector2(0, 150)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+	
+	# RichTextLabel pour l'affichage
+	var display = RichTextLabel.new()
+	display.name = "ChatDisplay"
+	display.bbcode_enabled = true
+	display.scroll_following = true
+	display.selection_enabled = true
+	display.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	display.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(display)
+	
+	# Mettre à jour les références
+	chat_display = display
+	scroll_container = scroll
+
+func _connect_to_guild_events():
+	var guild_manager = get_node_or_null("/root/GuildManager")
+	if guild_manager:
+		# Connexions/Déconnexions
+		if not guild_manager.member_connected.is_connected(_on_member_connected):
+			guild_manager.member_connected.connect(_on_member_connected)
+		if not guild_manager.member_disconnected.is_connected(_on_member_disconnected):
+			guild_manager.member_disconnected.connect(_on_member_disconnected)
+		
+		# Level up
+		if not guild_manager.member_leveled_up.is_connected(_on_member_leveled_up):
+			guild_manager.member_leveled_up.connect(_on_member_leveled_up)
+		
+		# Nouveau membre
+		if not guild_manager.member_recruited.is_connected(_on_member_recruited):
+			guild_manager.member_recruited.connect(_on_member_recruited)
+
+func _connect_to_activity_events():
+	var activity_manager = get_node_or_null("/root/ActivityManager")
+	if activity_manager:
+		# Activités
+		if not activity_manager.activity_started.is_connected(_on_activity_started):
+			activity_manager.activity_started.connect(_on_activity_started)
+		if not activity_manager.activity_completed.is_connected(_on_activity_completed):
+			activity_manager.activity_completed.connect(_on_activity_completed)
+		
+		# Donjons
+		if not activity_manager.dungeon_started.is_connected(_on_dungeon_started):
+			activity_manager.dungeon_started.connect(_on_dungeon_started)
+		if not activity_manager.dungeon_ended.is_connected(_on_dungeon_ended):
+			activity_manager.dungeon_ended.connect(_on_dungeon_ended)
+
+func add_message(text: String, type: String = "info", timestamp: bool = true):
+	# Créer le message avec timestamp si demandé
+	var message = ""
+	if timestamp:
+		var game_time = get_node_or_null("/root/GameTime")
+		if game_time:
+			message = "[color=#666666][%s][/color] " % game_time.get_current_time_string()
+		else:
+			var time = Time.get_time_dict_from_system()
+			message = "[color=#666666][%02d:%02d][/color] " % [time.hour, time.minute]
+	
+	# Ajouter la couleur selon le type
+	var color = MESSAGE_COLORS.get(type, MESSAGE_COLORS["info"])
+	var color_hex = "#%02x%02x%02x" % [int(color.r * 255), int(color.g * 255), int(color.b * 255)]
+	message += "[color=%s]%s[/color]" % [color_hex, text]
+	
+	# Ajouter le message à la liste
+	messages.append(message)
+	
+	# Limiter le nombre de messages
+	if messages.size() > MAX_MESSAGES:
+		messages.pop_front()
+	
+	# Mettre à jour l'affichage
+	_update_display()
+
+func _update_display():
+	if not chat_display:
+		return
+		
+	chat_display.clear()
+	for msg in messages:
+		chat_display.append_text(msg + "\n")
+	
+	# Auto-scroll vers le bas si activé
+	if auto_scroll:
+		await get_tree().process_frame
+		scroll_container.scroll_vertical = scroll_container.get_v_scroll_bar().max_value
+
+func clear_chat():
+	messages.clear()
+	if chat_display:
+		chat_display.clear()
+
+# Handlers pour les événements de guilde
+func _on_member_connected(member: SimulatedPlayer):
+	var msg = "%s s'est connecté(e)" % member.nom
+	add_message(msg, "connect")
+
+func _on_member_disconnected(member: SimulatedPlayer):
+	var msg = "%s s'est déconnecté(e)" % member.nom
+	add_message(msg, "disconnect")
+
+func _on_member_leveled_up(member: SimulatedPlayer, new_level: int):
+	var msg = "%s a atteint le niveau %d !" % [member.nom, new_level]
+	add_message(msg, "levelup")
+
+func _on_member_recruited(member: SimulatedPlayer):
+	var msg = "%s a rejoint la guilde ! Bienvenue !" % member.nom
+	add_message(msg, "connect")
+
+# Handlers pour les événements d'activité
+func _on_activity_started(player: SimulatedPlayer, activity):
+	if activity.type == activity.ActivityType.LEVELING:
+		var zone = activity.location if activity.location != "" else "une zone de leveling"
+		var msg = "%s part leveler dans %s" % [player.nom, zone]
+		add_message(msg, "activity")
+	elif activity.type == activity.ActivityType.FARMING:
+		var location = activity.location if activity.location != "" else "des ressources"
+		var msg = "%s commence à farmer %s" % [player.nom, location]
+		add_message(msg, "activity")
+
+func _on_activity_completed(player: SimulatedPlayer, activity):
+	# Message de fin d'activité si pertinent
+	pass
+
+func _on_dungeon_started(dungeon_instance):
+	var dungeon_name = dungeon_instance.dungeon_data.get("name", "Donjon")
+	var members_names = []
+	for member in dungeon_instance.group_members:
+		members_names.append(member.nom)
+	var msg = "Groupe formé pour %s : %s" % [dungeon_name, ", ".join(members_names)]
+	add_message(msg, "dungeon")
+	
+	# Connecter aux signaux de l'instance de donjon
+	if not dungeon_instance.boss_defeated.is_connected(_on_boss_defeated):
+		dungeon_instance.boss_defeated.connect(_on_boss_defeated)
+	if not dungeon_instance.boss_failed.is_connected(_on_boss_failed):
+		dungeon_instance.boss_failed.connect(_on_boss_failed)
+	if not dungeon_instance.dungeon_completed.is_connected(_on_dungeon_completed):
+		dungeon_instance.dungeon_completed.connect(_on_dungeon_completed)
+	if not dungeon_instance.loot_distributed.is_connected(_on_loot_distributed):
+		dungeon_instance.loot_distributed.connect(_on_loot_distributed)
+
+func _on_dungeon_ended(dungeon_instance):
+	# Les signaux sont déjà connectés dans _on_dungeon_started
+	pass
+
+func _on_boss_defeated(boss_index: int, boss_name: String, loot_winner):
+	var msg = "Boss vaincu : %s" % boss_name
+	if loot_winner:
+		msg += " (Loot : %s)" % loot_winner.nom
+	add_message(msg, "dungeon")
+
+func _on_boss_failed(boss_index: int, boss_name: String, wipe_count: int):
+	var msg = "Wipe sur %s (tentative #%d)" % [boss_name, wipe_count]
+	add_message(msg, "error")
+
+func _on_dungeon_completed(total_time: float, gold_reward: int):
+	var minutes = int(total_time) / 60
+	var seconds = int(total_time) % 60
+	var msg = "Donjon terminé en %02d:%02d ! Récompense : %d or" % [minutes, seconds, gold_reward]
+	add_message(msg, "dungeon")
+	
+	# Notification toast pour succès de donjon
+	if has_node("/root/NotificationManager"):
+		var notification_manager = get_node("/root/NotificationManager")
+		notification_manager.show_success("Donjon complété avec succès !", "Victoire")
+
+func _on_loot_distributed(member, item):
+	add_loot_notification(member.nom, item)
+	
+	# Notification toast pour loot rare/épique
+	if item.rarity >= item.Rarity.RARE and has_node("/root/NotificationManager"):
+		var notification_manager = get_node("/root/NotificationManager")
+		var message = "%s a obtenu %s" % [member.nom, item.name]
+		notification_manager.show_success(message, "Loot Rare")
+
+# Méthode publique pour ajouter des messages custom
+func add_system_message(text: String):
+	add_message("[Système] " + text, "info")
+
+func add_guild_message(text: String):
+	add_message("[Guilde] " + text, "info")
+
+func add_dungeon_message(text: String):
+	add_message("[Donjon] " + text, "dungeon")
+
+func add_loot_message(player_name: String, item: String):
+	var msg = "%s a obtenu : %s" % [player_name, item]
+	add_message(msg, "loot")
+
+func add_loot_notification(player_name: String, item):
+	# Nouvelle méthode pour les objets Item complets
+	var msg
+	if item.has_method("get_display_name"):
+		# Objet Item complet
+		msg = "[Loot] %s a obtenu %s (iLvl %d)" % [player_name, item.name, item.ilvl]
+		var stat_summary = item.get_stat_summary()
+		if stat_summary != "":
+			msg += " [%s]" % stat_summary
+		var color = item.get_rarity_color()
+		var color_hex = "#%02x%02x%02x" % [int(color.r * 255), int(color.g * 255), int(color.b * 255)]
+		msg = "[color=%s]%s[/color]" % [color_hex, msg]
+		add_message(msg, "loot", true)
+	else:
+		# Fallback pour les anciens objets string
+		add_loot_message(player_name, str(item))
+
+func add_phase_notification(phase_name: String):
+	var msg = "[PHASE] Félicitations ! Passage en %s" % phase_name
+	add_message(msg, "levelup")

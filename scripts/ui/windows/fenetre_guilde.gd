@@ -1,16 +1,27 @@
 extends PanelContainer
 
 const PlayerTagsData = preload("res://scripts/data/player_tags.gd")
+const EquipmentWindow = preload("res://scenes/Fenetre_Equipement.tscn")
+
+var equipment_window_instance = null
 
 var members_list: ItemList
 var member_details: VBoxContainer
 var close_button: Button
 var title_label: Label
 var title_bar: Panel
+var context_menu: PopupMenu
 
 var guild_members: Array = []
 var selected_member = null
 var guild_manager: Node
+var right_clicked_member_index: int = -1
+
+# Labels pour les infos de guilde
+var guild_level_label: Label
+var guild_xp_label: Label
+var guild_members_label: Label
+var guild_perks_label: Label
 
 # Variables pour le redimensionnement et déplacement
 var is_dragging: bool = false
@@ -30,12 +41,15 @@ func _ready():
 	
 	_setup_header(vbox)
 	_setup_content(vbox)
+	_setup_context_menu()
 	
 	guild_manager = get_node("/root/GuildManager")
 	if guild_manager:
 		guild_manager.member_activity_changed.connect(_on_member_activity_changed)
 		guild_manager.member_connected.connect(_on_member_status_changed)
 		guild_manager.member_disconnected.connect(_on_member_status_changed)
+		guild_manager.guild_level_changed.connect(_on_guild_level_changed)
+		guild_manager.guild_perk_unlocked.connect(_on_guild_perk_unlocked)
 	
 	hide()
 	_load_test_members()
@@ -73,6 +87,16 @@ func _setup_header(parent: VBoxContainer):
 	title_bar.gui_input.connect(_on_title_bar_input)
 
 func _setup_content(parent: VBoxContainer):
+	# Panel d'informations de guilde
+	var guild_info_panel = PanelContainer.new()
+	guild_info_panel.custom_minimum_size = Vector2(0, 80)
+	parent.add_child(guild_info_panel)
+	
+	var guild_info_vbox = VBoxContainer.new()
+	guild_info_panel.add_child(guild_info_vbox)
+	
+	_setup_guild_info(guild_info_vbox)
+	
 	var hsplit = HSplitContainer.new()
 	hsplit.split_offset = 300
 	parent.add_child(hsplit)
@@ -91,6 +115,7 @@ func _setup_content(parent: VBoxContainer):
 	members_list = ItemList.new()
 	members_list.custom_minimum_size = Vector2(300, 500)
 	members_list.item_selected.connect(_on_member_selected)
+	members_list.gui_input.connect(_on_members_list_gui_input)
 	left_vbox.add_child(members_list)
 	
 	var right_panel = PanelContainer.new()
@@ -119,15 +144,17 @@ func _setup_member_details():
 	member_details.add_child(info_label)
 
 func _load_test_members():
-	for i in 5:
-		var member = SimulatedPlayer.new()
-		guild_members.append(member)
-		if guild_manager:
-			guild_manager.add_member(member)
+	# Utiliser les membres existants du GuildManager au lieu d'en créer de nouveaux
+	if guild_manager:
+		guild_members = guild_manager.guild_members.duplicate()
 	
 	_refresh_member_list()
 
 func _refresh_member_list():
+	# Synchroniser avec le GuildManager au cas où de nouveaux membres auraient été ajoutés
+	if guild_manager:
+		guild_members = guild_manager.guild_members.duplicate()
+	
 	members_list.clear()
 	for member in guild_members:
 		var status = "[Hors ligne]"
@@ -168,15 +195,61 @@ func _update_member_details():
 	
 	_add_detail_row(info_grid, "Classe:", selected_member.personnage_classe)
 	_add_detail_row(info_grid, "Niveau:", str(selected_member.personnage_niveau))
-	_add_detail_row(info_grid, "Équipement:", str(selected_member.personnage_equipement))
+	_add_detail_row(info_grid, "Équipement:", selected_member.get_equipment_summary())
 	_add_detail_row(info_grid, "Rôle:", selected_member.get_role())
 	
 	member_details.add_child(HSeparator.new())
 	
-	_add_detail_row(info_grid, "Énergie:", "%.0f/100" % selected_member.energy)
-	_add_detail_row(info_grid, "Humeur:", "%.0f/100" % selected_member.mood)
-	_add_detail_row(info_grid, "Intégration:", "%.0f%%" % selected_member.integration)
-	_add_detail_row(info_grid, "Skill:", "%d/100" % selected_member.skill)
+	# Titre des métriques
+	var metrics_label = Label.new()
+	metrics_label.text = "Métriques:"
+	metrics_label.add_theme_font_size_override("font_size", 14)
+	member_details.add_child(metrics_label)
+	
+	# Container pour les StatDisplay
+	var stats_container = VBoxContainer.new()
+	stats_container.add_theme_constant_override("separation", 8)
+	member_details.add_child(stats_container)
+	
+	# Énergie avec StatDisplay
+	var energy_display = StatDisplay.new()
+	energy_display.stat_name = "Énergie"
+	energy_display.current_value = selected_member.energy
+	energy_display.max_value = 100.0
+	energy_display.display_mode = StatDisplay.DisplayMode.PROGRESS_BAR
+	energy_display.icon_text = "⚡"
+	energy_display.custom_minimum_size = Vector2(300, 25)
+	stats_container.add_child(energy_display)
+	
+	# Humeur avec StatDisplay
+	var mood_display = StatDisplay.new()
+	mood_display.stat_name = "Humeur"
+	mood_display.current_value = selected_member.mood
+	mood_display.max_value = 100.0
+	mood_display.display_mode = StatDisplay.DisplayMode.PROGRESS_BAR
+	mood_display.icon_text = "😊"
+	mood_display.custom_minimum_size = Vector2(300, 25)
+	stats_container.add_child(mood_display)
+	
+	# Intégration avec StatDisplay
+	var integration_display = StatDisplay.new()
+	integration_display.stat_name = "Intégration"
+	integration_display.current_value = selected_member.integration
+	integration_display.max_value = 100.0
+	integration_display.display_mode = StatDisplay.DisplayMode.PROGRESS_BAR
+	integration_display.icon_text = "🤝"
+	integration_display.custom_minimum_size = Vector2(300, 25)
+	stats_container.add_child(integration_display)
+	
+	# Skill avec StatDisplay
+	var skill_display = StatDisplay.new()
+	skill_display.stat_name = "Compétence"
+	skill_display.current_value = selected_member.skill
+	skill_display.max_value = 100.0
+	skill_display.display_mode = StatDisplay.DisplayMode.VALUE_PERCENTAGE
+	skill_display.icon_text = "⭐"
+	skill_display.custom_minimum_size = Vector2(300, 25)
+	stats_container.add_child(skill_display)
 	
 	var status = "Hors ligne"
 	if selected_member.is_online:
@@ -261,6 +334,7 @@ func add_member(player):
 	if guild_manager:
 		guild_manager.add_member(player)
 	_refresh_member_list()
+	_update_guild_info()
 
 func _on_member_activity_changed(player, _activity):
 	if player in guild_members:
@@ -319,3 +393,170 @@ func _update_cursor(pos: Vector2):
 		mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
 	else:
 		mouse_default_cursor_shape = Control.CURSOR_ARROW
+
+func _setup_guild_info(parent: VBoxContainer):
+	var guild_name_label = Label.new()
+	guild_name_label.text = "Ma Guilde"
+	guild_name_label.add_theme_font_size_override("font_size", 20)
+	parent.add_child(guild_name_label)
+	
+	var info_hbox = HBoxContainer.new()
+	info_hbox.add_theme_constant_override("separation", 30)
+	parent.add_child(info_hbox)
+	
+	# Niveau et XP
+	var level_vbox = VBoxContainer.new()
+	info_hbox.add_child(level_vbox)
+	
+	guild_level_label = Label.new()
+	guild_level_label.text = "Niveau 1"
+	guild_level_label.add_theme_font_size_override("font_size", 16)
+	level_vbox.add_child(guild_level_label)
+	
+	guild_xp_label = Label.new()
+	guild_xp_label.text = "XP: 0 / 200"
+	guild_xp_label.modulate = Color(0.8, 0.8, 0.8)
+	level_vbox.add_child(guild_xp_label)
+	
+	# Membres
+	guild_members_label = Label.new()
+	guild_members_label.text = "Membres: 0 / 5"
+	guild_members_label.add_theme_font_size_override("font_size", 14)
+	info_hbox.add_child(guild_members_label)
+	
+	# Perks actifs
+	var perks_vbox = VBoxContainer.new()
+	info_hbox.add_child(perks_vbox)
+	
+	var perks_title = Label.new()
+	perks_title.text = "Perks actifs:"
+	perks_title.add_theme_font_size_override("font_size", 12)
+	perks_vbox.add_child(perks_title)
+	
+	guild_perks_label = Label.new()
+	guild_perks_label.text = "Aucun"
+	guild_perks_label.modulate = Color(0.7, 0.7, 0.7)
+	guild_perks_label.add_theme_font_size_override("font_size", 11)
+	perks_vbox.add_child(guild_perks_label)
+	
+	_update_guild_info()
+
+func _update_guild_info():
+	if not guild_manager or not guild_manager.guild:
+		return
+		
+	var guild = guild_manager.guild
+	var level = guild.get_level()
+	var xp_progress = guild.get_xp_progress()
+	
+	guild_level_label.text = "Niveau %d" % level
+	guild_xp_label.text = "XP: %d / %d" % [xp_progress.progress, xp_progress.needed + xp_progress.progress]
+	
+	var max_members = guild.get_max_members()
+	guild_members_label.text = "Membres: %d / %d" % [guild_members.size(), max_members]
+	
+	# Mise à jour des perks
+	var perks = guild.get_active_perks()
+	if perks.is_empty():
+		guild_perks_label.text = "Aucun"
+	else:
+		var perk_names = []
+		for perk in perks:
+			perk_names.append(perk.name)
+		guild_perks_label.text = ", ".join(perk_names)
+
+func _on_guild_level_changed(_new_level: int):
+	_update_guild_info()
+	
+func _on_guild_perk_unlocked(perk_name: String, _level: int):
+	_update_guild_info()
+	# On pourrait afficher une notification ici
+
+func _setup_context_menu():
+	# Créer le menu contextuel
+	context_menu = PopupMenu.new()
+	add_child(context_menu)
+	
+	# Ajouter les options du menu
+	context_menu.add_item("Voir l'équipement", 0)
+	context_menu.add_separator()
+	context_menu.add_item("Promouvoir", 1)  
+	context_menu.add_item("Exclure de la guilde", 2)
+	
+	# Griser les options non implémentées pour l'instant
+	context_menu.set_item_disabled(1, true)
+	# Activer l'exclusion maintenant qu'on a ConfirmDialog
+	context_menu.set_item_disabled(2, false)
+	
+	# Connecter le signal de sélection
+	context_menu.id_pressed.connect(_on_context_menu_pressed)
+
+func _on_context_menu_pressed(id: int):
+	if right_clicked_member_index < 0 or right_clicked_member_index >= guild_members.size():
+		return
+		
+	var member = guild_members[right_clicked_member_index]
+	
+	match id:
+		0: # Voir l'équipement
+			_show_equipment_window(member)
+		1: # Promouvoir (pas encore implémenté)
+			print("Promouvoir %s (pas encore implémenté)" % member.nom)
+		2: # Exclure de la guilde
+			_confirm_kick_member(member)
+
+func _confirm_kick_member(member):
+	"""Affiche une confirmation avant d'exclure un membre"""
+	var dialog = load("res://scripts/ui/components/confirm_dialog.gd").new()
+	dialog.dialog_type = dialog.DialogType.DESTRUCTIVE
+	dialog.title_text = "Exclure un membre"
+	dialog.message_text = "Êtes-vous sûr de vouloir exclure %s de la guilde?\nCette action est irréversible." % member.nom
+	dialog.confirm_text = "Exclure"
+	dialog.confirmed.connect(func(): _kick_member(member))
+	get_tree().root.add_child(dialog)
+	dialog.show_dialog()
+
+func _kick_member(member):
+	"""Exclut un membre de la guilde"""
+	if guild_manager:
+		guild_manager.remove_member(member)
+		_refresh_member_list()
+		_update_guild_info()
+		
+		# Notification
+		var notification_manager = get_node_or_null("/root/NotificationManager")
+		if notification_manager:
+			notification_manager.show_warning(
+				"%s a été exclu de la guilde." % member.nom,
+				"Membre exclu"
+			)
+
+func _show_equipment_window(member):
+	# Nettoyer l'ancienne instance si elle existe
+	if equipment_window_instance:
+		equipment_window_instance.queue_free()
+		equipment_window_instance = null
+	
+	# Créer nouvelle instance de la fenêtre d'équipement
+	equipment_window_instance = EquipmentWindow.instantiate()
+	get_tree().current_scene.add_child(equipment_window_instance)
+	
+	# Afficher l'équipement du membre
+	equipment_window_instance.show_member_equipment(member)
+
+func _on_members_list_gui_input(event: InputEvent):
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			# Trouver l'index de l'item sous la souris
+			var item_index = members_list.get_item_at_position(event.position, true)
+			if item_index >= 0 and item_index < guild_members.size():
+				right_clicked_member_index = item_index
+				
+				# Sélectionner l'item aussi
+				members_list.select(item_index)
+				_on_member_selected(item_index)
+				
+				# Afficher le menu contextuel à la position du clic
+				var global_position = members_list.global_position + event.position
+				context_menu.position = Vector2i(global_position)
+				context_menu.popup()

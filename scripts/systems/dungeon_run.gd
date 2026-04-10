@@ -3,11 +3,13 @@ class_name DungeonRun
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
 const ActivityScript = preload("res://scripts/resources/activity.gd")
+const LootTablesScript = preload("res://scripts/data/loot_tables.gd")
 
 signal boss_defeated(boss_name, loot_dropped)
 signal run_completed(success, loot_gained)
 signal player_wiped(reason)
 signal progress_updated(current_boss, total_bosses)
+signal loot_distributed(member, item)
 
 @export var instance_id: String = ""
 @export var instance_data: Dictionary = {}
@@ -139,10 +141,14 @@ func _handle_loot_drop(boss_name: String, boss_index: int):
 	var loot_chance = 0.3 + (float(boss_index) / float(instance_data.bosses.size())) * 0.4
 	
 	if randf() < loot_chance:
-		# Détermine qui reçoit le loot
+		# Générer un objet selon le système de loot
+		var is_heroic = DungeonDataScript.is_heroic_dungeon(instance_id)
+		var looted_item = LootTablesScript.generate_item_for_level(instance_data.equipment_reward_level, is_heroic)
+		
+		# Détermine qui reçoit le loot (les joueurs avec moins d'équipement sont prioritaires)
 		var eligible_members = []
 		for member in group_members:
-			if member.personnage_equipement < instance_data.equipment_reward_level:
+			if member.get_total_ilvl() < instance_data.equipment_reward_level:
 				eligible_members.append(member)
 		
 		if eligible_members.is_empty():
@@ -150,26 +156,24 @@ func _handle_loot_drop(boss_name: String, boss_index: int):
 		
 		# Attribution du loot
 		var chosen_member = eligible_members[randi() % eligible_members.size()]
-		var equipment_gain = randi_range(1, 3)
 		
-		# Vérifier si le joueur a le tag "greedy" ou "ninja_looter"
-		if chosen_member.has_tag("greedy"):
-			# Les joueurs greedy prennent plus de loot
-			equipment_gain += 1
-			
+		# Vérifier les comportements spéciaux
 		if chosen_member.has_tag("ninja_looter") and randf() < 0.3:
 			# 30% de chance qu'un ninja looter vole un loot supplémentaire
-			equipment_gain += 2
-			# Cela peut créer un conflit
+			# Créer un conflit
 			for other_member in group_members:
 				if other_member != chosen_member:
 					other_member.trigger_loot_conflict()
 		
-		chosen_member.personnage_equipement += equipment_gain
+		# Équiper l'objet
+		chosen_member.equip_item(looted_item)
 		
 		if not loot_collected.has(chosen_member.nom):
-			loot_collected[chosen_member.nom] = 0
-		loot_collected[chosen_member.nom] += equipment_gain
+			loot_collected[chosen_member.nom] = []
+		loot_collected[chosen_member.nom].append(looted_item)
+		
+		# Émettre le signal de distribution de loot
+		loot_distributed.emit(chosen_member, looted_item)
 		
 		boss_defeated.emit(boss_name, true)
 		
@@ -236,6 +240,19 @@ func complete_run(success: bool):
 		
 		member.complete_activity()
 		member.energy = max(0, member.energy - 30)  # Fatigue après le donjon
+	
+	# Donner de l'XP à la guilde si succès
+	if success:
+		var guild_manager = Engine.get_singleton("GuildManager") if Engine.has_singleton("GuildManager") else null
+		if guild_manager and guild_manager.guild:
+			guild_manager.guild.gain_xp(100, "Donjon complété: " + instance_data.name)
+		
+		# Vérifier si c'était un donjon héroïque et notifier PhaseManager
+		var is_heroic = DungeonDataScript.is_heroic_dungeon(instance_id)
+		if is_heroic:
+			var phase_manager = Engine.get_singleton("PhaseManager") if Engine.has_singleton("PhaseManager") else null
+			if phase_manager:
+				phase_manager.complete_heroic_dungeon(instance_data.name)
 	
 	run_completed.emit(success, loot_collected)
 

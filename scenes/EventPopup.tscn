@@ -1,0 +1,52 @@
+[gd_scene load_steps=2 format=3 uid="uid://bk2cckxb4j4wy"]
+
+[ext_resource type="Script" path="res://scripts/ui/windows/event_popup.gd" id="1_d4i4w"]
+
+[node name="EventPopup" type="Window"]
+initial_position = 2
+size = Vector2i(600, 500)
+script = ExtResource("1_d4i4w")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Titre de l'événement"
+horizontal_alignment = 1
+autowrap_mode = 3
+clip_contents = true
+
+[node name="ImageContainer" type="Control" parent="VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 150)
+
+[node name="DescriptionContainer" type="ScrollContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DescriptionLabel" type="RichTextLabel" parent="VBoxContainer/DescriptionContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "Description de l'événement"
+fit_content = true
+
+[node name="ChoicesContainer" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 8
+
+[node name="ButtonContainer" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="VBoxContainer/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 8
+text = "Fermer (Esc)"

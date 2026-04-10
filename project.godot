@@ -8,24 +8,36 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="RaidLead"
 config/description="Un jeu de gestion de guilde dans un MMORPG fictif"
 run/main_scene="res://scenes/Main.tscn"
-config/features=PackedStringArray("4.4", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
 
 GameTime="*res://scripts/autoloads/game_time.gd"
+ServerVersion="*res://scripts/autoloads/server_version.gd"
+EffectSystem="*res://scripts/systems/effect_system.gd"
+ActivityManager="*res://scripts/systems/activity_manager.gd"
 GuildManager="*res://scripts/autoloads/guild_manager.gd"
 RecruitmentPool="*res://scripts/autoloads/recruitment_pool.gd"
+EventManager="*res://scripts/autoloads/event_manager.gd"
+PhaseManager="*res://scripts/systems/phase_manager.gd"
+GuildRanking="*res://scripts/systems/guild_ranking.gd"
+AIGuildManager="*res://scripts/systems/ai_guild_manager.gd"
+NotificationManager="*res://scripts/managers/notification_manager.gd"
 
 [display]
 
-window/size/viewport_width=1280
-window/size/viewport_height=720
+window/size/viewport_width=1920
+window/size/viewport_height=1080
 window/size/resizable=false
 
 [rendering]

@@ -1,5 +1,6 @@
 extends Node
 
+signal minute_changed(minute: int, hour: int)
 signal hour_changed(hour: int)
 signal day_changed(day: int, week: int, year: int)
 signal week_changed(week: int, year: int)
@@ -15,7 +16,7 @@ var time_speed: float = 60.0
 
 # État actuel du temps
 var current_minute: int = 0
-var current_hour: int = 9  # Commence à 9h du matin
+var current_hour: int = 18  # Commence à 18h du soir
 var current_day: int = 1   # 1-7 (Lundi-Dimanche)
 var current_week: int = 1  # 1-52
 var current_year: int = 1
@@ -48,6 +49,9 @@ func advance_minute():
 	if current_minute >= MINUTES_PER_HOUR:
 		current_minute = 0
 		advance_hour()
+	
+	# Émettre le signal de changement de minute
+	minute_changed.emit(current_minute, current_hour)
 
 func advance_hour():
 	current_hour += 1
@@ -120,7 +124,7 @@ func is_weekday() -> bool:
 	return current_day <= 5  # Lundi à Vendredi
 
 func is_evening() -> bool:
-	return current_hour >= 18 or current_hour < 2
+	return current_hour >= 19 or current_hour < 2
 
 func is_night() -> bool:
 	return current_hour >= 23 or current_hour < 6
@@ -129,7 +133,19 @@ func is_morning() -> bool:
 	return current_hour >= 6 and current_hour < 12
 
 func is_afternoon() -> bool:
-	return current_hour >= 12 and current_hour < 18
+	return current_hour >= 12 and current_hour < 19
+
+func get_current_timestamp() -> float:
+	# Retourne le timestamp total en secondes depuis le début du jeu
+	var total_minutes = 0
+	total_minutes += (current_year - 1) * WEEKS_PER_YEAR * DAYS_PER_WEEK * HOURS_PER_DAY * MINUTES_PER_HOUR
+	total_minutes += (current_week - 1) * DAYS_PER_WEEK * HOURS_PER_DAY * MINUTES_PER_HOUR
+	total_minutes += (current_day - 1) * HOURS_PER_DAY * MINUTES_PER_HOUR
+	total_minutes += current_hour * MINUTES_PER_HOUR
+	total_minutes += current_minute
+	
+	# Convertir en secondes
+	return float(total_minutes * 60) + accumulated_time
 
 # Sauvegarde et chargement
 func save_time_data() -> Dictionary:

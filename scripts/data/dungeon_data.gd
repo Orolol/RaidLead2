@@ -23,7 +23,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Oggleflint", "Taragaman le Vorace", "Jergosh l'Invocateur", "Bazzalan"],
 		"equipment_reward_level": 16,
-		"description": "Un réseau de cavernes volcaniques sous Orgrimmar"
+		"description": "Un réseau de cavernes volcaniques sous Orgrimmar",
+		"difficulty": 1.0,
+		"duration_minutes": 45,
+		"gold_reward": 50,
+		"boss_difficulty_multiplier": 1.2  # Le dernier boss est 20% plus dur
 	},
 	"deadmines": {
 		"name": "Les Mortemines",
@@ -34,7 +38,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Rhahk'Zor", "Sneed", "Gilnid", "M. Châtiment", "Cookie", "Edwin VanCleef"],
 		"equipment_reward_level": 22,
-		"description": "Le repaire de la Confrérie Défias"
+		"description": "Le repaire de la Confrérie Défias",
+		"difficulty": 1.2,
+		"duration_minutes": 60,
+		"gold_reward": 75,
+		"boss_difficulty_multiplier": 1.2
 	},
 	"wailing_caverns": {
 		"name": "Cavernes des Lamentations",
@@ -45,7 +53,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Seigneur Cobrahn", "Lady Anacondra", "Kresh", "Seigneur Pythas", "Mutanus le Dévoreur"],
 		"equipment_reward_level": 21,
-		"description": "Un labyrinthe de grottes corrompues"
+		"description": "Un labyrinthe de grottes corrompues",
+		"difficulty": 1.1,
+		"duration_minutes": 55,
+		"gold_reward": 75,
+		"boss_difficulty_multiplier": 1.2
 	},
 	
 	# Donjons niveau moyen (30-45)
@@ -58,7 +70,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Grubbis", "Viscidus", "Electrocuteur 6000", "Mekgineer Thermaplugg"],
 		"equipment_reward_level": 35,
-		"description": "La cité gnome irradiée"
+		"description": "La cité gnome irradiée",
+		"difficulty": 1.4,
+		"duration_minutes": 81,
+		"gold_reward": 140,
+		"boss_difficulty_multiplier": 1.2
 	},
 	"scarlet_monastery": {
 		"name": "Monastère Écarlate",
@@ -69,7 +85,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Interrogateur Vishas", "Thalnos le Dément", "Champion Mograine", "Whitemane"],
 		"equipment_reward_level": 42,
-		"description": "Le bastion de la Croisade Écarlate"
+		"description": "Le bastion de la Croisade Écarlate",
+		"difficulty": 1.5,
+		"duration_minutes": 95,
+		"gold_reward": 175,
+		"boss_difficulty_multiplier": 1.2
 	},
 	"uldaman": {
 		"name": "Uldaman",
@@ -80,7 +100,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Revelosh", "Les Sculpteurs de pierre", "Ironaya", "Archaedas"],
 		"equipment_reward_level": 47,
-		"description": "Une ancienne cité titan"
+		"description": "Une ancienne cité titan",
+		"difficulty": 1.6,
+		"duration_minutes": 105,
+		"gold_reward": 200,
+		"boss_difficulty_multiplier": 1.2
 	},
 	
 	# Donjons haut niveau (45-60)
@@ -93,7 +117,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Theka le Martyr", "Antu'sul", "Sorcière docteur Zum'rah", "Chef Ukorz Sandscalp", "Gahz'rilla"],
 		"equipment_reward_level": 50,
-		"description": "Une cité trolle en ruines dans le désert"
+		"description": "Une cité trolle en ruines dans le désert",
+		"difficulty": 1.7,
+		"duration_minutes": 111,
+		"gold_reward": 215,
+		"boss_difficulty_multiplier": 1.2
 	},
 	"blackrock_depths": {
 		"name": "Profondeurs de Rochenoire",
@@ -104,7 +132,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Interrogateur Gerstahn", "Bael'Gar", "Général Angerforge", "Empereur Dagran Thaurissan"],
 		"equipment_reward_level": 57,
-		"description": "La capitale des Sombrefer"
+		"description": "La capitale des Sombrefer",
+		"difficulty": 1.8,
+		"duration_minutes": 125,
+		"gold_reward": 250,
+		"boss_difficulty_multiplier": 1.25
 	},
 	"stratholme": {
 		"name": "Stratholme",
@@ -115,7 +147,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Le Fras Siabi", "Magistrat Barthilas", "Baron Rivendare", "Balnazzar"],
 		"equipment_reward_level": 60,
-		"description": "La cité en quarantaine infestée de morts-vivants"
+		"description": "La cité en quarantaine infestée de morts-vivants",
+		"difficulty": 1.9,
+		"duration_minutes": 135,
+		"gold_reward": 275,
+		"boss_difficulty_multiplier": 1.25
 	},
 	"scholomance": {
 		"name": "Scholomance",
@@ -126,7 +162,11 @@ static var DUNGEONS = {
 		"group_size": 5,
 		"bosses": ["Jandice Barov", "Rattlegore", "Ras Frostwhisper", "Darkmaster Gandling"],
 		"equipment_reward_level": 60,
-		"description": "L'école de nécromancie"
+		"description": "L'école de nécromancie",
+		"difficulty": 1.9,
+		"duration_minutes": 135,
+		"gold_reward": 275,
+		"boss_difficulty_multiplier": 1.25
 	}
 }
 
@@ -142,7 +182,11 @@ static var RAIDS = {
 		"bosses": ["Lucifron", "Magmadar", "Gehennas", "Garr", "Baron Geddon", "Shazzrah", "Sulfuron", "Golemagg", "Majordomo", "Ragnaros"],
 		"equipment_reward_level": 66,  # T1
 		"reset_days": 7,
-		"description": "Le domaine du Seigneur du Feu Ragnaros"
+		"description": "Le domaine du Seigneur du Feu Ragnaros",
+		"difficulty": 2.9,
+		"duration_minutes": 240,
+		"gold_reward": 2750,
+		"boss_difficulty_multiplier": 1.3
 	},
 	"onyxias_lair": {
 		"name": "Repaire d'Onyxia",
@@ -154,7 +198,11 @@ static var RAIDS = {
 		"bosses": ["Onyxia"],
 		"equipment_reward_level": 66,
 		"reset_days": 5,
-		"description": "L'antre de la dragonne noire"
+		"description": "L'antre de la dragonne noire",
+		"difficulty": 2.5,
+		"duration_minutes": 90,
+		"gold_reward": 1500,
+		"boss_difficulty_multiplier": 1.5
 	},
 	"blackwing_lair": {
 		"name": "Repaire de l'Aile noire",
@@ -166,7 +214,11 @@ static var RAIDS = {
 		"bosses": ["Razorgore", "Vaelastrasz", "Broodlord", "Firemaw", "Ebonroc", "Flamegor", "Chromaggus", "Nefarian"],
 		"equipment_reward_level": 70,  # T2
 		"reset_days": 7,
-		"description": "Le laboratoire de Nefarian"
+		"description": "Le laboratoire de Nefarian",
+		"difficulty": 3.2,
+		"duration_minutes": 300,
+		"gold_reward": 3500,
+		"boss_difficulty_multiplier": 1.4
 	},
 	"zul_gurub": {
 		"name": "Zul'Gurub",
@@ -178,7 +230,11 @@ static var RAIDS = {
 		"bosses": ["Venoxis", "Jeklik", "Mar'li", "Thekal", "Arlokk", "Hakkar"],
 		"equipment_reward_level": 68,
 		"reset_days": 3,
-		"description": "La cité trolle maudite"
+		"description": "La cité trolle maudite",
+		"difficulty": 2.3,
+		"duration_minutes": 180,
+		"gold_reward": 1800,
+		"boss_difficulty_multiplier": 1.3
 	}
 }
 
@@ -188,6 +244,27 @@ static func get_all_instances() -> Dictionary:
 	all_instances.merge(RAIDS)
 	return all_instances
 
+static func get_available_instances() -> Dictionary:
+	var available_instances = {}
+	
+	if not ServerVersion:
+		return get_all_instances()
+	
+	var available_dungeons = ServerVersion.get_available_dungeons()
+	var available_raids = ServerVersion.get_available_raids()
+	
+	# Ajouter les donjons disponibles
+	for dungeon_id in available_dungeons:
+		if DUNGEONS.has(dungeon_id):
+			available_instances[dungeon_id] = DUNGEONS[dungeon_id]
+	
+	# Ajouter les raids disponibles
+	for raid_id in available_raids:
+		if RAIDS.has(raid_id):
+			available_instances[raid_id] = RAIDS[raid_id]
+	
+	return available_instances
+
 static func get_instance_data(instance_id: String) -> Dictionary:
 	if DUNGEONS.has(instance_id):
 		return DUNGEONS[instance_id]
@@ -195,12 +272,17 @@ static func get_instance_data(instance_id: String) -> Dictionary:
 		return RAIDS[instance_id]
 	return {}
 
-static func get_instances_for_level(level: int, type = -1) -> Array:
+static func is_instance_available(instance_id: String) -> bool:
+	if not ServerVersion:
+		return true
+	return ServerVersion.is_instance_available(instance_id)
+
+static func get_instances_for_level(level: int, type = -1, available_only: bool = true) -> Array:
 	var suitable_instances = []
-	var all_instances = get_all_instances()
+	var instances_to_check = get_available_instances() if available_only else get_all_instances()
 	
-	for id in all_instances:
-		var instance = all_instances[id]
+	for id in instances_to_check:
+		var instance = instances_to_check[id]
 		if level >= instance.level_min and level <= instance.level_max:
 			if type == -1 or instance.type == type:
 				suitable_instances.append({
@@ -252,7 +334,7 @@ static func calculate_difficulty_score(instance_id: String, group: Array) -> flo
 	
 	for member in group:
 		avg_level += member.personnage_niveau
-		avg_equipment += member.personnage_equipement
+		avg_equipment += member.get_total_ilvl()
 		avg_skill += member.skill
 		
 	avg_level /= float(group.size())
@@ -275,3 +357,41 @@ static func calculate_difficulty_score(instance_id: String, group: Array) -> flo
 	score *= avg_skill / 50.0
 	
 	return clamp(score, 0.1, 2.0)
+
+static func get_heroic_dungeons() -> Dictionary:
+	"""Retourne les donjons niveau 60 en version héroïque"""
+	var heroic_dungeons = {}
+	
+	# Donjons niveau 60 qui peuvent être faits en héroïque
+	var level_60_dungeons = ["stratholme", "scholomance", "blackrock_depths"]
+	
+	for dungeon_id in level_60_dungeons:
+		var base_dungeon = DUNGEONS.get(dungeon_id, {})
+		if base_dungeon.is_empty():
+			continue
+			
+		var heroic_id = dungeon_id + "_heroic"
+		heroic_dungeons[heroic_id] = base_dungeon.duplicate()
+		heroic_dungeons[heroic_id]["name"] = base_dungeon.name + " (Héroïque)"
+		heroic_dungeons[heroic_id]["difficulty"] = base_dungeon.difficulty * 1.5  # 50% plus dur
+		heroic_dungeons[heroic_id]["equipment_reward_level"] = base_dungeon.equipment_reward_level + 10  # +10 iLvl
+		heroic_dungeons[heroic_id]["gold_reward"] = base_dungeon.gold_reward * 2  # Double récompense or
+		heroic_dungeons[heroic_id]["is_heroic"] = true
+		heroic_dungeons[heroic_id]["requires_level"] = 60  # Niveau max requis
+		heroic_dungeons[heroic_id]["description"] = base_dungeon.description + " - Version héroïque avec défis accrus"
+	
+	return heroic_dungeons
+
+static func is_heroic_dungeon(instance_id: String) -> bool:
+	"""Vérifie si un donjon est héroïque"""
+	return instance_id.ends_with("_heroic")
+
+static func get_all_dungeons_and_heroic() -> Dictionary:
+	"""Retourne tous les donjons normaux et héroïques combinés"""
+	var all_dungeons = DUNGEONS.duplicate()
+	var heroic_dungeons = get_heroic_dungeons()
+	
+	for heroic_id in heroic_dungeons:
+		all_dungeons[heroic_id] = heroic_dungeons[heroic_id]
+	
+	return all_dungeons

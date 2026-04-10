@@ -1,0 +1,390 @@
+extends Resource
+class_name DungeonInstance
+
+const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
+const LootTables = preload("res://scripts/data/loot_tables.gd")
+
+signal boss_reached(boss_index: int, boss_name: String)
+signal boss_defeated(boss_index: int, boss_name: String, loot_winner: SimulatedPlayer)
+signal boss_failed(boss_index: int, boss_name: String, wipe_count: int)
+signal dungeon_completed(total_time: float, gold_reward: int)
+signal dungeon_abandoned(reason: String)
+signal progress_updated(progress_percent: float)
+signal loot_distributed(member, item)
+
+@export var dungeon_id: String = ""
+@export var dungeon_data: Dictionary = {}
+@export var group_members: Array[SimulatedPlayer] = []
+@export var start_time: float = 0.0
+@export var current_boss_index: int = 0
+@export var is_active: bool = false
+@export var wipe_count: int = 0
+@export var total_wipes: int = 0
+@export var progress_percent: float = 0.0
+@export var time_lost_to_wipes: float = 0.0
+
+# Variables pour le timing
+var expected_boss_times: Array[float] = []
+var boss_times: Array[float] = []  # Temps entre chaque boss
+var game_time_node = null  # Référence à GameTime
+var current_position: float = 0.0  # Position actuelle sur le chemin (0.0 à 1.0)
+var boss_positions: Array[float] = []  # Positions des boss sur le chemin
+var time_to_next_boss: float = 0.0
+var is_fighting_boss: bool = false
+var boss_fight_start_time: float = 0.0
+
+# Configuration
+const WIPE_TIME_PENALTY: float = 180.0  # 3 minutes perdues par wipe
+const MORALE_LOSS_PER_WIPE: int = 10
+const MAX_WIPES_BEFORE_ABANDON: int = 10
+const BOSS_BASE_FIGHT_TIME: float = 120.0  # 2 minutes par boss de base
+
+func initialize(p_dungeon_id: String, p_group_members: Array) -> void:
+	dungeon_id = p_dungeon_id
+	dungeon_data = DungeonDataScript.get_instance_data(dungeon_id)
+	
+	# Copier les membres du groupe
+	group_members.clear()
+	for member in p_group_members:
+		if member is SimulatedPlayer:
+			group_members.append(member)
+	
+	# Initialiser les temps et positions
+	_calculate_boss_times_and_positions()
+	
+	# Démarrer l'instance
+	# Le temps sera récupéré lors du premier update
+	start_time = 0.0
+	
+	is_active = true
+	current_boss_index = 0
+	current_position = 0.0
+	wipe_count = 0
+	total_wipes = 0
+	progress_percent = 0.0
+	is_fighting_boss = false
+	
+	# Calculer le temps jusqu'au premier boss
+	if boss_positions.size() > 0:
+		time_to_next_boss = boss_positions[0] * dungeon_data.get("duration_minutes", 60) * 60.0
+
+func _calculate_boss_times_and_positions() -> void:
+	expected_boss_times.clear()
+	boss_positions.clear()
+	boss_times.clear()
+	
+	if not dungeon_data.has("bosses"):
+		return
+		
+	var bosses = dungeon_data.bosses
+	var num_bosses = bosses.size()
+	if num_bosses == 0:
+		return
+		
+	var total_duration = dungeon_data.get("duration_minutes", 60) * 60.0
+	
+	# Répartir les boss uniformément sur le chemin
+	# avec un peu plus de temps avant le dernier boss
+	for i in range(num_bosses):
+		var position: float
+		if i == num_bosses - 1:
+			# Le dernier boss est à 90% du chemin
+			position = 0.9
+		else:
+			# Les autres boss sont répartis uniformément sur les 80% premiers
+			position = (float(i) / float(num_bosses - 1)) * 0.8
+		
+		boss_positions.append(position)
+		expected_boss_times.append(position * total_duration)
+		
+		# Calculer le temps entre chaque boss
+		if i == 0:
+			boss_times.append(position * total_duration)
+		else:
+			var prev_time = expected_boss_times[i-1]
+			boss_times.append(position * total_duration - prev_time)
+
+func update(delta: float, game_time_ref = null) -> void:
+	if not is_active:
+		return
+	
+	# Stocker la référence à GameTime
+	if game_time_ref:
+		game_time_node = game_time_ref
+	
+	# Ne rien faire si le jeu est en pause
+	if game_time_node and game_time_node.is_paused:
+		return
+		
+	# Initialiser start_time si nécessaire
+	if start_time == 0.0 and game_time_node:
+		start_time = game_time_node.get_current_timestamp()
+	
+	if is_fighting_boss:
+		# En combat contre un boss
+		_update_boss_fight(delta)
+	else:
+		# En progression vers le prochain boss
+		_update_progression(delta, game_time_node)
+		
+	# Vérifier si le donjon est terminé
+	if current_boss_index >= dungeon_data.bosses.size() and is_active:
+		_complete_dungeon()
+		return
+		
+	# Mettre à jour le pourcentage de progression global
+	var boss_progress = float(current_boss_index) / float(dungeon_data.bosses.size())
+	var path_progress = current_position * 0.1  # Le chemin compte pour 10%
+	progress_percent = (boss_progress * 0.9 + path_progress) * 100.0
+	progress_updated.emit(progress_percent)
+
+func _update_progression(delta: float, game_time_ref = null) -> void:
+	# Utiliser le delta du temps du jeu au lieu du temps réel
+	var game_delta = delta
+	
+	# Ne pas progresser si le jeu est en pause
+	if game_time_ref:
+		if game_time_ref.is_paused:
+			return
+		if game_time_ref.time_speed > 0:
+			game_delta = delta * game_time_ref.time_speed
+	
+	time_to_next_boss -= game_delta
+	
+	if time_to_next_boss <= 0.0 and current_boss_index < boss_positions.size():
+		# Arrivé au boss
+		_start_boss_fight(game_time_node)
+	else:
+		# Mettre à jour la position sur le chemin entre les boss
+		if current_boss_index < boss_positions.size():
+			var current_boss_pos = boss_positions[current_boss_index]
+			var prev_boss_pos = boss_positions[current_boss_index - 1] if current_boss_index > 0 else 0.0
+			var segment_length = current_boss_pos - prev_boss_pos
+			var time_for_segment = boss_times[current_boss_index] if current_boss_index < boss_times.size() else 300.0
+			var time_in_segment = time_for_segment - time_to_next_boss
+			var segment_progress = clamp(time_in_segment / time_for_segment, 0.0, 1.0)
+			current_position = prev_boss_pos + segment_progress * segment_length
+		else:
+			current_position = 1.0
+
+func _start_boss_fight(game_time_ref = null) -> void:
+	is_fighting_boss = true
+	if game_time_ref:
+		boss_fight_start_time = game_time_ref.get_current_timestamp()
+	else:
+		boss_fight_start_time = 0.0
+	
+	var boss_name = dungeon_data.bosses[current_boss_index]
+	boss_reached.emit(current_boss_index, boss_name)
+	
+	# Simuler le résultat du combat après un court délai
+	await Engine.get_main_loop().create_timer(2.0).timeout
+	_simulate_boss_fight()
+
+func _simulate_boss_fight() -> void:
+	var boss_name = dungeon_data.bosses[current_boss_index]
+	var is_final_boss = current_boss_index == dungeon_data.bosses.size() - 1
+	
+	# Calculer la difficulté du boss
+	var boss_difficulty = dungeon_data.get("difficulty", 1.0)
+	if is_final_boss:
+		boss_difficulty *= dungeon_data.get("boss_difficulty_multiplier", 1.2)
+	
+	# Calculer les chances de succès du groupe
+	var success_chance = _calculate_boss_success_chance(boss_difficulty)
+	
+	# Appliquer une pénalité basée sur le nombre de wipes
+	success_chance *= pow(0.95, wipe_count)  # -5% par wipe
+	
+	# Résoudre le combat
+	if randf() < success_chance:
+		_on_boss_defeated()
+	else:
+		_on_boss_failed()
+
+func _calculate_boss_success_chance(boss_difficulty: float) -> float:
+	var base_score = 0.0
+	var total_members = group_members.size()
+	
+	if total_members == 0:
+		return 0.0
+		
+	# Calculer le score moyen du groupe
+	for member in group_members:
+		var member_score = 0.0
+		
+		# Niveau par rapport au donjon
+		var level_diff = member.personnage_niveau - dungeon_data.level_recommended
+		member_score += 0.3 * (1.0 + level_diff / 10.0)
+		
+		# Skill
+		member_score += 0.3 * (member.skill / 100.0)
+		
+		# Équipement
+		var expected_equipment = dungeon_data.level_recommended * 3
+		member_score += 0.2 * (member.get_total_ilvl() / expected_equipment)
+		
+		# Moral
+		member_score += 0.1 * (member.mood / 100.0)
+		
+		# Énergie
+		member_score += 0.1 * (member.energy / 100.0)
+		
+		base_score += member_score
+		
+	base_score /= total_members
+	
+	# Vérifier la composition du groupe
+	var composition = DungeonDataScript.get_group_composition(dungeon_id)
+	var composition_penalty = _check_group_composition(composition)
+	base_score *= composition_penalty
+	
+	# Appliquer la difficulté
+	var success_chance = base_score / boss_difficulty
+	
+	return clamp(success_chance, 0.1, 0.95)
+
+func _check_group_composition(required_comp: Dictionary) -> float:
+	var actual_comp = {"Tank": 0, "Healer": 0, "DPS": 0}
+	
+	for member in group_members:
+		var role = member.personnage_role
+		if actual_comp.has(role):
+			actual_comp[role] += 1
+			
+	var penalty = 1.0
+	
+	# Pénalités pour composition incorrecte
+	if actual_comp["Tank"] < required_comp.get("Tank", 1):
+		penalty *= 0.5  # Grosse pénalité sans tank
+	if actual_comp["Healer"] < required_comp.get("Healer", 1):
+		penalty *= 0.6  # Grosse pénalité sans healer
+	if actual_comp["DPS"] < required_comp.get("DPS", 3):
+		penalty *= 0.9  # Pénalité moindre pour manque de DPS
+		
+	return penalty
+
+func _on_boss_defeated() -> void:
+	var boss_name = dungeon_data.bosses[current_boss_index]
+	
+	# Vérifier si le boss drop du loot
+	var is_heroic = DungeonDataScript.is_heroic_dungeon(dungeon_id)
+	var loot_chance = LootTables.get_boss_loot_chance(current_boss_index, dungeon_data.bosses.size(), is_heroic)
+	
+	var loot_winner = null
+	var looted_item = null
+	
+	if randf() < loot_chance:
+		# Générer un objet
+		looted_item = LootTables.generate_item_for_level(dungeon_data.equipment_reward_level, is_heroic)
+		
+		# Choisir qui reçoit l'objet (pour l'instant aléatoire)
+		loot_winner = group_members.pick_random() if group_members.size() > 0 else null
+		
+		if loot_winner and looted_item:
+			loot_winner.equip_item(looted_item)
+			# Émettre le signal de distribution de loot pour le chat
+			loot_distributed.emit(loot_winner, looted_item)
+	
+	boss_defeated.emit(current_boss_index, boss_name, loot_winner, looted_item)
+	
+	# Réinitialiser le compteur de wipes pour ce boss
+	wipe_count = 0
+	
+	# Passer au boss suivant
+	current_boss_index += 1
+	is_fighting_boss = false
+	
+	# Mettre à jour la position après avoir vaincu le boss
+	if current_boss_index > 0 and current_boss_index - 1 < boss_positions.size():
+		current_position = boss_positions[current_boss_index - 1]
+	
+	if current_boss_index >= dungeon_data.bosses.size():
+		# Donjon terminé !
+		_complete_dungeon()
+	else:
+		# Calculer le temps jusqu'au prochain boss
+		var current_time = get_elapsed_time(game_time_node) - time_lost_to_wipes
+		var next_boss_time = expected_boss_times[current_boss_index]
+		time_to_next_boss = max(30.0, next_boss_time - current_time)  # Au moins 30 secondes
+
+func _on_boss_failed() -> void:
+	wipe_count += 1
+	total_wipes += 1
+	
+	var boss_name = dungeon_data.bosses[current_boss_index]
+	boss_failed.emit(current_boss_index, boss_name, wipe_count)
+	
+	# Ajouter la pénalité de temps
+	time_lost_to_wipes += WIPE_TIME_PENALTY
+	
+	# Réduire le moral du groupe
+	for member in group_members:
+		member.mood = max(0, member.mood - MORALE_LOSS_PER_WIPE)
+		member.energy = max(0, member.energy - 5)
+	
+	# Vérifier si on abandonne
+	if total_wipes >= MAX_WIPES_BEFORE_ABANDON:
+		_abandon_dungeon("Trop de wipes (%d)" % total_wipes)
+		return
+		
+	# Vérifier le moral du groupe
+	var avg_morale = 0
+	for member in group_members:
+		avg_morale += member.mood
+	avg_morale /= group_members.size()
+	
+	if avg_morale < 20:
+		_abandon_dungeon("Moral trop bas")
+		return
+		
+	# Sinon, on retente le boss après un délai
+	is_fighting_boss = false
+	time_to_next_boss = 30.0  # 30 secondes avant de retenter
+
+func _update_boss_fight(_delta: float) -> void:
+	# Le combat est résolu instantanément dans _simulate_boss_fight
+	# Cette fonction pourrait être utilisée pour des animations futures
+	pass
+
+func _complete_dungeon() -> void:
+	is_active = false
+	var total_time = get_elapsed_time(game_time_node)
+	var gold_reward = dungeon_data.get("gold_reward", 100)
+	
+	# Distribuer l'or aux membres
+	var gold_per_member = gold_reward / group_members.size()
+	for member in group_members:
+		member.or_actuel += gold_per_member
+		# Bonus de moral pour avoir terminé
+		member.mood = min(100, member.mood + 20)
+		
+	dungeon_completed.emit(total_time, gold_reward)
+
+func _abandon_dungeon(reason: String) -> void:
+	is_active = false
+	
+	# Pénalité de moral pour abandon
+	for member in group_members:
+		member.mood = max(0, member.mood - 20)
+		
+	dungeon_abandoned.emit(reason)
+
+func get_current_boss_name() -> String:
+	if current_boss_index < dungeon_data.bosses.size():
+		return dungeon_data.bosses[current_boss_index]
+	return ""
+
+func get_remaining_bosses() -> int:
+	return dungeon_data.bosses.size() - current_boss_index
+
+func get_elapsed_time(game_time_ref = null) -> float:
+	if game_time_ref:
+		return game_time_ref.get_current_timestamp() - start_time
+	else:
+		return 0.0
+
+func get_estimated_remaining_time() -> float:
+	var total_duration = dungeon_data.get("duration_minutes", 60) * 60.0
+	var elapsed = get_elapsed_time(game_time_node)
+	return max(0.0, total_duration - elapsed + time_lost_to_wipes)

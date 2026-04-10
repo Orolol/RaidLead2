@@ -8,9 +8,9 @@ var available_players: Array = []
 var game_time: Node
 var last_refresh_day: int = 0
 
-# Configuration du pool
-const MIN_POOL_SIZE = 15
-const MAX_POOL_SIZE = 30
+# Configuration du pool (sera ajustée selon la version serveur)
+const BASE_MIN_POOL_SIZE = 15
+const BASE_MAX_POOL_SIZE = 30
 const REFRESH_INTERVAL_DAYS = 3
 const DAILY_NEW_PLAYERS = 2  # Nouveaux joueurs par jour
 
@@ -33,18 +33,44 @@ func _ready():
 		game_time.day_changed.connect(_on_day_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 	
+	# Se connecter aux mises à jour de version serveur
+	if ServerVersion:
+		ServerVersion.version_updated.connect(_on_server_version_updated)
+	
 	# Génère le pool initial
 	_generate_initial_pool()
 
 func _generate_initial_pool():
 	available_players.clear()
 	
-	var pool_size = randi_range(MIN_POOL_SIZE, MAX_POOL_SIZE)
+	var pool_limits = _get_current_pool_limits()
+	var pool_size = randi_range(pool_limits.min_size, pool_limits.max_size)
 	for i in pool_size:
 		var player = _create_random_player()
 		available_players.append(player)
 	
 	pool_refreshed.emit()
+
+func _get_current_pool_limits() -> Dictionary:
+	var base_min = BASE_MIN_POOL_SIZE
+	var base_max = BASE_MAX_POOL_SIZE
+	
+	if ServerVersion:
+		var pool_size = ServerVersion.get_recruitment_pool_size()
+		base_min = pool_size
+		base_max = min(pool_size + 10, BASE_MAX_POOL_SIZE)
+	
+	# Ajouter le bonus de perks de guilde
+	var guild_manager = get_node("/root/GuildManager")
+	if guild_manager and guild_manager.guild:
+		var bonus = guild_manager.guild.get_recruitment_pool_bonus()
+		base_min += bonus
+		base_max += bonus
+	
+	return {
+		"min_size": base_min,
+		"max_size": base_max
+	}
 
 func _create_random_player() -> SimulatedPlayer:
 	var player = SimulatedPlayer.new()
@@ -98,9 +124,11 @@ func _calculate_recruitment_difficulty(player: SimulatedPlayer) -> float:
 	return clamp(difficulty, 0.1, 0.9)
 
 func _on_day_changed(_day: int, _week: int, _year: int):
+	var pool_limits = _get_current_pool_limits()
+	
 	# Ajoute quelques nouveaux joueurs chaque jour
 	for i in randi_range(1, DAILY_NEW_PLAYERS):
-		if available_players.size() < MAX_POOL_SIZE:
+		if available_players.size() < pool_limits.max_size:
 			var new_player = _create_random_player()
 			available_players.append(new_player)
 	
@@ -115,6 +143,7 @@ func _on_hour_changed(_hour: int):
 
 func _refresh_pool():
 	last_refresh_day = game_time.current_day
+	var pool_limits = _get_current_pool_limits()
 	
 	# Retire certains joueurs (recrutés ailleurs, ont arrêté, etc.)
 	var players_to_remove = []
@@ -129,7 +158,7 @@ func _refresh_pool():
 			player_lost_to_competition.emit(player, guild)
 	
 	# Ajoute de nouveaux joueurs
-	while available_players.size() < MIN_POOL_SIZE:
+	while available_players.size() < pool_limits.min_size:
 		available_players.append(_create_random_player())
 	
 	pool_refreshed.emit()
@@ -207,6 +236,12 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 	elif not expectations.hardcore and not guild_data.get("hardcore", false):
 		base_chance += 0.15
 	
+	# Bonus de réputation de guilde
+	if guild_data.has("reputation"):
+		var reputation_bonus = (guild_data.reputation - 50.0) * 0.01  # -50% à +50%
+		base_chance += reputation_bonus
+		base_chance = clamp(base_chance, 0.0, 1.0)
+	
 	# Ajuste selon la difficulté
 	var final_chance = base_chance * (1.0 - recruitment_difficulty)
 	
@@ -243,6 +278,25 @@ func _generate_rejection_reasons(player: SimulatedPlayer, guild_data: Dictionary
 	reasons.append("Les horaires ne correspondent pas")
 	
 	return reasons
+
+func _on_server_version_updated(new_version: float, _update_name: String):
+	print("Pool de recrutement : mise à jour vers version %s" % new_version)
+	
+	# Augmenter la taille du pool si nécessaire
+	var pool_limits = _get_current_pool_limits()
+	while available_players.size() < pool_limits.min_size:
+		available_players.append(_create_random_player())
+	
+	# Permettre à certains joueurs existants de progresser en niveau
+	var max_level = ServerVersion.get_max_player_level()
+	for player in available_players:
+		# 30% de chance qu'un joueur gagne quelques niveaux lors d'une mise à jour
+		if randf() < 0.3 and player.personnage_niveau < max_level:
+			var level_gain = randi_range(1, min(5, max_level - player.personnage_niveau))
+			player.personnage_niveau += level_gain
+			# L'équipement ne suit plus automatiquement le niveau avec le nouveau système
+	
+	pool_refreshed.emit()
 
 func get_player_info(player: SimulatedPlayer) -> Dictionary:
 	return {

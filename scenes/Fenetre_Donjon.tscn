@@ -1,0 +1,130 @@
+[gd_scene load_steps=3 format=3 uid="uid://bvw2yf5pguvg3"]
+
+[ext_resource type="Script" path="res://scripts/ui/windows/fenetre_donjon.gd" id="1_0h2vx"]
+[ext_resource type="Script" path="res://scripts/ui/components/resizable_window.gd" id="2_qd3ej"]
+
+[node name="Fenetre_Donjon" type="Panel"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -300.0
+offset_right = 400.0
+offset_bottom = 300.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1_0h2vx")
+
+[node name="ResizableWindow" type="PanelContainer" parent="."]
+script = ExtResource("2_qd3ej")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+
+[node name="Header" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="VBoxContainer/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "Donjon en cours"
+
+[node name="CloseButton" type="Button" parent="VBoxContainer/Header"]
+layout_mode = 2
+text = "X"
+
+[node name="DungeonInfo" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="DungeonName" type="Label" parent="VBoxContainer/DungeonInfo"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "Nom du donjon"
+
+[node name="TimeElapsed" type="Label" parent="VBoxContainer/DungeonInfo"]
+layout_mode = 2
+text = "Temps: 00:00"
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="ProgressionContainer" type="Control" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="DungeonPath" type="Control" parent="VBoxContainer/ProgressionContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="PathLine" type="Line2D" parent="VBoxContainer/ProgressionContainer/DungeonPath"]
+points = PackedVector2Array(50, 100, 750, 100)
+width = 4.0
+default_color = Color(0.4, 0.4, 0.4, 1)
+
+[node name="GroupMarker" type="Panel" parent="VBoxContainer/ProgressionContainer/DungeonPath"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 90.0
+offset_right = 60.0
+offset_bottom = 110.0
+modulate = Color(0, 0.8, 0, 1)
+
+[node name="BossMarkers" type="Control" parent="VBoxContainer/ProgressionContainer/DungeonPath"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="HSeparator2" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="GroupInfo" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Label" type="Label" parent="VBoxContainer/GroupInfo"]
+layout_mode = 2
+text = "Membres du groupe:"
+
+[node name="MembersList" type="ItemList" parent="VBoxContainer/GroupInfo"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StatusContainer" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="VBoxContainer/StatusContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "En progression..."
+
+[node name="WipeCount" type="Label" parent="VBoxContainer/StatusContainer"]
+layout_mode = 2
+text = "Wipes: 0"
+
+[node name="ActionButtons" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+alignment = 2
+
+[node name="AbandonButton" type="Button" parent="VBoxContainer/ActionButtons"]
+layout_mode = 2
+text = "Abandonner"
+modulate = Color(1, 0.5, 0.5, 1)
+
+[connection signal="pressed" from="VBoxContainer/Header/CloseButton" to="." method="_on_close_button_pressed"]
+[connection signal="pressed" from="VBoxContainer/ActionButtons/AbandonButton" to="." method="_on_abandon_button_pressed"]

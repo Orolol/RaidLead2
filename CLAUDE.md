@@ -139,3 +139,4 @@ All scripts are currently in `/scripts/`. Proposed reorganization:
 2. Variable naming consistency (character_* vs personnage_*)
 3. All scripts in one folder - needs organization
 4. Some unused signals declared
+- N'oublie pas de mettre a jour @RoadmapComplet.md après chaque avoir implémenter une feature.

@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/components/notification_toast.gd" id="1"]
+
+[node name="NotificationToast" type="PanelContainer"]
+custom_minimum_size = Vector2(350, 80)
+size_flags_horizontal = 8
+script = ExtResource("1")

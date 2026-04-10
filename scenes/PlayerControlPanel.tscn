@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://cp5wl0p4gkepk"]
+
+[ext_resource type="Script" path="res://scripts/ui/components/player_control_panel.gd" id="1_5q8n8"]
+
+[node name="PlayerControlPanel" type="PanelContainer"]
+custom_minimum_size = Vector2(300, 200)
+anchors_preset = 1
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_right = 300.0
+offset_bottom = 200.0
+script = ExtResource("1_5q8n8")

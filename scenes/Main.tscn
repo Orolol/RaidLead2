@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://b73rv43j2xj5l" path="res://scripts/managers/window_manager.gd" id="2_2y8up"]
 [ext_resource type="Script" uid="uid://mbmnpfihqm60" path="res://scripts/ui/components/menu_bar.gd" id="3_3y8up"]
 
-[node name="root" type="Control"]
+[node name="root2" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

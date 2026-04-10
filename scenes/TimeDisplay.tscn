@@ -20,6 +20,12 @@ text = "09:00"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 24
 
+[node name="ServerVersionLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Serveur v1.0 - Launch"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
+
 [node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
 layout_mode = 2
 
@@ -37,6 +43,10 @@ layout_mode = 2
 [node name="PauseButton" type="Button" parent="VBoxContainer/HBoxContainer"]
 layout_mode = 2
 text = "Pause"
+
+[node name="DebugVersionButton" type="Button" parent="VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Next Version"
 
 [node name="SpeedSlider" type="HSlider" parent="VBoxContainer"]
 layout_mode = 2

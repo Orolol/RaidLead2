@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3k8mam2n5o7p"]
+
+[ext_resource type="Script" path="res://scripts/ui/windows/fenetre_equipement.gd" id="1_equipment"]
+
+[node name="root" type="AcceptDialog"]
+title = "Équipement de "
+initial_position = 2
+size = Vector2i(500, 400)
+script = ExtResource("1_equipment")
