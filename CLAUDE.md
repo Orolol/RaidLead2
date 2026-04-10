@@ -173,6 +173,38 @@ All scripts are currently in `/scripts/`. Proposed reorganization:
   main.gd
 ```
 
+## Generation d'assets via ComfyUI
+
+Ce projet utilise ComfyUI local pour generer des assets pixel art et UI.
+
+### Stack
+- **ComfyUI** : `~/tools/ComfyUI/` (venv Python 3.13, PyTorch 2.11+cu130)
+- **Modele** : Flux.1-dev FP8 (charge en fp8_e4m3fn)
+- **LoRA** : UmeAiRT Modern Pixel Art (`UmeAiRT_ModernPixelArt.safetensors`)
+- **Post-processing** : ComfyUI-PixelArt-Detector (palette converter, downscale, quantification)
+- **MCP** : `comfyui` configure dans `.mcp.json` avec `COMFYUI_PATH`
+
+### Conventions
+- Tous les assets generes vont dans `res://assets/generated/`
+- Trigger word obligatoire dans le prompt : `umempart`
+- Resolutions standard : 32 (icones), 64 (petits sprites), 128 (personnages), 256 (portraits/boss)
+- Generation toujours en 1024x1024 puis downscale via PixelArtDetectorConverter (jamais generer petit directement)
+- Apres generation, importer dans Godot avec `texture_filter = NEAREST` et `texture_repeat = DISABLED`
+
+### Workflow type
+1. Formuler un prompt incluant `umempart` + description + style (front view, isometric...) + background
+2. Envoyer via MCP `comfyui` (enqueue_workflow en format API)
+3. Recuperer l'image via `get_image` avec `save_dir` vers `assets/generated/`
+4. Importer dans Godot avec settings NEAREST via MCP godot-mcp-pro
+
+### Demarrage ComfyUI
+```bash
+# ComfyUI doit tourner pour que le MCP fonctionne
+~/tools/start-comfyui.sh
+# Ou via tmux pour persistance :
+tmux new-session -d -s comfyui '~/tools/start-comfyui.sh'
+```
+
 ## Known Issues
 
 1. Some class_name declarations conflict with autoloads

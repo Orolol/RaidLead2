@@ -153,6 +153,20 @@ func _populate_loot_entries(loot_entries: Array) -> void:
 		item_column.add_theme_constant_override("separation", 2)
 		row.add_child(item_column)
 		
+		var item_hbox = HBoxContainer.new()
+		item_hbox.add_theme_constant_override("separation", 6)
+		item_column.add_child(item_hbox)
+
+		if item:
+			var slot_icon: Texture2D = AssetLoader.get_slot_icon(item.slot)
+			if slot_icon:
+				var icon_rect = TextureRect.new()
+				icon_rect.texture = slot_icon
+				icon_rect.custom_minimum_size = Vector2(18, 18)
+				icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				item_hbox.add_child(icon_rect)
+
 		var item_label = Label.new()
 		if item:
 			item_label.text = item.get_display_name()
@@ -160,7 +174,7 @@ func _populate_loot_entries(loot_entries: Array) -> void:
 		else:
 			item_label.text = "Objet inconnu"
 		item_label.add_theme_font_size_override("font_size", 13)
-		item_column.add_child(item_label)
+		item_hbox.add_child(item_label)
 		
 		var detail_parts: Array[String] = []
 		if boss_name != "":

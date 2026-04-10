@@ -89,9 +89,21 @@ func _setup_image():
 	for child in image_container.get_children():
 		child.queue_free()
 	
-	if current_event.image:
+	var event_texture: Texture2D = current_event.image
+	if not event_texture and current_event.category:
+		var category_map: Dictionary = {
+			"negative": "dispute",
+			"positive": "celebration",
+			"crisis": "crisis",
+			"neutral": "celebration",
+		}
+		var art_name: String = category_map.get(current_event.category, "")
+		if art_name != "":
+			event_texture = AssetLoader._load_cached(AssetLoader.ASSET_BASE + "events/" + art_name + ".png")
+
+	if event_texture:
 		var texture_rect = TextureRect.new()
-		texture_rect.texture = current_event.image
+		texture_rect.texture = event_texture
 		texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		texture_rect.custom_minimum_size = Vector2(200, 150)
 		image_container.add_child(texture_rect)

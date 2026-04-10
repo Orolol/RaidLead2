@@ -83,12 +83,27 @@ func _connect_instance_signals() -> void:
 	current_instance.loot_distributed.connect(_on_loot_distributed)
 
 func _setup_display() -> void:
-	# Mettre à jour les infos du donjon
-	var dungeon_data = current_instance.dungeon_data
-	dungeon_name_label.text = dungeon_data.get("name", "Donjon inconnu")
-	title_label.text = "Donjon: " + dungeon_data.get("name", "Inconnu")
-	
-	# Attendre le prochain frame pour que la taille soit correcte
+	var dungeon_data_dict = current_instance.dungeon_data
+	var dungeon_name: String = dungeon_data_dict.get("name", "Donjon inconnu")
+	dungeon_name_label.text = dungeon_name
+	title_label.text = "Donjon: " + dungeon_name
+
+	var dungeon_id: String = dungeon_data_dict.get("id", "")
+	var banner: Texture2D = AssetLoader.get_dungeon_banner(dungeon_id)
+	if banner:
+		var banner_rect: TextureRect = dungeon_path.get_node_or_null("BannerRect")
+		if not banner_rect:
+			banner_rect = TextureRect.new()
+			banner_rect.name = "BannerRect"
+			banner_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			banner_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			banner_rect.modulate = Color(0.4, 0.4, 0.4, 0.5)
+			banner_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			banner_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			dungeon_path.add_child(banner_rect)
+			dungeon_path.move_child(banner_rect, 0)
+		banner_rect.texture = banner
+
 	await get_tree().process_frame
 	
 	# Configurer la ligne du chemin

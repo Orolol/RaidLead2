@@ -162,9 +162,16 @@ func _refresh_member_list():
 			status = "[En ligne]"
 			if member.current_activity:
 				status = "[%s]" % member.current_activity.get_type_string()
-		
+
 		var text = "%s %s - %s Niv.%d" % [member.nom, status, member.personnage_classe, member.personnage_niveau]
-		members_list.add_item(text)
+		var portrait: Texture2D = AssetLoader.get_class_portrait(member.personnage_classe)
+		if portrait:
+			members_list.add_item(text, portrait)
+		else:
+			members_list.add_item(text)
+		var idx: int = members_list.item_count - 1
+		if not member.is_online:
+			members_list.set_item_custom_fg_color(idx, Color(0.5, 0.5, 0.5))
 
 func _on_member_selected(index: int):
 	if index < 0 or index >= guild_members.size():
@@ -180,23 +187,56 @@ func _update_member_details():
 	if not selected_member:
 		return
 	
+	# Header avec portrait
+	var header_hbox = HBoxContainer.new()
+	header_hbox.add_theme_constant_override("separation", 12)
+	member_details.add_child(header_hbox)
+
+	var portrait: Texture2D = AssetLoader.get_class_portrait(selected_member.personnage_classe)
+	if portrait:
+		var portrait_rect = TextureRect.new()
+		portrait_rect.texture = portrait
+		portrait_rect.custom_minimum_size = Vector2(64, 64)
+		portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		header_hbox.add_child(portrait_rect)
+
+	var name_vbox = VBoxContainer.new()
+	header_hbox.add_child(name_vbox)
+
 	var details_label = Label.new()
-	details_label.text = "Détails de " + selected_member.nom
+	details_label.text = selected_member.nom
 	details_label.add_theme_font_size_override("font_size", 18)
-	member_details.add_child(details_label)
-	
+	name_vbox.add_child(details_label)
+
+	var subtitle_hbox = HBoxContainer.new()
+	subtitle_hbox.add_theme_constant_override("separation", 6)
+	name_vbox.add_child(subtitle_hbox)
+
+	var role_icon: Texture2D = AssetLoader.get_role_icon(selected_member.get_role())
+	if role_icon:
+		var role_rect = TextureRect.new()
+		role_rect.texture = role_icon
+		role_rect.custom_minimum_size = Vector2(20, 20)
+		role_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		role_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		subtitle_hbox.add_child(role_rect)
+
+	var subtitle_label = Label.new()
+	subtitle_label.text = "%s %s - Niv.%d" % [selected_member.get_role(), selected_member.personnage_classe, selected_member.personnage_niveau]
+	subtitle_label.add_theme_font_size_override("font_size", 13)
+	subtitle_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	subtitle_hbox.add_child(subtitle_label)
+
 	member_details.add_child(HSeparator.new())
-	
+
 	var info_grid = GridContainer.new()
 	info_grid.columns = 2
 	info_grid.add_theme_constant_override("h_separation", 20)
 	info_grid.add_theme_constant_override("v_separation", 10)
 	member_details.add_child(info_grid)
-	
-	_add_detail_row(info_grid, "Classe:", selected_member.personnage_classe)
-	_add_detail_row(info_grid, "Niveau:", str(selected_member.personnage_niveau))
+
 	_add_detail_row(info_grid, "Équipement:", selected_member.get_equipment_summary())
-	_add_detail_row(info_grid, "Rôle:", selected_member.get_role())
 	
 	member_details.add_child(HSeparator.new())
 	

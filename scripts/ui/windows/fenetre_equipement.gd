@@ -56,13 +56,21 @@ func _create_equipment_slots(parent: VBoxContainer):
 	
 	for slot in slot_names:
 		var slot_container = HBoxContainer.new()
-		slot_container.add_theme_constant_override("separation", 15)
+		slot_container.add_theme_constant_override("separation", 10)
 		parent.add_child(slot_container)
-		
-		# Nom du slot (largeur fixe)
+
+		var slot_icon: Texture2D = AssetLoader.get_slot_icon(slot)
+		if slot_icon:
+			var icon_rect = TextureRect.new()
+			icon_rect.texture = slot_icon
+			icon_rect.custom_minimum_size = Vector2(36, 36)
+			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			slot_container.add_child(icon_rect)
+
 		var slot_label = Label.new()
 		slot_label.text = slot_names[slot] + ":"
-		slot_label.custom_minimum_size = Vector2(100, 0)
+		slot_label.custom_minimum_size = Vector2(80, 0)
 		slot_label.add_theme_font_size_override("font_size", 14)
 		slot_container.add_child(slot_label)
 		
@@ -154,11 +162,19 @@ func _update_equipment_display():
 				slot_data.stats_label.text = stat_summary
 				slot_data.stats_label.modulate = Color(0.95, 0.95, 0.95)
 			
-			# Couleur de fond selon la rareté
+			# Style fond selon la rarete
 			var style = StyleBoxFlat.new()
 			var bg_color = item.get_rarity_color()
-			bg_color.a = 0.2  # Transparence pour le fond
+			bg_color.a = 0.15
 			style.bg_color = bg_color
+			style.border_color = item.get_rarity_color()
+			style.border_color.a = 0.6
+			style.set_border_width_all(1)
+			style.set_corner_radius_all(3)
+			style.content_margin_left = 8
+			style.content_margin_right = 8
+			style.content_margin_top = 4
+			style.content_margin_bottom = 4
 			slot_data.panel.add_theme_stylebox_override("panel", style)
 		else:
 			# Slot vide

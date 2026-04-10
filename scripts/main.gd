@@ -43,11 +43,23 @@ func _ready():
 
 
 func _setup_background():
-	var background = ColorRect.new()
-	background.color = Color(0.1, 0.1, 0.15)
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
-	move_child(background, 0)
+	var bg_texture: Texture2D = AssetLoader.get_background()
+	if bg_texture:
+		var background = TextureRect.new()
+		background.texture = bg_texture
+		background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		background.modulate = Color(0.6, 0.6, 0.6)
+		add_child(background)
+		move_child(background, 0)
+	else:
+		var background = ColorRect.new()
+		background.color = Color(0.1, 0.1, 0.15)
+		background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(background)
+		move_child(background, 0)
 
 func _setup_time_display():
 	var time_display_scene = load("res://scenes/TimeDisplay.tscn")

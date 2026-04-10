@@ -113,20 +113,33 @@ func _setup_character_info_tab():
 	info_vbox.add_theme_constant_override("separation", 10)
 	info_panel.add_child(info_vbox)
 	
-	# Titre du personnage
+	# Header avec portrait
+	var header_hbox = HBoxContainer.new()
+	header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	header_hbox.add_theme_constant_override("separation", 15)
+	info_vbox.add_child(header_hbox)
+
+	var portrait: Texture2D = AssetLoader.get_class_portrait("Guerrier")
+	if portrait:
+		var portrait_rect = TextureRect.new()
+		portrait_rect.texture = portrait
+		portrait_rect.custom_minimum_size = Vector2(80, 80)
+		portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		header_hbox.add_child(portrait_rect)
+
+	var title_vbox = VBoxContainer.new()
+	header_hbox.add_child(title_vbox)
+
 	var character_title = Label.new()
-	character_title.text = "👤 Votre Personnage"
+	character_title.text = "Votre Personnage"
 	character_title.add_theme_font_size_override("font_size", 18)
-	character_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info_vbox.add_child(character_title)
-	
-	info_vbox.add_child(HSeparator.new())
-	
-	# Informations de base
+	title_vbox.add_child(character_title)
+
 	classe_label = Label.new()
 	classe_label.text = "Classe: Guerrier"
 	classe_label.add_theme_font_size_override("font_size", 16)
-	info_vbox.add_child(classe_label)
+	title_vbox.add_child(classe_label)
 	
 	niveau_label = Label.new()
 	niveau_label.text = "Niveau: 1"

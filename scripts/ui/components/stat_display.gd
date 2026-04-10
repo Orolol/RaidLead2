@@ -99,18 +99,19 @@ func _create_ui():
 		_create_text_elements()
 
 func _create_icon():
-	"""Crée l'élément icône"""
-	
-	if icon_texture:
-		# Icône texture
+	"""Crée l'élément icône — cherche d'abord dans AssetLoader si pas de texture explicite"""
+	var resolved_texture: Texture2D = icon_texture
+	if not resolved_texture and stat_name != "":
+		resolved_texture = AssetLoader.get_stat_icon(stat_name)
+
+	if resolved_texture:
 		var texture_rect = TextureRect.new()
-		texture_rect.texture = icon_texture
+		texture_rect.texture = resolved_texture
 		texture_rect.custom_minimum_size = icon_size
 		texture_rect.size = icon_size
 		texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon_element = texture_rect
 	else:
-		# Icône texte (caractère Unicode ou emoji)
 		var icon_label = Label.new()
 		icon_label.text = icon_text if icon_text != "" else "★"
 		icon_label.add_theme_font_size_override("font_size", int(icon_size.x * 0.8))
@@ -118,7 +119,7 @@ func _create_icon():
 		icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		icon_element = icon_label
-	
+
 	container.add_child(icon_element)
 
 func _create_text_elements():

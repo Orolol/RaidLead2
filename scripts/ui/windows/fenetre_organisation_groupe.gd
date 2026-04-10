@@ -317,12 +317,31 @@ func _create_draggable_member(member):
 	hbox.add_theme_constant_override("separation", 10)
 	draggable.add_child(hbox)
 	
+	# Portrait de classe
+	var class_portrait: Texture2D = AssetLoader.get_class_portrait(member.personnage_classe)
+	if class_portrait:
+		var portrait_rect = TextureRect.new()
+		portrait_rect.texture = class_portrait
+		portrait_rect.custom_minimum_size = Vector2(32, 32)
+		portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hbox.add_child(portrait_rect)
+
 	# Icône de rôle
-	var role_icon = Label.new()
-	role_icon.text = _get_role_icon(member.get_role())
-	role_icon.add_theme_font_size_override("font_size", 16)
-	hbox.add_child(role_icon)
-	
+	var role_tex: Texture2D = AssetLoader.get_role_icon(member.get_role())
+	if role_tex:
+		var role_rect = TextureRect.new()
+		role_rect.texture = role_tex
+		role_rect.custom_minimum_size = Vector2(20, 20)
+		role_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		role_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hbox.add_child(role_rect)
+	else:
+		var role_label = Label.new()
+		role_label.text = _get_role_icon(member.get_role())
+		role_label.add_theme_font_size_override("font_size", 16)
+		hbox.add_child(role_label)
+
 	# Nom et classe
 	var member_label = Label.new()
 	member_label.text = "%s\n%s Niv.%d" % [member.nom, member.personnage_classe, member.personnage_niveau]

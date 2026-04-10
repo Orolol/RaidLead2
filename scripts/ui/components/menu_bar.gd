@@ -33,6 +33,10 @@ func _create_menu_button(text: String, callback: Callable) -> Button:
 	var button = Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(150, 50)
+	var icon_tex: Texture2D = AssetLoader.get_menu_icon(text)
+	if icon_tex:
+		button.icon = icon_tex
+		button.expand_icon = true
 	button.pressed.connect(callback)
 	return button
 
