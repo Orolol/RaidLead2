@@ -1,5 +1,6 @@
 class_name Guild
 extends Resource
+const Singletons = preload("res://scripts/utils/singletons.gd")
 
 @export var name: String = "Ma Guilde"
 @export var xp: int = 0
@@ -93,7 +94,7 @@ func add_item_to_bank(item: Dictionary) -> void:
 
 # Méthodes pour le système d'effets
 func get_modified_stat(stat_name: String, base_value: float) -> float:
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return base_value
 	
@@ -112,13 +113,13 @@ func get_modified_xp() -> int:
 	return int(get_modified_stat("xp", float(xp)))
 
 func has_effect(effect_id: String) -> bool:
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return false
 	return effect_system.has_effect(self, effect_id)
 
 func get_effects() -> Array:
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return []
 	return effect_system.get_effects(self)
@@ -183,7 +184,7 @@ func lose_reputation(amount: float, reason: String) -> void:
 
 func _add_reputation_event(change: float, reason: String) -> void:
 	"""Ajoute un événement à l'historique de réputation"""
-	var game_time = Engine.get_singleton("GameTime")
+	var game_time = Singletons.get_autoload("GameTime")
 	var current_date = {}
 	if game_time:
 		current_date = {

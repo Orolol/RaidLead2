@@ -1,5 +1,6 @@
 class_name EffectInstance
 extends Resource
+const Singletons = preload("res://scripts/utils/singletons.gd")
 
 const EffectResource = preload("res://scripts/resources/effect.gd")
 
@@ -90,7 +91,7 @@ func get_tooltip() -> String:
 	return tooltip
 
 func _get_game_time() -> float:
-	var game_time = Engine.get_singleton("GameTime")
+	var game_time = Singletons.get_autoload("GameTime")
 	if game_time:
 		return game_time.get_current_timestamp()
 	return 0.0

@@ -1,5 +1,6 @@
 class_name EventChoiceResource
 extends Resource
+const Singletons = preload("res://scripts/utils/singletons.gd")
 
 const EffectResource = preload("res://scripts/resources/effect.gd")
 
@@ -47,12 +48,12 @@ func is_available(player_data: Dictionary = {}, guild_data: Dictionary = {}) -> 
 		else:
 			match requirement:
 				"time_of_day":
-					var game_time = Engine.get_singleton("GameTime")
+					var game_time = Singletons.get_autoload("GameTime")
 					if game_time and not _check_condition(game_time.current_hour, required_value):
 						return false
 				
 				"day_of_week":
-					var game_time = Engine.get_singleton("GameTime")
+					var game_time = Singletons.get_autoload("GameTime")
 					if game_time and not _check_condition(game_time.current_day, required_value):
 						return false
 				

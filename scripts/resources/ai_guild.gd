@@ -1,5 +1,6 @@
 class_name AIGuild
 extends Guild
+# Singletons hérité de Guild
 
 # Système de guildes IA concurrentes avec comportements réalistes
 
@@ -260,7 +261,7 @@ func _achieve_pve_success():
 	
 	# Si c'est un server first, le notifier
 	if recent_achievements[-1].is_server_first:
-		var guild_ranking = Engine.get_singleton("GuildRanking")
+		var guild_ranking = Singletons.get_autoload("GuildRanking")
 		if guild_ranking:
 			guild_ranking.register_server_first(name, content.id)
 	
@@ -554,7 +555,7 @@ func _get_recent_clears() -> Array:
 
 func _get_current_date() -> Dictionary:
 	"""Retourne la date actuelle du jeu"""
-	var game_time = Engine.get_singleton("GameTime")
+	var game_time = Singletons.get_autoload("GameTime")
 	if game_time:
 		return {
 			"day": game_time.current_day,

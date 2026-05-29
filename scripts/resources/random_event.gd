@@ -1,5 +1,6 @@
 class_name RandomEventResource
 extends Resource
+const Singletons = preload("res://scripts/utils/singletons.gd")
 
 const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
 
@@ -48,36 +49,36 @@ func _evaluate_condition(condition_data: Dictionary, game_state: Dictionary) -> 
 	
 	match condition_type:
 		"guild_level":
-			var guild_manager = Engine.get_singleton("GuildManager")
+			var guild_manager = Singletons.get_autoload("GuildManager")
 			if guild_manager and guild_manager.guild:
 				var current_level = guild_manager.guild.get_level()
 				return _check_value_condition(current_level, condition_value)
 		
 		"guild_members_count":
-			var guild_manager = Engine.get_singleton("GuildManager")
+			var guild_manager = Singletons.get_autoload("GuildManager")
 			if guild_manager:
 				var member_count = guild_manager.guild_members.size()
 				return _check_value_condition(member_count, condition_value)
 		
 		"time_of_day":
-			var game_time = Engine.get_singleton("GameTime")
+			var game_time = Singletons.get_autoload("GameTime")
 			if game_time:
 				return _check_value_condition(game_time.current_hour, condition_value)
 		
 		"day_of_week":
-			var game_time = Engine.get_singleton("GameTime")
+			var game_time = Singletons.get_autoload("GameTime")
 			if game_time:
 				return _check_value_condition(game_time.current_day, condition_value)
 		
 		"server_version":
-			var server_version = Engine.get_singleton("ServerVersion")
+			var server_version = Singletons.get_autoload("ServerVersion")
 			if server_version:
 				return server_version.current_version == condition_value
 		
 		"has_active_effect":
 			# Vérifier si un effet spécifique est actif sur la guilde ou un joueur
-			var effect_system = Engine.get_singleton("EffectSystem")
-			var guild_manager = Engine.get_singleton("GuildManager")
+			var effect_system = Singletons.get_autoload("EffectSystem")
+			var guild_manager = Singletons.get_autoload("GuildManager")
 			
 			if effect_system and guild_manager:
 				if guild_manager.guild and guild_manager.guild.has_effect(condition_value):

@@ -1,5 +1,6 @@
 extends Resource
 class_name DungeonRun
+const Singletons = preload("res://scripts/utils/singletons.gd")
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
 const ActivityScript = preload("res://scripts/resources/activity.gd")
@@ -37,7 +38,7 @@ func start_run(instance: String, members: Array):
 	wipe_count = 0
 	
 	# Marque le début
-	var game_time = Engine.get_singleton("GameTime") if Engine.has_singleton("GameTime") else null
+	var game_time = Singletons.get_autoload("GameTime")
 	if game_time:
 		start_time = {
 			"hour": game_time.current_hour,
@@ -248,14 +249,14 @@ func complete_run(success: bool):
 	
 	# Donner de l'XP à la guilde si succès
 	if success:
-		var guild_manager = Engine.get_singleton("GuildManager") if Engine.has_singleton("GuildManager") else null
+		var guild_manager = Singletons.get_autoload("GuildManager")
 		if guild_manager and guild_manager.guild:
 			guild_manager.guild.gain_xp(100, "Donjon complété: " + instance_data.name)
 		
 		# Vérifier si c'était un donjon héroïque et notifier PhaseManager
 		var is_heroic = DungeonDataScript.is_heroic_dungeon(instance_id)
 		if is_heroic:
-			var phase_manager = Engine.get_singleton("PhaseManager") if Engine.has_singleton("PhaseManager") else null
+			var phase_manager = Singletons.get_autoload("PhaseManager")
 			if phase_manager:
 				phase_manager.complete_heroic_dungeon(instance_data.name)
 	

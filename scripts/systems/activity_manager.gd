@@ -1,4 +1,5 @@
 extends Node
+const Singletons = preload("res://scripts/utils/singletons.gd")
 
 const ActivityScript = preload("res://scripts/resources/activity.gd")
 const DungeonInstanceScript = preload("res://scripts/systems/dungeon_instance.gd")
@@ -128,7 +129,7 @@ func _update_player_activity(player):
 				
 		ActivityScript.ActivityType.FARMING:
 			# Vérifier si la guilde a débloqué le farming
-			var guild_manager = Engine.get_singleton("GuildManager") if Engine.has_singleton("GuildManager") else null
+			var guild_manager = Singletons.get_autoload("GuildManager")
 			if guild_manager and guild_manager.guild.has_farming():
 				# Ajouter de l'or à la banque de guilde (proportionnel au temps)
 				# Base : 10-50 or par heure, donc 0.83-4.17 or par 5 minutes
@@ -439,7 +440,7 @@ func _update_player_controlled_activity(player):
 					player.gain_experience(xp_gained)
 		
 		ActivityScript.ActivityType.FARMING:
-			var guild_manager = Engine.get_singleton("GuildManager") if Engine.has_singleton("GuildManager") else null
+			var guild_manager = Singletons.get_autoload("GuildManager")
 			if guild_manager and guild_manager.guild.has_farming():
 				if randf() < 0.3:  # 30% de chance toutes les 5 minutes
 					var gold_gain = randi_range(2, 8)  # Plus généreux pour le joueur

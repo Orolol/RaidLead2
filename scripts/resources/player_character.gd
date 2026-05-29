@@ -1,5 +1,6 @@
 extends SimulatedPlayer
 class_name PlayerCharacter
+# Singletons hérité de SimulatedPlayer
 
 signal forced_disconnect_requested(recovery_hours: int)
 
@@ -336,13 +337,8 @@ func should_disconnect(game_time: Node) -> bool:
 
 # Méthodes utilitaires
 func _get_game_time() -> Node:
-	"""Récupère le nœud GameTime"""
-	if Engine.has_singleton("GameTime"):
-		return Engine.get_singleton("GameTime")
-	var tree = Engine.get_main_loop()
-	if tree and tree.root:
-		return tree.root.get_node_or_null("/root/GameTime")
-	return null
+	"""Récupère le nœud GameTime (autoload)"""
+	return Singletons.get_autoload("GameTime")
 
 func _get_activity_manager() -> Node:
 	"""Récupère l'ActivityManager"""

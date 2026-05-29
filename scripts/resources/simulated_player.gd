@@ -1,5 +1,6 @@
 extends Resource
 class_name SimulatedPlayer
+const Singletons = preload("res://scripts/utils/singletons.gd")
 
 const PlayerTagsScript = preload("res://scripts/data/player_tags.gd")
 const EquipmentScript = preload("res://scripts/resources/equipment.gd")
@@ -470,7 +471,7 @@ func gain_experience(amount: int) -> void:
 	personnage_xp += amount
 	
 	# Vérifier si on monte de niveau
-	var server_version = Engine.get_singleton("ServerVersion") if Engine.has_singleton("ServerVersion") else null
+	var server_version = Singletons.get_autoload("ServerVersion")
 	var _max_level = 60 if server_version else 60
 	
 	# Formule d'XP plus progressive et réaliste
@@ -481,7 +482,7 @@ func gain_experience(amount: int) -> void:
 		personnage_niveau += 1
 		
 		# Donner de l'XP à la guilde pour chaque niveau gagné
-		var guild_manager = Engine.get_singleton("GuildManager") if Engine.has_singleton("GuildManager") else null
+		var guild_manager = Singletons.get_autoload("GuildManager")
 		if not guild_manager:
 			# Essayer via l'arbre de scène si on a accès à un node
 			var tree = Engine.get_main_loop()
@@ -526,7 +527,7 @@ func _calculate_xp_for_level(level: int) -> int:
 
 # Méthodes pour le système d'effets
 func get_modified_stat(stat_name: String, base_value: float) -> float:
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return base_value
 	
@@ -551,19 +552,19 @@ func get_modified_integration() -> float:
 	return get_modified_stat("integration", integration)
 
 func has_effect(effect_id: String) -> bool:
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return false
 	return effect_system.has_effect(self, effect_id)
 
 func get_effects() -> Array:
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return []
 	return effect_system.get_effects(self)
 
 func can_perform_action(action: String) -> bool:
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return true
 	
@@ -577,7 +578,7 @@ func get_available_actions() -> Array[String]:
 	var base_actions: Array[String] = ["leveling", "farming", "fun", "dungeon", "raid"]
 	var available_actions: Array[String] = base_actions.duplicate()
 	
-	var effect_system = Engine.get_singleton("EffectSystem")
+	var effect_system = Singletons.get_autoload("EffectSystem")
 	if not effect_system:
 		return available_actions
 	
@@ -648,7 +649,7 @@ func _initialize_activity_preferences():
 
 func _get_current_day() -> int:
 	"""Obtient le jour actuel du jeu"""
-	var game_time = Engine.get_singleton("GameTime") if Engine.has_singleton("GameTime") else null
+	var game_time = Singletons.get_autoload("GameTime")
 	if game_time:
 		# GameTime pourrait être un autoload, essayer de le récupérer depuis l'arbre
 		var tree = Engine.get_main_loop()
