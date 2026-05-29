@@ -20,6 +20,14 @@ func _process(_delta: float) -> bool:
 			if _frames >= 180:
 				_main = current_scene
 				_shoot("user://shot_main.png")
+				# Régression : ouvrir Guilde + sélectionner un membre construit les
+				# StatDisplay (skill = VALUE_PERCENTAGE) — déclenchait le bug Container.
+				_main.window_manager.show_window("guilde")
+				var g = _main.window_manager._get_existing_instance("guilde")
+				if g and g.has_method("_on_member_selected"):
+					g._on_member_selected(0)
+					print("Guilde: membre 0 sélectionné")
+				_shoot("user://shot_guilde.png")
 				_open_national()
 				_seed()
 				_state = 2

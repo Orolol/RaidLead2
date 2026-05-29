@@ -50,7 +50,8 @@ enum Layout {
 @export var color_neutral: Color = Color(0.8, 0.8, 0.8)  # Couleur par défaut
 
 # Éléments UI
-var container: Container
+# Typé Control (et non Container) car certains layouts utilisent un Control nu
+var container: Control
 var icon_element: Control
 var text_label: Label
 var progress_bar: ProgressBar
@@ -126,7 +127,8 @@ func _create_text_elements():
 	"""Crée les éléments texte"""
 	
 	# Container pour texte (peut contenir label + progress bar)
-	var text_container: Container
+	# Typé Control : l'else ci-dessous assigne un Control nu
+	var text_container: Control
 	
 	if display_mode == DisplayMode.PROGRESS_BAR and layout == Layout.HORIZONTAL:
 		text_container = VBoxContainer.new()
