@@ -46,7 +46,7 @@ func _generate_initial_pool():
 	var pool_limits = _get_current_pool_limits()
 	var pool_size = randi_range(pool_limits.min_size, pool_limits.max_size)
 	for i in pool_size:
-		var player = _create_random_player()
+		var player = _spawn_player()
 		available_players.append(player)
 	
 	pool_refreshed.emit()
@@ -66,11 +66,22 @@ func _get_current_pool_limits() -> Dictionary:
 		var bonus = guild_manager.guild.get_recruitment_pool_bonus()
 		base_min += bonus
 		base_max += bonus
-	
+
+	# Phase nationale : pool élargi (50-100 joueurs)
+	if is_national_phase():
+		base_min = maxi(base_min, 50)
+		base_max = maxi(base_max, 100)
+
 	return {
 		"min_size": base_min,
 		"max_size": base_max
 	}
+
+func _spawn_player() -> SimulatedPlayer:
+	"""Génère une recrue : en phase nationale, ~40% sont des semi-pros (avec salaire)."""
+	if is_national_phase() and randf() < 0.4:
+		return _create_national_player()
+	return _create_random_player()
 
 func _create_random_player() -> SimulatedPlayer:
 	var player = SimulatedPlayer.new()
@@ -129,7 +140,7 @@ func _on_day_changed(_day: int, _week: int, _year: int):
 	# Ajoute quelques nouveaux joueurs chaque jour
 	for i in randi_range(1, DAILY_NEW_PLAYERS):
 		if available_players.size() < pool_limits.max_size:
-			var new_player = _create_random_player()
+			var new_player = _spawn_player()
 			available_players.append(new_player)
 	
 	# Refresh complet périodiquement
@@ -159,7 +170,7 @@ func _refresh_pool():
 	
 	# Ajoute de nouveaux joueurs
 	while available_players.size() < pool_limits.min_size:
-		available_players.append(_create_random_player())
+		available_players.append(_spawn_player())
 	
 	pool_refreshed.emit()
 
@@ -285,7 +296,7 @@ func _on_server_version_updated(new_version: float, _update_name: String):
 	# Augmenter la taille du pool si nécessaire
 	var pool_limits = _get_current_pool_limits()
 	while available_players.size() < pool_limits.min_size:
-		available_players.append(_create_random_player())
+		available_players.append(_spawn_player())
 	
 	# Permettre à certains joueurs existants de progresser en niveau
 	var max_level = ServerVersion.get_max_player_level()
@@ -365,6 +376,7 @@ func attempt_national_recruitment(player: SimulatedPlayer, offered_salary: int) 
 
 	if ratio >= 1.0:
 		# Offre >= demande : acceptation directe
+		player.set_meta("salary", offered_salary)
 		available_players.erase(player)
 		player_recruited.emit(player)
 		return {"success": true, "player": player, "salary": offered_salary, "step": "accepted"}
@@ -381,6 +393,7 @@ func accept_counter_offer(player: SimulatedPlayer, salary: int) -> Dictionary:
 	if player not in available_players:
 		return {"success": false, "reason": "Joueur non disponible"}
 
+	player.set_meta("salary", salary)
 	available_players.erase(player)
 	player_recruited.emit(player)
 
@@ -420,18 +433,3 @@ func _get_guild_data() -> Dictionary:
 		data["hardcore"] = false
 	return data
 
-func _generate_initial_pool_override():
-	"""Override pour generer un pool mixte en phase nationale."""
-	if not is_national_phase():
-		return
-
-	# Ajouter des joueurs nationaux au pool existant
-	var national_count: int = randi_range(10, 20)
-	for i in range(national_count):
-		available_players.append(_create_national_player())
-
-	# Agrandir le pool
-	while available_players.size() < 50:
-		available_players.append(_create_random_player())
-
-	pool_refreshed.emit()

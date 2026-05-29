@@ -194,6 +194,10 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		"last_raid_success_day": player.last_raid_success_day,
 		"last_epic_loot_day": player.last_epic_loot_day,
 		"last_wipe_day": player.last_wipe_day,
+		"celebrity_level": player.celebrity_level,
+		"salary_demand": player.salary_demand,
+		"salary": player.get_meta("salary", 0),
+		"is_national": player.get_meta("is_national", false),
 		"equipment": _serialize_equipment(player.equipment),
 	}
 
@@ -236,6 +240,12 @@ func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 	player.last_raid_success_day = data.get("last_raid_success_day", -1)
 	player.last_epic_loot_day = data.get("last_epic_loot_day", -1)
 	player.last_wipe_day = data.get("last_wipe_day", -1)
+	player.celebrity_level = data.get("celebrity_level", 0.0)
+	player.salary_demand = data.get("salary_demand", 0)
+	if data.get("salary", 0) > 0:
+		player.set_meta("salary", data.get("salary", 0))
+	if data.get("is_national", false):
+		player.set_meta("is_national", true)
 
 	# Équipement
 	if data.has("equipment"):

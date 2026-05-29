@@ -40,6 +40,7 @@ func _ready():
 		game_time.minute_changed.connect(_on_minute_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 		game_time.day_changed.connect(_on_day_changed)
+		game_time.week_changed.connect(_on_week_changed)
 		
 	# Se connecter aux mises à jour de version serveur
 	if ServerVersion:
@@ -72,6 +73,38 @@ func _on_day_changed(_day: int, _week: int, _year: int):
 	# Incrémente les jours dans la guilde pour tous les membres
 	for member in guild_members:
 		member.increment_days_in_guild()
+
+func _on_week_changed(_week: int, _year: int):
+	# Verse les salaires des recrues semi-pro (Phase Nationale)
+	_pay_salaries()
+
+func get_total_weekly_salaries() -> int:
+	"""Masse salariale hebdomadaire totale (recrues nationales)."""
+	var total: int = 0
+	for member in guild_members:
+		total += member.get_meta("salary", 0)
+	return total
+
+func _pay_salaries() -> void:
+	"""Verse les salaires hebdomadaires ; pénalise le moral si la guilde ne peut pas payer."""
+	var total: int = get_total_weekly_salaries()
+	if total <= 0:
+		return
+
+	var notification_manager: Node = get_node_or_null("/root/NotificationManager")
+	if guild and guild.gold >= total:
+		guild.spend_gold(total)
+		if notification_manager:
+			notification_manager.show_info("Salaires versés : %d or" % total, "Masse salariale")
+	else:
+		# Impossible de payer : impact moral des salariés + réputation
+		for member in guild_members:
+			if member.get_meta("salary", 0) > 0:
+				member.mood = maxf(0.0, member.mood - 15.0)
+		if guild:
+			guild.lose_reputation(3.0, "Salaires impayés")
+		if notification_manager:
+			notification_manager.show_warning("Salaires impayés (%d or manquants) ! Moral en baisse." % (total - guild.gold), "Budget")
 
 func _update_all_members():
 	# Les connexions/déconnexions sont maintenant gérées par le BehaviorSystem

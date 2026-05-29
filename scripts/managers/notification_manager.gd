@@ -411,9 +411,12 @@ func _on_guild_level_up(new_level):
 	show_achievement("La guilde a atteint le niveau %d !" % new_level, "Level Up!")
 
 # Nouveaux gestionnaires d'événements
-func _on_phase_changed(new_phase, old_phase):
+func _on_phase_changed(new_phase, _old_phase):
 	"""Quand la phase du jeu change"""
-	show_info("Nouvelle phase : %s" % new_phase.name, "Phase changée")
+	var phase_name := str(new_phase)
+	if PhaseManager and PhaseManager.has_method("get_phase_name"):
+		phase_name = PhaseManager.get_phase_name(new_phase)
+	show_info("Nouvelle phase : %s" % phase_name, "Phase changée")
 
 func _on_progression_updated(phase, progress):
 	"""Quand la progression d'une phase est mise à jour"""

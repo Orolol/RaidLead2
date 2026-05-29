@@ -7,6 +7,7 @@ var advanced_tabs: AdvancedTabs
 var guild_ranking_list: ItemList
 var recruitment_list: ItemList
 var recruit_details: VBoxContainer
+var salary_spinbox: SpinBox = null
 
 var available_players: Array = []
 var selected_recruit = null
@@ -435,9 +436,11 @@ func _refresh_recruitment_list(filter_class: String = ""):
 		elif difficulty < 0.3:
 			difficulty_text = " (Facile)"
 		
-		var text = "%s - %s Niv.%d (Équip: %d)%s" % [
-			player.nom, 
-			player.personnage_classe, 
+		var national_marker = "💼 " if player.get_meta("is_national", false) else ""
+		var text = "%s%s - %s Niv.%d (Équip: %d)%s" % [
+			national_marker,
+			player.nom,
+			player.personnage_classe,
 			player.personnage_niveau,
 			player.get_total_ilvl(),
 			difficulty_text
@@ -559,36 +562,150 @@ func _update_recruit_details():
 	recruit_details.add_child(planning_text)
 	
 	recruit_details.add_child(HSeparator.new())
-	
-	# Créer un conteneur pour centrer le bouton
+
+	# Contrôles de recrutement : négociation salariale pour les recrues semi-pro (national)
+	if selected_recruit.get_meta("is_national", false):
+		_build_national_recruit_controls()
+	else:
+		_build_standard_invite_controls()
+
+func _build_standard_invite_controls() -> void:
 	var button_container = HBoxContainer.new()
 	button_container.add_theme_constant_override("separation", 10)
 	recruit_details.add_child(button_container)
-	
-	# Ajouter un spacer pour centrer
 	button_container.add_spacer(false)
-	
+
 	var invite_button = Button.new()
 	invite_button.text = "Envoyer une invitation"
 	invite_button.custom_minimum_size = Vector2(250, 50)
 	invite_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	
-	# Vérifier si la guilde peut recruter
 	if guild_manager and guild_manager.guild:
 		if not guild_manager.guild.can_recruit():
 			invite_button.disabled = true
 			invite_button.tooltip_text = "Votre guilde doit atteindre le niveau 2 pour pouvoir recruter"
-	
 	invite_button.pressed.connect(_on_invite_pressed)
 	button_container.add_child(invite_button)
-	
-	# Ajouter un autre spacer
 	button_container.add_spacer(false)
-	
-	# Ajouter un peu d'espace en bas
+
 	var spacer = Control.new()
 	spacer.custom_minimum_size = Vector2(0, 20)
 	recruit_details.add_child(spacer)
+
+func _build_national_recruit_controls() -> void:
+	var demand: int = selected_recruit.salary_demand
+	var has_agent: bool = selected_recruit.get_meta("has_agent", false)
+
+	var header = Label.new()
+	header.text = "💼 Recrue semi-professionnelle"
+	header.add_theme_font_size_override("font_size", 15)
+	header.modulate = Color(1.0, 0.82, 0.30)
+	recruit_details.add_child(header)
+
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 20)
+	grid.add_theme_constant_override("v_separation", 6)
+	recruit_details.add_child(grid)
+	_add_detail_row(grid, "Salaire demandé:", "%d or/sem" % demand)
+	if has_agent:
+		_add_detail_row(grid, "Agent:", "Oui (commission %d or)" % selected_recruit.get_meta("agent_commission", 0))
+	else:
+		_add_detail_row(grid, "Agent:", "Non")
+	_add_detail_row(grid, "Masse salariale actuelle:", "%d or/sem" % (guild_manager.get_total_weekly_salaries() if guild_manager else 0))
+
+	# Négociation salariale
+	var neg_box = HBoxContainer.new()
+	neg_box.add_theme_constant_override("separation", 8)
+	recruit_details.add_child(neg_box)
+	var lbl = Label.new()
+	lbl.text = "Votre offre:"
+	neg_box.add_child(lbl)
+	salary_spinbox = SpinBox.new()
+	salary_spinbox.min_value = 0
+	salary_spinbox.max_value = maxi(demand * 3, 10)
+	salary_spinbox.step = 5
+	salary_spinbox.value = demand
+	neg_box.add_child(salary_spinbox)
+	var lbl2 = Label.new()
+	lbl2.text = "or/sem"
+	neg_box.add_child(lbl2)
+
+	var btn_box = HBoxContainer.new()
+	btn_box.add_theme_constant_override("separation", 10)
+	recruit_details.add_child(btn_box)
+	var negotiate_btn = Button.new()
+	negotiate_btn.text = "Négocier"
+	negotiate_btn.pressed.connect(_on_negotiate_pressed)
+	btn_box.add_child(negotiate_btn)
+	var scout_btn = Button.new()
+	scout_btn.text = "Scouter (-2 réput.)"
+	scout_btn.tooltip_text = "Révèle les traits cachés et le skill réel"
+	scout_btn.pressed.connect(_on_scout_pressed)
+	btn_box.add_child(scout_btn)
+
+func _on_negotiate_pressed() -> void:
+	if not selected_recruit or not recruitment_pool or not salary_spinbox:
+		return
+	var offer: int = int(salary_spinbox.value)
+	var result: Dictionary = recruitment_pool.attempt_national_recruitment(selected_recruit, offer)
+	match result.get("step", ""):
+		"accepted":
+			player_recruited.emit(result.player)
+			_show_recruit_dialog("%s rejoint la guilde pour %d or/semaine !" % [result.player.nom, result.salary])
+			selected_recruit = null
+			_refresh_recruitment_list()
+			_update_recruit_details()
+		"counter":
+			_show_counter_offer_dialog(selected_recruit, result.counter_offer)
+		"rejected":
+			_show_recruit_dialog(result.reason)
+		_:
+			# Pas d'exigence salariale → recrutement standard
+			if result.get("success", false):
+				player_recruited.emit(result.player)
+				_show_recruit_dialog("%s rejoint la guilde !" % result.player.nom)
+				selected_recruit = null
+				_refresh_recruitment_list()
+				_update_recruit_details()
+			else:
+				_show_recruit_dialog(result.get("reason", "Recrutement échoué"))
+
+func _show_counter_offer_dialog(player, counter: int) -> void:
+	var dialog = ConfirmationDialog.new()
+	dialog.title = "Contre-proposition"
+	dialog.dialog_text = "%s demande %d or/semaine. Accepter ce contrat ?" % [player.nom, counter]
+	get_tree().root.add_child(dialog)
+	dialog.confirmed.connect(func():
+		var res: Dictionary = recruitment_pool.accept_counter_offer(player, counter)
+		if res.get("success", false):
+			player_recruited.emit(res.player)
+			selected_recruit = null
+			_refresh_recruitment_list()
+			_update_recruit_details()
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()
+
+func _on_scout_pressed() -> void:
+	if not selected_recruit or not recruitment_pool:
+		return
+	var result: Dictionary = recruitment_pool.scout_player(selected_recruit)
+	var msg = "Skill réel : %d\nSalaire demandé : %d or/sem\nAgent : %s" % [
+		result.get("skill", 0), result.get("salary_demand", 0),
+		"Oui" if result.get("has_agent", false) else "Non"]
+	var revealed: Array = result.get("revealed_tags", [])
+	if not revealed.is_empty():
+		msg += "\nTraits révélés : " + ", ".join(revealed)
+	_show_recruit_dialog(msg)
+	_update_recruit_details()
+
+func _show_recruit_dialog(text: String) -> void:
+	var dialog = AcceptDialog.new()
+	dialog.dialog_text = text
+	get_tree().root.add_child(dialog)
+	dialog.popup_centered()
+	dialog.confirmed.connect(dialog.queue_free)
 
 func _add_detail_row(parent: GridContainer, label_text: String, value_text: String):
 	var label = Label.new()

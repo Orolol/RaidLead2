@@ -355,7 +355,7 @@
 
 **Impact sur planning** : +10-15 jours mais **facilitera énormément** l'implémentation des Milestones 3-4 (+30-40% efficiency gain estimé)
 
-## 3. Milestone 3 : Phase 2 - Niveau National (~75%)
+## 3. Milestone 3 : Phase 2 - Niveau National (~95%)
 **Temps estimé : 7-10 jours**
 
 > **MàJ 29 mai 2026** — Backends médias/sponsors/dramas branchés et fonctionnels :
@@ -367,7 +367,8 @@
 > - ✅ **Popup de résolution de drama** (silence / communication / sanctions / exclusion) + notifications toast + pause auto.
 > - ✅ **Sauvegarde/chargement** des 3 systèmes dans `SaveManager`.
 > - ✅ **Thème UI global** (`UITheme`) appliqué à toute l'interface.
-> - 📋 Reste : **US 3.5** (pool de recrutement national, agents, salaires) ; brancher les compteurs réels dans `PhaseManager` (`active_sponsors`, `max_dramas_per_year`, `media_reputation`).
+> - ✅ **US 3.5** (recrutement national) branchée : pool élargi, semi-pros avec salaires/agents, négociation, scouting, masse salariale hebdo (commit dédié).
+> - 📋 Reste : brancher les compteurs réels dans `PhaseManager` (`active_sponsors`, `max_dramas_per_year`, `media_reputation`, `national_rank_duration`) pour la progression Phase 2→3.
 
 ### US 3.1 : Système de Célébrité des Joueurs
 - 📋 **Propriétés** : `celebrity_level`, `public_recognition` pour SimulatedPlayer  
@@ -397,12 +398,13 @@
 - 📋 **Impact** : recrutement, sponsors, moral équipe
 - 📋 **Récupération** : mécaniques de reconstruction réputation
 
-### US 3.5 : Pool de Recrutement National
-- 📋 **Extension pool** : 50-100 joueurs niveau national
-- 📋 **Semi-professionnels** : agents, exigences salariales, clauses
-- 📋 **Négociations complexes** : durée, contre-propositions, conditions
-- 📋 **Historique public** : réputation, préférences équipe
-- 📋 **Scouting** : identification talents émergents
+### US 3.5 : Pool de Recrutement National ✅
+- ✅ **Extension pool** : 50-100 joueurs en phase nationale (`_get_current_pool_limits`), ~40% de semi-pros (`_spawn_player`)
+- ✅ **Semi-professionnels** : `salary_demand` (or/sem), agents avec commission, masse salariale hebdomadaire prélevée sur l'or (GuildManager `_pay_salaries`, impact moral si impayé)
+- ✅ **Négociations** : offre via SpinBox, acceptation directe / contre-proposition (ConfirmationDialog) / refus (`attempt_national_recruitment`, `accept_counter_offer`)
+- ✅ **Historique public / préférences** : motivation, activité attendue, salaire, agent affichés dans la fiche recrue ; recrues nationales marquées 💼 dans la liste
+- ✅ **Scouting** : bouton « Scouter » révèle traits cachés + skill réel (coût -2 réputation, `scout_player`)
+- ✅ **Bonus** : fix d'un bug pré-existant `notification_manager._on_phase_changed` (`.name` sur un int) qui plantait à chaque changement de phase
 
 ## 3. Milestone 4 : Phase 3 - Niveau Esport (0%)
 **Temps estimé : 7-10 jours**
@@ -562,7 +564,7 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~62% terminé *(+Milestone 3 National branché, thème UI global, fix compilation critique)*
+- **Global** : ~65% terminé *(+Milestone 3 National quasi complet (recrutement national + salaires), thème UI global, fixes critiques)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
@@ -574,7 +576,7 @@
 - **Tooling Claude Code** : 100% ✅ *(Godot 4.5, MCP Pro, LSP, godot-docs)*
 - **Infrastructure UI Phase 3** : 0% 📋 *(Phase 3 - Polish)*
 - **Thème UI global** : 100% ✅ *(UITheme appliqué partout)*
-- **Milestone 3** : ~75% 🚧 *(National : célébrité, médias, sponsors, dramas branchés + UI ; reste recrutement national US 3.5)*
+- **Milestone 3** : ~95% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires — reste les compteurs de progression Phase 2→3 dans PhaseManager)*
 - **Milestone 4** : 0% 📋
 - **Milestone 5** : 0% 📋
 - **Milestone 6** : 0% 📋
