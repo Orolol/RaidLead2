@@ -9,12 +9,15 @@ signal drama_response_needed(drama)
 
 var active_dramas: Array = []
 var resolved_dramas: Array = []
+var dramas_this_year: int = 0  # dramas majeurs (severité >= MEDIUM) sur l'année courante
 
 const MAX_ACTIVE_DRAMAS := 3
 
 func _ready() -> void:
 	if GameTime.has_signal("week_changed"):
 		GameTime.week_changed.connect(_on_week_changed)
+	if GameTime.has_signal("year_changed"):
+		GameTime.year_changed.connect(_on_year_changed)
 
 	# Connecter aux incidents media
 	if has_node("/root/MediaManager"):
@@ -82,6 +85,8 @@ func _create_drama(type: Drama.DramaType, severity: Drama.Severity, source: Stri
 
 	var drama := Drama.new(type, severity, source, desc)
 	active_dramas.append(drama)
+	if severity >= Drama.Severity.MEDIUM:
+		dramas_this_year += 1
 	drama_occurred.emit(drama)
 	drama_response_needed.emit(drama)
 
@@ -152,6 +157,13 @@ func _has_tag(member, tag_name: String) -> bool:
 		return tag_name in member.tags_comportement
 	return false
 
+func _on_year_changed(_year: int) -> void:
+	"""Réinitialise le compteur de dramas annuel."""
+	dramas_this_year = 0
+
+func get_dramas_this_year() -> int:
+	return dramas_this_year
+
 func get_active_dramas_count() -> int:
 	return active_dramas.size()
 
@@ -168,9 +180,11 @@ func serialize() -> Dictionary:
 	return {
 		"active_dramas": active_data,
 		"resolved_dramas": resolved_data,
+		"dramas_this_year": dramas_this_year,
 	}
 
 func deserialize(data: Dictionary) -> void:
+	dramas_this_year = data.get("dramas_this_year", 0)
 	active_dramas.clear()
 	for d_data in data.get("active_dramas", []):
 		active_dramas.append(Drama.deserialize(d_data))

@@ -355,7 +355,7 @@
 
 **Impact sur planning** : +10-15 jours mais **facilitera énormément** l'implémentation des Milestones 3-4 (+30-40% efficiency gain estimé)
 
-## 3. Milestone 3 : Phase 2 - Niveau National (~95%)
+## 3. Milestone 3 : Phase 2 - Niveau National (100% ✅)
 **Temps estimé : 7-10 jours**
 
 > **MàJ 29 mai 2026** — Backends médias/sponsors/dramas branchés et fonctionnels :
@@ -368,7 +368,7 @@
 > - ✅ **Sauvegarde/chargement** des 3 systèmes dans `SaveManager`.
 > - ✅ **Thème UI global** (`UITheme`) appliqué à toute l'interface.
 > - ✅ **US 3.5** (recrutement national) branchée : pool élargi, semi-pros avec salaires/agents, négociation, scouting, masse salariale hebdo (commit dédié).
-> - 📋 Reste : brancher les compteurs réels dans `PhaseManager` (`active_sponsors`, `max_dramas_per_year`, `media_reputation`, `national_rank_duration`) pour la progression Phase 2→3.
+> - ✅ **Progression Phase 2→3 branchée** : `PhaseManager` lit désormais de vraies valeurs — `active_sponsors` (SponsorshipManager), `max_dramas_per_year` (compteur annuel DramaManager), `media_reputation` (MediaManager), `world_first_count` (server firsts du joueur), `national_rank_position`/`duration` (GuildRanking + suivi `days_at_rank_1`). Sémantique de rang corrigée (plus petit = meilleur).
 
 ### US 3.1 : Système de Célébrité des Joueurs
 - 📋 **Propriétés** : `celebrity_level`, `public_recognition` pour SimulatedPlayer  
@@ -564,7 +564,7 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~65% terminé *(+Milestone 3 National quasi complet (recrutement national + salaires), thème UI global, fixes critiques)*
+- **Global** : ~67% terminé *(+Milestone 3 National 100% (recrutement, salaires, progression Phase 2→3), thème UI global, fixes critiques)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
@@ -576,7 +576,7 @@
 - **Tooling Claude Code** : 100% ✅ *(Godot 4.5, MCP Pro, LSP, godot-docs)*
 - **Infrastructure UI Phase 3** : 0% 📋 *(Phase 3 - Polish)*
 - **Thème UI global** : 100% ✅ *(UITheme appliqué partout)*
-- **Milestone 3** : ~95% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires — reste les compteurs de progression Phase 2→3 dans PhaseManager)*
+- **Milestone 3** : 100% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires, progression Phase 2→3 branchée)*
 - **Milestone 4** : 0% 📋
 - **Milestone 5** : 0% 📋
 - **Milestone 6** : 0% 📋

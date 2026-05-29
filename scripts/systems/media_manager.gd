@@ -126,6 +126,19 @@ func get_total_weekly_revenue() -> float:
 			total += member.get_meta("stream_revenue", 0.0)
 	return total
 
+func get_media_reputation() -> float:
+	"""Réputation médiatique (0-100) : réputation de guilde + exposition (audience, célébrité)."""
+	var base: float = GuildManager.guild.reputation if GuildManager.guild else 50.0
+	var audience_bonus: float = clampf(float(get_total_audience()) / 1000.0, 0.0, 15.0)
+	var celeb_total: float = 0.0
+	var count: int = 0
+	for member in GuildManager.guild_members:
+		celeb_total += member.celebrity_level
+		count += 1
+	var avg_celeb: float = (celeb_total / count) if count > 0 else 0.0
+	var celeb_bonus: float = clampf(avg_celeb / 5.0, 0.0, 15.0)
+	return clampf(base + audience_bonus + celeb_bonus, 0.0, 100.0)
+
 func get_streamers() -> Array:
 	"""Retourne la liste des streamers actifs."""
 	var streamers: Array = []

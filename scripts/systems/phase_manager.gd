@@ -22,6 +22,7 @@ var phase_unlock_date: Dictionary = {}
 
 # Tracking spécifique des accomplissements
 var heroic_dungeons_completed: int = 0
+var days_at_rank_1: int = 0  # jours consécutifs à la 1ère place du classement
 
 # Configuration des phases et leurs requirements
 const PHASE_CONFIG = {
@@ -312,12 +313,12 @@ func _get_requirement_current_value(req_name: String):
 			return heroic_dungeons_completed
 		
 		"server_rank_position":
-			# TODO: Sera implémenté avec le système de classement
-			return 1 # Placeholder
-		
+			if GuildRanking:
+				return GuildRanking.get_player_guild_position()
+			return 0
+
 		"server_rank_duration":
-			# TODO: Calculer depuis combien de temps on est TOP 1
-			return 0 # Placeholder
+			return days_at_rank_1
 			
 		"active_members_min":
 			if GuildManager:
@@ -339,24 +340,30 @@ func _get_requirement_current_value(req_name: String):
 			# TODO: Sera calculé avec le système de progression PvE
 			return 0.0 # Placeholder
 			
-		"national_rank_position", "national_rank_duration":
-			# TODO: Implémenté en Phase 2
+		"national_rank_position":
+			if GuildRanking:
+				return GuildRanking.get_player_guild_position()
 			return 0
+
+		"national_rank_duration":
+			return days_at_rank_1
 			
 		"max_dramas_per_year":
-			# TODO: Compter les dramas dans l'année
+			if DramaManager and DramaManager.has_method("get_dramas_this_year"):
+				return DramaManager.get_dramas_this_year()
 			return 0
 			
 		"active_sponsors":
-			# TODO: Compter les sponsors actifs
+			if SponsorshipManager:
+				return SponsorshipManager.active_sponsors.size()
 			return 0
 			
 		"world_first_count":
-			# TODO: Compter les world first
-			return 0
+			return _count_player_world_firsts()
 			
 		"media_reputation":
-			# TODO: Calculer réputation média
+			if MediaManager and MediaManager.has_method("get_media_reputation"):
+				return MediaManager.get_media_reputation()
 			return 50.0
 			
 		_:
@@ -367,6 +374,9 @@ func _check_requirement_met(req_name: String, current_value, required_value) -> 
 	match req_name:
 		"max_dramas_per_year":
 			return current_value <= required_value
+		"server_rank_position", "national_rank_position":
+			# Rang : plus petit = meilleur. Être classé <= au rang requis (et classé).
+			return current_value > 0 and current_value <= required_value
 		_:
 			return current_value >= required_value
 
@@ -381,6 +391,8 @@ func _calculate_requirement_progress(req_name: String, current_value, required_v
 				return 100.0
 			else:
 				return max(0.0, 100.0 - (current_value - required_value) * 25.0)
+		"server_rank_position", "national_rank_position":
+			return 100.0 if (current_value > 0 and current_value <= required_value) else 0.0
 		_:
 			return min(100.0, (float(current_value) / float(required_value)) * 100.0)
 
@@ -400,10 +412,33 @@ func _on_day_changed(day: int, week: int, year: int):
 	"""Appelé chaque jour pour mettre à jour la progression"""
 	# Incrémenter les jours dans la phase actuelle
 	phase_progress[current_phase]["days_in_phase"] += 1
-	
+
+	# Suivi de la durée passée au rang 1 (pour server_rank_duration / national_rank_duration)
+	_update_rank_duration()
+
 	# Vérifier périodiquement la progression (tous les 7 jours)
 	if day % 7 == 0:
 		check_phase_progression()
+
+func _update_rank_duration():
+	"""Compte les jours consécutifs à la 1ère place du classement."""
+	if not GuildRanking:
+		return
+	if GuildRanking.get_player_guild_position() == 1:
+		days_at_rank_1 += 1
+	else:
+		days_at_rank_1 = 0
+
+func _count_player_world_firsts() -> int:
+	"""Nombre de premiers clears réalisés par la guilde du joueur (= world firsts ici)."""
+	if not GuildRanking or not GuildManager or not GuildManager.guild:
+		return 0
+	var count: int = 0
+	var firsts: Dictionary = GuildRanking.get_server_firsts()
+	for content_id in firsts:
+		if firsts[content_id] == GuildManager.guild.name:
+			count += 1
+	return count
 
 func _on_week_changed(week: int, year: int):
 	"""Appelé chaque semaine"""
@@ -463,7 +498,8 @@ func save_phase_data() -> Dictionary:
 		"current_phase": current_phase,
 		"phase_progress": phase_progress,
 		"phase_unlock_date": phase_unlock_date,
-		"heroic_dungeons_completed": heroic_dungeons_completed
+		"heroic_dungeons_completed": heroic_dungeons_completed,
+		"days_at_rank_1": days_at_rank_1
 	}
 
 func load_phase_data(data: Dictionary):
@@ -472,6 +508,7 @@ func load_phase_data(data: Dictionary):
 	phase_progress = data.get("phase_progress", {})
 	phase_unlock_date = data.get("phase_unlock_date", {})
 	heroic_dungeons_completed = data.get("heroic_dungeons_completed", 0)
+	days_at_rank_1 = data.get("days_at_rank_1", 0)
 	
 	# S'assurer que toutes les phases ont des données de progression
 	_initialize_phase_progress()
