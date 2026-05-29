@@ -26,6 +26,9 @@ func save_game() -> bool:
 		"guild": _serialize_guild(),
 		"members": _serialize_members(),
 		"loot_history": _serialize_loot_history(),
+		"media": MediaManager.serialize(),
+		"sponsors": SponsorshipManager.serialize(),
+		"dramas": DramaManager.serialize(),
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
@@ -87,6 +90,13 @@ func load_game() -> bool:
 		_deserialize_members(data.members)
 	if data.has("loot_history"):
 		_deserialize_loot_history(data.loot_history)
+	# Systemes National (apres les membres car ils y font reference)
+	if data.has("media"):
+		MediaManager.deserialize(data.media)
+	if data.has("sponsors"):
+		SponsorshipManager.deserialize(data.sponsors)
+	if data.has("dramas"):
+		DramaManager.deserialize(data.dramas)
 
 	print("SaveManager: chargement réussi (version %d)" % data.save_version)
 	load_completed.emit(true)

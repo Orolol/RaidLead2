@@ -20,6 +20,9 @@ var player_character = null  # Référence au personnage joueur
 # var fast_forward_manager: Node = null  # Supprimé - système simplifié
 
 func _ready():
+	# Applique le thème global cohérent à toute l'UI (fenêtres, popups, notifications)
+	get_tree().root.theme = UITheme.build()
+
 	# Les nœuds existent déjà dans la scène
 	menu_bar = $VBoxContainer/menu_bar
 	window_manager = $VBoxContainer/window_manager
@@ -33,6 +36,7 @@ func _ready():
 	_connect_window_signals()
 	_connect_event_system()
 	_connect_loot_conflict_system()
+	_connect_national_systems()
 	_setup_player_systems()
 
 	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
@@ -137,6 +141,7 @@ func _connect_menu_signals():
 	menu_bar.guilde_button_pressed.connect(_on_guilde_button_pressed)
 	menu_bar.monde_button_pressed.connect(_on_monde_button_pressed)
 	menu_bar.organisation_button_pressed.connect(_on_organisation_button_pressed)
+	menu_bar.national_button_pressed.connect(_on_national_button_pressed)
 
 func _on_personnage_button_pressed():
 	window_manager.show_window("personnage")
@@ -150,11 +155,15 @@ func _on_monde_button_pressed():
 func _on_organisation_button_pressed():
 	window_manager.show_window("organisation")
 
+func _on_national_button_pressed():
+	window_manager.show_window("national")
+
 func _register_windows():
 	window_manager.register_window("personnage", "res://scenes/Fenetre_Personnage.tscn")
 	window_manager.register_window("guilde", "res://scenes/Fenetre_Guilde.tscn")
 	window_manager.register_window("monde", "res://scenes/Fenetre_Monde.tscn")
 	window_manager.register_window("organisation", "res://scenes/Fenetre_OrganisationGroupe.tscn")
+	window_manager.register_window("national", "res://scenes/Fenetre_National.tscn")
 
 func _connect_window_signals():
 	# Écouter l'ouverture des fenêtres pour connecter leurs signaux
@@ -318,7 +327,10 @@ func _input(event: InputEvent) -> void:
 					menu_bar._on_monde_pressed()
 			KEY_O:  # O pour Organisation
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_organisation_groupe_pressed()
+					menu_bar._on_organisation_pressed()
+			KEY_N:  # N pour National
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_national_pressed()
 			KEY_SPACE:  # Espace pour pause
 				var game_time_node = GameTime
 				if game_time_node:
@@ -478,6 +490,148 @@ func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Arr
 			"%s a reçu %s" % [winner.nom, item.name],
 			"Loot attribué"
 		)
+
+# === SYSTÈMES NATIONAUX (Milestone 3 : médias, sponsors, dramas) ===
+
+var _drama_popup_active: bool = false
+var _pending_dramas: Array = []
+
+func _connect_national_systems() -> void:
+	"""Connecte les signaux des systèmes médias, sponsors et dramas (Phase Nationale)."""
+	var media: Node = MediaManager
+	if media:
+		media.media_incident.connect(_on_media_incident)
+		media.streamer_started.connect(_on_streamer_started)
+
+	var sponsors: Node = SponsorshipManager
+	if sponsors:
+		sponsors.sponsor_acquired.connect(_on_sponsor_acquired)
+		sponsors.sponsor_lost.connect(_on_sponsor_lost)
+
+	var dramas: Node = DramaManager
+	if dramas:
+		dramas.drama_occurred.connect(_on_drama_occurred)
+		dramas.drama_response_needed.connect(_on_drama_response_needed)
+		dramas.drama_resolved.connect(_on_drama_resolved)
+
+func _on_media_incident(_member_name: String, _incident_type: String, description: String) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Média] %s" % description, "warning")
+
+func _on_streamer_started(member_name: String) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Stream] %s commence à streamer !" % member_name, "activity")
+	if NotificationManager:
+		NotificationManager.show_info("%s est désormais streamer" % member_name, "Nouveau streamer")
+
+func _on_sponsor_acquired(sponsor) -> void:
+	if NotificationManager:
+		NotificationManager.show_success(
+			"Contrat signé avec %s (+%d or/sem.)" % [sponsor.sponsor_name, sponsor.weekly_revenue],
+			"Sponsor")
+	if chat_panel:
+		chat_panel.add_message("[Sponsor] Nouveau contrat : %s" % sponsor.sponsor_name, "loot")
+
+func _on_sponsor_lost(sponsor, reason: String) -> void:
+	if NotificationManager:
+		NotificationManager.show_warning("%s : %s" % [sponsor.sponsor_name, reason], "Sponsor perdu")
+
+func _on_drama_occurred(drama) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Drama] %s" % drama.description, "error")
+	if NotificationManager:
+		NotificationManager.show_warning(
+			drama.description,
+			"%s (%s)" % [drama.get_type_name(), drama.get_severity_name()])
+
+func _on_drama_resolved(drama) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Drama] Crise résolue : %s" % drama.get_type_name(), "info")
+
+func _on_drama_response_needed(drama) -> void:
+	# File d'attente pour éviter les popups simultanées
+	if _drama_popup_active:
+		_pending_dramas.append(drama)
+		return
+	_show_drama_popup(drama)
+
+func _show_drama_popup(drama) -> void:
+	"""Affiche un popup pour résoudre un drama, avec mise en pause du jeu."""
+	_drama_popup_active = true
+
+	var game_time_node: Node = GameTime
+	var was_paused: bool = false
+	if game_time_node:
+		was_paused = game_time_node.is_paused
+		if not was_paused:
+			game_time_node.toggle_pause()
+
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = "Drama : %s" % drama.get_type_name()
+	dialog.exclusive = true
+	dialog.get_ok_button().hide()
+	dialog.process_mode = Node.PROCESS_MODE_ALWAYS
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	dialog.add_child(vbox)
+
+	var severity_label: Label = Label.new()
+	severity_label.text = "Gravité : %s" % drama.get_severity_name()
+	severity_label.add_theme_font_size_override("font_size", 16)
+	severity_label.modulate = Color(0.9, 0.3, 0.3) if drama.severity >= 3 else Color(0.9, 0.7, 0.2)
+	vbox.add_child(severity_label)
+
+	var desc_label: Label = Label.new()
+	desc_label.text = drama.description
+	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_label.custom_minimum_size = Vector2(440, 0)
+	vbox.add_child(desc_label)
+
+	vbox.add_child(HSeparator.new())
+
+	var instruction: Label = Label.new()
+	instruction.text = "Comment réagissez-vous ?"
+	instruction.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(instruction)
+
+	var options: Array = [
+		{"id": "silence", "label": "Garder le silence", "desc": "Résolution lente (4 sem.), aucun effet immédiat"},
+		{"id": "communication", "label": "Communication de crise", "desc": "Résolution en 2 sem., +2 réputation"},
+		{"id": "sanctions", "label": "Sanctions disciplinaires", "desc": "Rapide (1 sem.), -15 moral, +5 réputation"},
+		{"id": "exclusion", "label": "Exclure le membre fautif", "desc": "Immédiat, -25 moral, +10 réputation"},
+	]
+	for opt in options:
+		var btn: Button = Button.new()
+		btn.text = opt.label
+		btn.custom_minimum_size = Vector2(440, 34)
+		var resolution: String = opt.id
+		btn.pressed.connect(func():
+			DramaManager.resolve_drama(drama, resolution)
+			dialog.queue_free()
+			if game_time_node and not was_paused:
+				game_time_node.toggle_pause()
+			_drama_popup_active = false
+			_process_next_drama()
+		)
+		vbox.add_child(btn)
+
+		var desc: Label = Label.new()
+		desc.text = opt.desc
+		desc.add_theme_font_size_override("font_size", 11)
+		desc.modulate = Color(0.65, 0.67, 0.72)
+		vbox.add_child(desc)
+
+	add_child(dialog)
+	dialog.popup_centered(Vector2(540, 380))
+
+func _process_next_drama() -> void:
+	"""Affiche le prochain drama en attente, s'il en reste."""
+	while not _pending_dramas.is_empty():
+		var next = _pending_dramas.pop_front()
+		if next and next.active:
+			_show_drama_popup(next)
+			return
 
 func _setup_player_systems():
 	"""Configure les systèmes spécifiques au joueur"""

@@ -402,10 +402,6 @@ func would_be_upgrade(item: Item) -> bool:
 
 	return calculate_item_score(item) > calculate_item_score(current_item)
 
-func trigger_loot_conflict() -> void:
-	"""Appele quand le joueur perd un conflit de loot."""
-	loot_conflicts += 1
-
 # --- Celebrite ---
 
 func update_celebrity(delta: float) -> void:

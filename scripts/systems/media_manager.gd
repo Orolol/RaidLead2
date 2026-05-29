@@ -21,8 +21,33 @@ func _ready() -> void:
 		GameTime.week_changed.connect(_on_week_changed)
 
 func _on_week_changed(_week: int, _year: int) -> void:
+	_update_celebrity()
 	_update_streamers()
 	_check_media_events()
+	_pay_guild_revenue_cut()
+
+func _update_celebrity() -> void:
+	"""Fait evoluer la celebrite des membres selon leurs performances et leur exposition."""
+	for member in GuildManager.guild_members:
+		var growth: float = 0.0
+		# Le talent attire l'attention
+		if member.skill >= 85:
+			growth += 1.5
+		elif member.skill >= 70:
+			growth += 0.7
+		# Le streaming amplifie fortement la celebrite
+		if member.get_meta("is_streamer", false):
+			var audience: int = member.get_meta("audience_size", 0)
+			growth += clampf(float(audience) / 1500.0, 0.0, 3.0)
+		# Decroissance naturelle si rien ne se passe
+		growth -= 0.6
+		member.update_celebrity(growth)
+
+func _pay_guild_revenue_cut() -> void:
+	"""La guilde percoit une part des revenus de streaming de ses membres."""
+	var guild_cut: int = int(get_total_weekly_revenue() * 0.3)
+	if guild_cut > 0 and GuildManager.guild:
+		GuildManager.guild.add_gold(guild_cut)
 
 func _update_streamers() -> void:
 	"""Met a jour le statut des streamers et leur audience."""
@@ -33,7 +58,7 @@ func _update_streamers() -> void:
 			member.set_meta("stream_revenue", 0.0)
 
 		var is_streamer: bool = member.get_meta("is_streamer")
-		var celebrity: float = member.get_meta("celebrity_level") if member.has_meta("celebrity_level") else 0.0
+		var celebrity: float = member.celebrity_level
 
 		if not is_streamer:
 			# Chance de devenir streamer

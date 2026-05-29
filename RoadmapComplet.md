@@ -355,8 +355,19 @@
 
 **Impact sur planning** : +10-15 jours mais **facilitera énormément** l'implémentation des Milestones 3-4 (+30-40% efficiency gain estimé)
 
-## 3. Milestone 3 : Phase 2 - Niveau National (0%)
+## 3. Milestone 3 : Phase 2 - Niveau National (~75%)
 **Temps estimé : 7-10 jours**
+
+> **MàJ 29 mai 2026** — Backends médias/sponsors/dramas branchés et fonctionnels :
+> - ✅ **3 managers enregistrés en autoloads** (`MediaManager`, `SponsorshipManager`, `DramaManager`) — ils étaient écrits mais orphelins (jamais exécutés).
+> - ✅ **Bug critique corrigé** : fonction `trigger_loot_conflict` dupliquée dans `simulated_player.gd` (l.241 + l.405) → cassait *toute* la compilation à froid. Le jeu ne s'instanciait plus hors éditeur chaud.
+> - ✅ **Célébrité** : lecture corrigée (propriété `celebrity_level`, plus `get_meta`), croissance hebdo (talent + streaming) dans `MediaManager`.
+> - ✅ **Revenus** : sponsors + part streaming (30%) versés à l'or de la guilde chaque semaine.
+> - ✅ **Fenêtre `National`** (`Fenetre_National.tscn`) : onglets Célébrité / Médias / Sponsors / Dramas + bouton menu + raccourci Ctrl+N.
+> - ✅ **Popup de résolution de drama** (silence / communication / sanctions / exclusion) + notifications toast + pause auto.
+> - ✅ **Sauvegarde/chargement** des 3 systèmes dans `SaveManager`.
+> - ✅ **Thème UI global** (`UITheme`) appliqué à toute l'interface.
+> - 📋 Reste : **US 3.5** (pool de recrutement national, agents, salaires) ; brancher les compteurs réels dans `PhaseManager` (`active_sponsors`, `max_dramas_per_year`, `media_reputation`).
 
 ### US 3.1 : Système de Célébrité des Joueurs
 - 📋 **Propriétés** : `celebrity_level`, `public_recognition` pour SimulatedPlayer  
@@ -551,7 +562,7 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~55% terminé *(+5% refactoring architecture, save/load, tooling)*
+- **Global** : ~62% terminé *(+Milestone 3 National branché, thème UI global, fix compilation critique)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
@@ -562,7 +573,8 @@
 - **Système Save/Load** : 100% ✅ *(SaveManager autoload, JSON, F5 manual save)*
 - **Tooling Claude Code** : 100% ✅ *(Godot 4.5, MCP Pro, LSP, godot-docs)*
 - **Infrastructure UI Phase 3** : 0% 📋 *(Phase 3 - Polish)*
-- **Milestone 3** : 0% 📋
+- **Thème UI global** : 100% ✅ *(UITheme appliqué partout)*
+- **Milestone 3** : ~75% 🚧 *(National : célébrité, médias, sponsors, dramas branchés + UI ; reste recrutement national US 3.5)*
 - **Milestone 4** : 0% 📋
 - **Milestone 5** : 0% 📋
 - **Milestone 6** : 0% 📋

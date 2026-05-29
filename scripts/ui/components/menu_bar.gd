@@ -5,6 +5,7 @@ signal personnage_button_pressed
 signal guilde_button_pressed
 signal monde_button_pressed
 signal organisation_button_pressed
+signal national_button_pressed
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -23,11 +24,13 @@ func _ready():
 	var guilde_btn = _create_menu_button("Guilde", _on_guilde_pressed)
 	var monde_btn = _create_menu_button("Monde", _on_monde_pressed)
 	var organisation_btn = _create_menu_button("Organisation", _on_organisation_pressed)
-	
+	var national_btn = _create_menu_button("National", _on_national_pressed)
+
 	hbox.add_child(personnage_btn)
 	hbox.add_child(guilde_btn)
 	hbox.add_child(monde_btn)
 	hbox.add_child(organisation_btn)
+	hbox.add_child(national_btn)
 
 func _create_menu_button(text: String, callback: Callable) -> Button:
 	var button = Button.new()
@@ -51,3 +54,6 @@ func _on_monde_pressed():
 
 func _on_organisation_pressed():
 	organisation_button_pressed.emit()
+
+func _on_national_pressed():
+	national_button_pressed.emit()

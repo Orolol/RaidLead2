@@ -48,7 +48,7 @@ func _check_drama_triggers() -> void:
 		return
 
 	for member in GuildManager.guild_members:
-		var celebrity: float = member.get_meta("celebrity_level") if member.has_meta("celebrity_level") else 0.0
+		var celebrity: float = member.celebrity_level
 
 		# Celebrity elevee -> scandale
 		if celebrity > 80.0 and randf() < 0.15:

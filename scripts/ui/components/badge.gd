@@ -7,7 +7,7 @@ class_name Badge
 # Configuration
 @export var text: String = "Badge" : set = set_text
 @export var badge_type: BadgeType = BadgeType.DEFAULT : set = set_badge_type
-@export var size: BadgeSize = BadgeSize.NORMAL : set = set_size
+@export var badge_size: BadgeSize = BadgeSize.NORMAL : set = set_badge_size
 @export var show_close_button: bool = false : set = set_show_close_button
 @export var clickable: bool = false : set = set_clickable
 @export var animate_appearance: bool = true
@@ -132,7 +132,7 @@ func _create_close_button():
 func _apply_styling():
 	"""Applique le style visuel au badge"""
 	
-	var size_config = SIZE_CONFIGS[size]
+	var size_config = SIZE_CONFIGS[badge_size]
 	current_color = BADGE_COLORS[badge_type]
 	
 	# Style du panel de fond
@@ -194,8 +194,8 @@ func set_badge_type(new_type: BadgeType):
 	if is_inside_tree():
 		_apply_styling()
 
-func set_size(new_size: BadgeSize):
-	size = new_size
+func set_badge_size(new_size: BadgeSize):
+	badge_size = new_size
 	if is_inside_tree():
 		_apply_styling()
 
@@ -357,7 +357,7 @@ static func create_tag_badge(tag_text: String, parent: Node) -> Badge:
 	var badge = Badge.new()
 	badge.text = tag_text
 	badge.badge_type = BadgeType.TAG
-	badge.size = BadgeSize.SMALL
+	badge.badge_size = BadgeSize.SMALL
 	badge.clickable = true
 	badge.show_close_button = false
 	parent.add_child(badge)
@@ -368,7 +368,7 @@ static func create_counter_badge(count: int, parent: Node) -> Badge:
 	var badge = Badge.new()
 	badge.text = str(count)
 	badge.badge_type = BadgeType.COUNTER
-	badge.size = BadgeSize.SMALL
+	badge.badge_size = BadgeSize.SMALL
 	badge.auto_size = true
 	parent.add_child(badge)
 	return badge
@@ -378,7 +378,7 @@ static func create_status_badge(is_online: bool, parent: Node) -> Badge:
 	var badge = Badge.new()
 	badge.text = "●"  # Caractère cercle
 	badge.badge_type = BadgeType.SUCCESS if is_online else BadgeType.ERROR
-	badge.size = BadgeSize.SMALL
+	badge.badge_size = BadgeSize.SMALL
 	badge.auto_size = false
 	badge.custom_minimum_size = Vector2(16, 16)
 	parent.add_child(badge)
@@ -390,7 +390,7 @@ func setup_for_player_tag(tag_name: String, removable: bool = false):
 	"""Configuration spéciale pour les tags de joueur"""
 	update_text(tag_name)
 	update_type(BadgeType.TAG)
-	set_size(BadgeSize.SMALL)
+	set_badge_size(BadgeSize.SMALL)
 	set_show_close_button(removable)
 	set_clickable(true)
 
@@ -398,7 +398,7 @@ func setup_for_notification_count(count: int):
 	"""Configuration spéciale pour les compteurs de notifications"""
 	update_text(str(count))
 	update_type(BadgeType.COUNTER)
-	set_size(BadgeSize.SMALL)
+	set_badge_size(BadgeSize.SMALL)
 	if count == 0:
 		visible = false
 	else:
@@ -408,7 +408,7 @@ func setup_for_connection_status(is_connected: bool):
 	"""Configuration spéciale pour le statut de connexion"""
 	update_text("●")
 	update_type(BadgeType.SUCCESS if is_connected else BadgeType.ERROR)
-	set_size(BadgeSize.SMALL)
+	set_badge_size(BadgeSize.SMALL)
 	custom_minimum_size = Vector2(12, 12)
 
 # ==================== ANIMATIONS AVANCÉES ====================

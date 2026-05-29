@@ -43,10 +43,19 @@ func _on_week_changed(_week: int, _year: int) -> void:
 	# Tick sponsors actifs
 	_tick_active_sponsors()
 
+	# Versement des revenus hebdomadaires a la guilde
+	_pay_sponsor_revenue()
+
 	# Refresh du pool periodique
 	if weeks_since_refresh >= POOL_REFRESH_WEEKS:
 		_refresh_pool()
 		weeks_since_refresh = 0
+
+func _pay_sponsor_revenue() -> void:
+	"""Verse les revenus hebdomadaires des sponsors actifs a la guilde."""
+	var revenue: int = get_weekly_revenue()
+	if revenue > 0 and GuildManager.guild:
+		GuildManager.guild.add_gold(revenue)
 
 func _tick_active_sponsors() -> void:
 	"""Met a jour les sponsors actifs et verifie les obligations."""
