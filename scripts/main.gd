@@ -13,6 +13,8 @@ var menu_bar: Control
 
 var chat_panel: ChatPanel = null
 var event_popup: EventPopupWindow = null
+var _pending_event_queue: Array = []  # événements en attente derrière un autre popup modal
+var _loot_dialog_active: bool = false
 
 # Système joueur
 var player_control_panel: PlayerControlPanelScript = null
@@ -383,9 +385,10 @@ func _on_event_triggered(event: RandomEventResource):
 func show_event_popup(event: RandomEventResource):
 	print("Main: show_event_popup appelé pour l'événement: %s" % event.title)
 	
-	if event_popup:
-		print("Main: Nettoyage de l'ancienne popup")
-		event_popup.queue_free()
+	# File d'attente : ne pas empiler sur un autre popup modal (loot, drama, ou un événement déjà affiché)
+	if event_popup != null or _drama_popup_active or _loot_dialog_active:
+		_pending_event_queue.append(event)
+		return
 	
 	print("Main: Chargement de la scène EventPopup.tscn")
 	var event_popup_scene = load("res://scenes/EventPopup.tscn")
@@ -408,9 +411,19 @@ func _on_event_choice_selected(choice: EventChoiceResource):
 		event_manager.resolve_event(event_manager.pending_event, choice)
 	
 	event_popup = null
+	_show_next_pending_event.call_deferred()
 
 func _on_event_popup_closed():
 	event_popup = null
+	_show_next_pending_event.call_deferred()
+
+func _show_next_pending_event() -> void:
+	"""Affiche le prochain événement en file, si plus aucun popup modal n'est ouvert."""
+	if _pending_event_queue.is_empty():
+		return
+	if event_popup != null or _drama_popup_active or _loot_dialog_active:
+		return
+	show_event_popup(_pending_event_queue.pop_front())
 
 func _connect_loot_conflict_system():
 	var gm: Node = GuildManager
@@ -484,9 +497,12 @@ func _on_loot_conflict(conflict: Dictionary):
 			# Reprendre le jeu
 			if game_time_node and not was_paused:
 				game_time_node.toggle_pause()
+			_loot_dialog_active = false
+			_show_next_pending_event.call_deferred()
 		)
 		vbox.add_child(btn)
 
+	_loot_dialog_active = true
 	add_child(dialog)
 	dialog.popup_centered(Vector2(500, 300))
 
@@ -634,6 +650,7 @@ func _show_drama_popup(drama) -> void:
 				game_time_node.toggle_pause()
 			_drama_popup_active = false
 			_process_next_drama()
+			_show_next_pending_event.call_deferred()
 		)
 		vbox.add_child(btn)
 

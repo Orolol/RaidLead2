@@ -34,8 +34,23 @@ func _ready():
 	
 	_setup_header(vbox)
 	_setup_content(vbox)
-	
+
+	# Rafraîchir la liste des membres disponibles aux connexions/déconnexions
+	if GuildManager:
+		GuildManager.member_connected.connect(_on_member_availability_changed)
+		GuildManager.member_disconnected.connect(_on_member_availability_changed)
+
 	hide()
+
+func _on_member_availability_changed(_player) -> void:
+	if visible:
+		_refresh_available_members()
+
+func refresh_window() -> void:
+	"""Recharge les membres et rafraîchit la liste disponible (appelé à l'affichage)."""
+	if GuildManager:
+		guild_members = GuildManager.guild_members
+	_refresh_available_members()
 
 func _setup_header(parent: VBoxContainer):
 	var header = HBoxContainer.new()
