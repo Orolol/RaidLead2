@@ -11,6 +11,7 @@ const GREEN := Color(0.55, 0.82, 0.55)
 const RED := Color(0.88, 0.45, 0.45)
 
 var advanced_tabs: AdvancedTabs
+var _drag_active: bool = false
 
 var _morale_box: VBoxContainer
 var _relations_box: VBoxContainer
@@ -52,6 +53,10 @@ func _setup_header(parent: VBoxContainer) -> void:
 	var title := Label.new()
 	title.text = "Cohésion de Guilde"
 	title.add_theme_font_size_override("font_size", 20)
+	title.mouse_filter = Control.MOUSE_FILTER_STOP
+	title.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title.gui_input.connect(_on_header_drag)
 	header.add_child(title)
 
 	header.add_spacer(false)
@@ -66,6 +71,13 @@ func _setup_header(parent: VBoxContainer) -> void:
 	close_btn.custom_minimum_size = Vector2(34, 30)
 	close_btn.pressed.connect(func(): hide())
 	header.add_child(close_btn)
+
+func _on_header_drag(event: InputEvent) -> void:
+	"""Permet de déplacer la fenêtre en glissant sur la barre de titre."""
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
 
 func _add_scroll_tab(tab_title: String) -> VBoxContainer:
 	var scroll := ScrollContainer.new()

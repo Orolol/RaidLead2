@@ -511,9 +511,17 @@ func _connect_window_signals(instance: Control, window_name: String, instance_id
 		)
 
 func _center_window(window: Control):
-	"""Centre une fenêtre sur l'écran"""
-	var viewport_size = get_viewport().get_visible_rect().size
-	window.position = (viewport_size - window.size) / 2
+	"""Centre une fenêtre dans la zone sûre (au-dessus de la barre de menu, sur l'écran)."""
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var menu_bar_h: float = 90.0
+	var margin: float = 16.0
+	var pos: Vector2 = (viewport_size - window.size) / 2.0
+	# Rester au-dessus de la barre de menu et dans l'écran
+	var max_y: float = maxf(margin, viewport_size.y - menu_bar_h - window.size.y)
+	var max_x: float = maxf(margin, viewport_size.x - margin - window.size.x)
+	pos.x = clampf(pos.x, margin, max_x)
+	pos.y = clampf(pos.y, margin, max_y)
+	window.position = pos
 
 func _generate_instance_id(window_name: String) -> String:
 	"""Génère un ID unique pour une instance"""
