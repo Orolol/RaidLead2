@@ -37,6 +37,8 @@ func _ready():
 	_connect_event_system()
 	_connect_loot_conflict_system()
 	_connect_national_systems()
+	_connect_esport_systems()
+	_connect_culture_systems()
 	_setup_player_systems()
 
 	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
@@ -142,6 +144,8 @@ func _connect_menu_signals():
 	menu_bar.monde_button_pressed.connect(_on_monde_button_pressed)
 	menu_bar.organisation_button_pressed.connect(_on_organisation_button_pressed)
 	menu_bar.national_button_pressed.connect(_on_national_button_pressed)
+	menu_bar.esport_button_pressed.connect(_on_esport_button_pressed)
+	menu_bar.cohesion_button_pressed.connect(_on_cohesion_button_pressed)
 
 func _on_personnage_button_pressed():
 	window_manager.show_window("personnage")
@@ -158,16 +162,27 @@ func _on_organisation_button_pressed():
 func _on_national_button_pressed():
 	window_manager.show_window("national")
 
+func _on_esport_button_pressed():
+	window_manager.show_window("esport")
+
+func _on_cohesion_button_pressed():
+	window_manager.show_window("cohesion")
+
 func _register_windows():
 	window_manager.register_window("personnage", "res://scenes/Fenetre_Personnage.tscn")
 	window_manager.register_window("guilde", "res://scenes/Fenetre_Guilde.tscn")
 	window_manager.register_window("monde", "res://scenes/Fenetre_Monde.tscn")
 	window_manager.register_window("organisation", "res://scenes/Fenetre_OrganisationGroupe.tscn")
 	window_manager.register_window("national", "res://scenes/Fenetre_National.tscn")
+	window_manager.register_window("esport", "res://scenes/Fenetre_Esport.tscn")
+	window_manager.register_window("cohesion", "res://scenes/Fenetre_Social.tscn")
 
 func _connect_window_signals():
 	# Écouter l'ouverture des fenêtres pour connecter leurs signaux
 	window_manager.window_opened.connect(_on_window_opened)
+
+	# Surligner le bouton de menu de la fenêtre active
+	window_manager.window_focused.connect(func(wname: String): menu_bar.set_active_window(wname))
 
 	# Ouvrir la fenêtre Personnage par défaut après que le tree soit stabilisé
 	get_tree().create_timer(0.1).timeout.connect(func():
@@ -331,6 +346,12 @@ func _input(event: InputEvent) -> void:
 			KEY_N:  # N pour National
 				if Input.is_key_pressed(KEY_CTRL):
 					menu_bar._on_national_pressed()
+			KEY_E:  # E pour Esport
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_esport_pressed()
+			KEY_K:  # K pour Cohésion
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_cohesion_pressed()
 			KEY_SPACE:  # Espace pour pause
 				var game_time_node = GameTime
 				if game_time_node:
@@ -632,6 +653,71 @@ func _process_next_drama() -> void:
 		if next and next.active:
 			_show_drama_popup(next)
 			return
+
+# === SYSTÈMES ESPORT (Milestone 4 : staff, tournois, transferts, legacy) ===
+
+func _connect_esport_systems() -> void:
+	"""Connecte les notifications des systèmes de la phase Esport."""
+	if TournamentManager:
+		TournamentManager.tournament_completed.connect(_on_tournament_completed)
+	if StaffManager:
+		StaffManager.staff_hired.connect(_on_staff_hired)
+	if TransferManager:
+		TransferManager.transfer_completed.connect(_on_transfer_completed)
+		TransferManager.transfer_window_opened.connect(_on_transfer_window_opened)
+	if LegacyManager:
+		LegacyManager.title_unlocked.connect(_on_legacy_title_unlocked)
+
+func _on_tournament_completed(_tournament, _stage_reached: int, is_champion: bool, results: Dictionary) -> void:
+	if chat_panel:
+		if is_champion:
+			chat_panel.add_message("[Esport] Victoire au %s ! (+%d or)" % [results.get("tournament", ""), results.get("gold", 0)], "loot")
+		else:
+			chat_panel.add_message("[Esport] Éliminé : %s (tour %d/%d)" % [results.get("tournament", ""), results.get("stage_reached", 0), results.get("rounds", 0)], "info")
+	if NotificationManager:
+		if is_champion:
+			NotificationManager.show_achievement("Champion : %s" % results.get("tournament", ""), "Tournoi")
+		else:
+			NotificationManager.show_info("Tournoi terminé (tour %d/%d)" % [results.get("stage_reached", 0), results.get("rounds", 0)], "Esport")
+
+func _on_staff_hired(staff) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Staff] %s rejoint le staff (%s)" % [staff.staff_name, staff.get_role_name()], "activity")
+
+func _on_transfer_completed(player) -> void:
+	if NotificationManager:
+		NotificationManager.show_success("%s rejoint la guilde (transfert international)" % player.nom, "Transfert")
+	if chat_panel:
+		chat_panel.add_message("[Transfert] %s arrive de %s" % [player.nom, player.get_meta("region", "?")], "loot")
+
+func _on_transfer_window_opened() -> void:
+	if NotificationManager:
+		NotificationManager.show_info("La fenêtre de transfert internationale est ouverte", "Transferts")
+
+func _on_legacy_title_unlocked(title) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Legacy] Nouveau titre débloqué : %s" % title, "loot")
+
+# === SYSTÈME DE COHÉSION (Milestone 5 : moral, social, team-building, traditions, conflits) ===
+
+func _connect_culture_systems() -> void:
+	"""Connecte les notifications du système de cohésion de guilde."""
+	if GuildCultureManager:
+		GuildCultureManager.tension_detected.connect(_on_tension_detected)
+		GuildCultureManager.team_building_done.connect(_on_team_building_done)
+		GuildCultureManager.tradition_established.connect(_on_tradition_established)
+
+func _on_tension_detected(player1_name: String, player2_name: String, reason: String) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Cohésion] Tension entre %s et %s (%s)" % [player1_name, player2_name, reason], "warning")
+
+func _on_team_building_done(activity_name: String, _morale_gain: float) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Cohésion] Team-building : %s" % activity_name, "activity")
+
+func _on_tradition_established(tradition_name: String) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Cohésion] Nouvelle tradition établie : %s" % tradition_name, "loot")
 
 func _setup_player_systems():
 	"""Configure les systèmes spécifiques au joueur"""

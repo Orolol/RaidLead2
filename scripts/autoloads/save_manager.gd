@@ -29,6 +29,11 @@ func save_game() -> bool:
 		"media": MediaManager.serialize(),
 		"sponsors": SponsorshipManager.serialize(),
 		"dramas": DramaManager.serialize(),
+		"staff": StaffManager.serialize(),
+		"tournaments": TournamentManager.serialize(),
+		"transfers": TransferManager.serialize(),
+		"legacy": LegacyManager.serialize(),
+		"culture": GuildCultureManager.serialize(),
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
@@ -97,6 +102,17 @@ func load_game() -> bool:
 		SponsorshipManager.deserialize(data.sponsors)
 	if data.has("dramas"):
 		DramaManager.deserialize(data.dramas)
+	# Systemes Esport (Milestone 4)
+	if data.has("staff"):
+		StaffManager.deserialize(data.staff)
+	if data.has("tournaments"):
+		TournamentManager.deserialize(data.tournaments)
+	if data.has("transfers"):
+		TransferManager.deserialize(data.transfers)
+	if data.has("legacy"):
+		LegacyManager.deserialize(data.legacy)
+	if data.has("culture"):
+		GuildCultureManager.deserialize(data.culture)
 
 	print("SaveManager: chargement réussi (version %d)" % data.save_version)
 	load_completed.emit(true)
@@ -198,6 +214,10 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		"salary_demand": player.salary_demand,
 		"salary": player.get_meta("salary", 0),
 		"is_national": player.get_meta("is_national", false),
+		"stress_level": player.stress_level,
+		"is_international": player.get_meta("is_international", false),
+		"region": player.get_meta("region", ""),
+		"adaptation_weeks": player.get_meta("adaptation_weeks", 0),
 		"equipment": _serialize_equipment(player.equipment),
 	}
 
@@ -246,6 +266,13 @@ func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 		player.set_meta("salary", data.get("salary", 0))
 	if data.get("is_national", false):
 		player.set_meta("is_national", true)
+	player.stress_level = data.get("stress_level", 0.0)
+	if data.get("is_international", false):
+		player.set_meta("is_international", true)
+	if data.get("region", "") != "":
+		player.set_meta("region", data.get("region", ""))
+	if data.get("adaptation_weeks", 0) > 0:
+		player.set_meta("adaptation_weeks", data.get("adaptation_weeks", 0))
 
 	# Équipement
 	if data.has("equipment"):

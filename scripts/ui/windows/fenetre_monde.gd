@@ -317,6 +317,11 @@ func _calculate_guild_progression() -> int:
 	
 	return min(100, progression)  # Plafonner à 100
 
+func refresh_window() -> void:
+	"""Rafraîchit le classement et le recrutement (appelé à l'affichage de la fenêtre)."""
+	_refresh_guild_ranking()
+	_refresh_recruitment_from_pool()
+
 func _refresh_recruitment_from_pool():
 	if not recruitment_pool:
 		return

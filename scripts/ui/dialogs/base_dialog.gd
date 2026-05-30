@@ -349,32 +349,32 @@ func _apply_button_style(button: Button, style: ButtonStyle):
 # ==================== ANIMATIONS ====================
 
 func _animate_open():
-	"""Animation d'ouverture"""
+	"""Animation d'ouverture (fondu du contenu ; un Window ne supporte ni modulate ni scale)"""
 	is_opening = true
-	
-	# État initial
-	modulate.a = 0.0
-	scale = Vector2(0.8, 0.8)
-	
+
+	if not main_container:
+		is_opening = false
+		dialog_opened.emit()
+		return
+
+	main_container.modulate.a = 0.0
 	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(self, "modulate:a", 1.0, animation_duration)
-	tween.tween_property(self, "scale", Vector2.ONE, animation_duration).set_ease(Tween.EASE_OUT)
-	
+	tween.tween_property(main_container, "modulate:a", 1.0, animation_duration)
 	tween.finished.connect(func():
 		is_opening = false
 		dialog_opened.emit()
 	)
 
 func _animate_close():
-	"""Animation de fermeture"""
+	"""Animation de fermeture (fondu du contenu)"""
 	is_closing = true
-	
+
+	if not main_container:
+		_finalize_close()
+		return
+
 	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(self, "modulate:a", 0.0, animation_duration)
-	tween.tween_property(self, "scale", Vector2(0.8, 0.8), animation_duration).set_ease(Tween.EASE_IN)
-	
+	tween.tween_property(main_container, "modulate:a", 0.0, animation_duration)
 	tween.finished.connect(_finalize_close)
 
 func _finalize_close():

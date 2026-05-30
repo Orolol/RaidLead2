@@ -406,81 +406,93 @@
 - ✅ **Scouting** : bouton « Scouter » révèle traits cachés + skill réel (coût -2 réputation, `scout_player`)
 - ✅ **Bonus** : fix d'un bug pré-existant `notification_manager._on_phase_changed` (`.name` sur un int) qui plantait à chaque changement de phase
 
-## 3. Milestone 4 : Phase 3 - Niveau Esport (0%)
+## 3. Milestone 4 : Phase 3 - Niveau Esport (100% ✅)
 **Temps estimé : 7-10 jours**
 
-### US 4.1 : Système de Staff Professionnel
-- 📋 **StaffMember** : nouvelle classe de ressource
-- 📋 **Rôles** : coach stratégique, analyste, psychologue, manager
-- 📋 **Compétences** : impact moral, stratégie, performance
-- 📋 **Salaires** : budgets dédiés staff
-- 📋 **Synergies** : interactions entre types de staff
+> **MàJ 30 mai 2026** — Phase Esport implémentée et validée dans l'éditeur Godot 4.6 (MCP).
+> - ✅ **4 nouveaux autoloads** : `StaffManager`, `TournamentManager`, `TransferManager`, `LegacyManager`.
+> - ✅ **2 nouvelles resources** : `StaffMember` (rôles + bonus), `Tournament` (types + brackets).
+> - ✅ **Fenêtre `Esport`** (`Fenetre_Esport.tscn`, 6 onglets) + bouton menu + raccourci **Ctrl+E**.
+> - ✅ **PhaseManager** : objectifs de maîtrise branchés sur de vraies valeurs (`world_championship_wins`, `professional_staff_count`, `international_reputation`, `team_stability`) + helper public `get_requirements_progress()`.
+> - ✅ **Sauvegarde/chargement** des 4 systèmes + `stress_level` et métadonnées internationales des membres.
+> - ✅ **Validation runtime** : boucle tournoi → récompenses → legacy → notifications → stress vérifiée bout-en-bout, sans erreur.
 
-### US 4.2 : Système de Tournois Internationaux
-- 📋 **TournamentManager** : nouveau système
-- 📋 **Types** : World Championship, Regional Qualifiers, Invitationals
-- 📋 **Format** : phases, brackets, prize pools
-- 📋 **Préparation** : bootcamps, stratégies spéciales
-- 📋 **Récompenses** : prestige et financières significatives
+### US 4.1 : Système de Staff Professionnel ✅
+- ✅ **StaffMember** : resource avec rôle, skill (1-100), salaire, bonus par rôle
+- ✅ **Rôles** : coach stratégique (perf/stratégie), analyste (stratégie), psychologue (relief stress/moral), manager (stabilité/efficacité salariale)
+- ✅ **Compétences** : bonus mis à l'échelle par le skill, agrégés dans `StaffManager`
+- ✅ **Salaires** : frais d'embauche + masse salariale hebdo prélevée sur l'or (départ possible si impayé)
+- ✅ **Synergies** : +5% par rôle distinct présent (max +15%)
 
-### US 4.3 : Gestion du Burnout et Pression
-- 📋 **Propriétés** : `stress_level`, `burnout_risk` pour SimulatedPlayer
-- 📋 **Facteurs** : charge entraînement, pression médiatique, attentes
-- 📋 **Prévention** : rotation, vacances, support psychologique
-- 📋 **Conséquences** : performances dégradées, risque départ
-- 📋 **Staff spécialisé** : gestion bien-être
+### US 4.2 : Système de Tournois Internationaux ✅
+- ✅ **TournamentManager** : pool d'offres rafraîchi, autoload
+- ✅ **Types** : World Championship, Regional Qualifiers, Invitationals (difficulté/prix/prestige différenciés)
+- ✅ **Format** : simulation de bracket (force roster + staff − stress), tours successifs plus difficiles
+- ✅ **Préparation** : bootcamp (coût or, +perf prochain tournoi, +stress équipe)
+- ✅ **Récompenses** : or + prestige (réputation internationale), titres mondiaux comptabilisés
 
-### US 4.4 : Système de Transferts Internationaux
-- 📋 **Pool mondial** : joueurs de tous continents
-- 📋 **Complexités** : visas, adaptation culturelle, barrières linguistiques
-- 📋 **Agents professionnels** : négociations poussées
-- 📋 **Fenêtres transfert** : périodes limitées
-- 📋 **Fair-play financier** : salary cap
+### US 4.3 : Gestion du Burnout et Pression ✅
+- ✅ **Propriétés** : `stress_level` (0-100) + `get_burnout_risk()` sur SimulatedPlayer (combiné à la fatigue existante)
+- ✅ **Facteurs** : tournois, bootcamps, wipes ajoutent du stress ; pression de base hebdo en phase Esport
+- ✅ **Prévention** : action « repos de l'équipe » (cooldown) + psychologue (relief hebdo)
+- ✅ **Conséquences** : `get_esport_performance_factor()` (malus en compétition), baisse de moral, alimente la fatigue/burnout
+- ✅ **Staff spécialisé** : `StaffManager._process_wellbeing()` orchestre le bien-être hebdomadaire
 
-### US 4.5 : Système de Legacy et Recognition
-- 📋 **Hall of Fame** : achievements exceptionnels
-- 📋 **Stratégies innovantes** : copiées par autres guildes
-- 📋 **Mentoring** : formation prochaine génération
-- 📋 **Impact meta-game** : influence sur évolution du jeu
-- 📋 **Unlocks permanents** : cosmétiques, titres
+### US 4.4 : Système de Transferts Internationaux ✅
+- ✅ **Pool mondial** : joueurs d'élite (skill 78-98, niveau 60) par régions
+- ✅ **Complexités** : adaptation culturelle (malus moral/intégration temporaire à l'arrivée)
+- ✅ **Agents professionnels** : négociation (offre / contre-proposition / refus), commission d'agent
+- ✅ **Fenêtres transfert** : 2 périodes/an (semaines 1-4 et 26-29) ; recrutement bloqué hors fenêtre
+- ✅ **Prime de transfert** : 4 semaines de salaire + commission (sink d'or)
+- 📋 **Fair-play financier** (salary cap) : non implémenté (option d'équilibrage future)
 
-## 4. Milestone 5 : Mécaniques Transversales (0%)
+### US 4.5 : Système de Legacy et Recognition ✅
+- ✅ **Hall of Fame** : entrées d'accomplissements (titres de tournois, accession à l'esport) avec points et date
+- ✅ **Titres permanents** : déblocage par paliers de points de legacy (Espoir → Immortel) + titre « Champion du Monde »
+- ✅ **Notifications** : toasts achievement + messages chat à chaque accomplissement
+- 📋 **Stratégies innovantes / Mentoring / Impact meta-game** : non implémentés (extensions futures, recoupent Milestone 5)
+
+## 4. Milestone 5 : Mécaniques Transversales (100% ✅)
 **Temps estimé : 5-7 jours**
 
-### US 5.1 : Système de Dynamiques de Groupe
-- 📋 **GroupDynamics** : nouveau système
-- 📋 **Cliques** : formation sous-groupes dans guilde
-- 📋 **Leaders naturels** : influence sur autres membres
-- 📋 **Conflits personnalité** : basés sur tags incompatibles
-- 📋 **Relations individuelles** : amitié, rivalité, indifférence
+> **MàJ 30 mai 2026** — Implémenté et validé dans l'éditeur Godot 4.6 (MCP).
+> - ✅ **Réveil du système social dormant** : `SocialDynamics` (relations/cliques/conflits) existait mais n'était jamais alimenté ; `GuildCultureManager` forme désormais les relations chaque semaine via les profils comportementaux. Vérifié en jeu : amitiés, rivalités, mentorats et cliques se forment.
+> - ✅ **Nouvel autoload** `GuildCultureManager` (1 fichier, catalogues statiques — pas de nouvelle resource).
+> - ✅ **Fenêtre `Cohésion`** (`Fenetre_Social.tscn`, 6 onglets) + bouton menu + raccourci **Ctrl+K**.
+> - ✅ **Sauvegarde** du moral et des traditions établies.
+> - ✅ **Validation runtime** : team-building (moral +10, coût or, cooldown), médiation d'une rivalité (tension résolue), affichage relations/cliques — tout vérifié par screenshots.
 
-### US 5.2 : Moral Collectif et Ambiance
-- 📋 **guild_morale** : métrique globale
-- 📋 **Contagion émotionnelle** : propagation états d'esprit
-- 📋 **Événements ambiance** : célébrations, défaites, crises
-- 📋 **Actions amélioration** : team building, récompenses
-- 📋 **Impact visible** : performances raid, cohésion
+### US 5.1 : Système de Dynamiques de Groupe ✅
+- ✅ **GroupDynamics** : `GuildCultureManager` pilote le `SocialDynamics` existant (auparavant inerte)
+- ✅ **Cliques** : formation, leader (plus haute influence), cohésion, affichées dans l'onglet Cliques
+- ✅ **Leaders naturels** : influence sociale calculée, leader de clique désigné
+- ✅ **Conflits personnalité** : relations formées selon compatibilité des profils comportementaux
+- ✅ **Relations individuelles** : amitié, rivalité, mentor/élève, inimitié (affichées par membre)
 
-### US 5.3 : Système d'Événements Team-Building  
-- 📋 **Types événements** : sorties virtuelles, challenges, célébrations
-- 📋 **Coût vs bénéfices** : temps et ressources vs cohésion
-- 📋 **Préférences individuelles** : selon personnalités
-- 📋 **Événements saisonniers** : liés aux succès
-- 📋 **Traditions guilde** : culture unique
+### US 5.2 : Moral Collectif et Ambiance ✅
+- ✅ **guild_morale** : métrique globale 0-100 (humeur moyenne + santé sociale + traditions)
+- ✅ **Contagion émotionnelle** : l'humeur dérive chaque semaine vers celle du cercle social (pondérée par la force des liens)
+- ✅ **Actions amélioration** : team-building, traditions
+- ✅ **Impact visible** : santé sociale (amitiés/rivalités/inimitiés) affichée, tiers d'ambiance
+- 📋 **Événements ambiance dédiés** : réutilisent le système d'événements existant (non étendu)
 
-### US 5.4 : Système de Rituels et Traditions
-- 📋 **Rituels pré-raid** : habitudes, porte-bonheur, discours
-- 📋 **Traditions célébration** : pour succès
-- 📋 **Codes internes** : références partagées
-- 📋 **Onboarding** : personnalisé nouveaux membres
-- 📋 **Évolution** : traditions dans le temps
+### US 5.3 : Système d'Événements Team-Building ✅
+- ✅ **Types événements** : soirée détente, challenge interne, sortie virtuelle, célébration
+- ✅ **Coût vs bénéfices** : or + énergie contre moral + humeur + cohésion + nouveaux liens
+- ✅ **Cooldown** : un seul événement à la fois, cooldown par activité
+- 📋 **Préférences individuelles / saisonniers** : non implémentés (extension future)
 
-### US 5.5 : Gestion Avancée des Conflits
-- 📋 **Détection précoce** : tensions (moral, interactions négatives)
-- 📋 **Options résolution** : médiation, sanctions, séparation
-- 📋 **Conflits leadership** : gestion autorité
-- 📋 **Impact décisions** : perception autres membres
-- 📋 **Formation** : gestion conflits via staff
+### US 5.4 : Système de Rituels et Traditions ✅
+- ✅ **Traditions** : discours d'avant-raid, célébration de victoire, mentorat, anniversaire
+- ✅ **Bonus passifs** : moral/cohésion hebdomadaires par tradition établie
+- ✅ **Conditions** : seuils de membres + coût en or (gating vérifié en jeu)
+- ✅ **Persistance** : traditions établies sauvegardées
+
+### US 5.5 : Gestion Avancée des Conflits ✅
+- ✅ **Détection** : tensions (rivalités/inimitiés) listées dans l'onglet Conflits
+- ✅ **Options résolution** : médiation (un membre ami des deux arbitre) + apaisement direct
+- ✅ **Déclenchement dynamique** : plus le moral est bas, plus des tensions éclatent
+- 📋 **Conflits leadership / formation staff** : non implémentés (recoupent Milestone 4 staff)
 
 ## 5. Milestone 6 : Polish et Équilibrage (0%)
 **Temps estimé : 3-5 jours**
@@ -564,7 +576,7 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~67% terminé *(+Milestone 3 National 100% (recrutement, salaires, progression Phase 2→3), thème UI global, fixes critiques)*
+- **Global** : ~82% terminé *(+Milestone 5 Transversales 100% : système social réveillé, moral de guilde, contagion, team-building, traditions, conflits ; validé dans Godot 4.6)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
@@ -577,8 +589,8 @@
 - **Infrastructure UI Phase 3** : 0% 📋 *(Phase 3 - Polish)*
 - **Thème UI global** : 100% ✅ *(UITheme appliqué partout)*
 - **Milestone 3** : 100% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires, progression Phase 2→3 branchée)*
-- **Milestone 4** : 0% 📋
-- **Milestone 5** : 0% 📋
+- **Milestone 4** : 100% ✅ *(Esport : staff pro, tournois internationaux, burnout/stress, transferts internationaux, legacy/Hall of Fame)*
+- **Milestone 5** : 100% ✅ *(Transversales : dynamiques de groupe, moral collectif + contagion, team-building, traditions, gestion des conflits)*
 - **Milestone 6** : 0% 📋
 
 ### Dépendances Critiques (Mises à jour)

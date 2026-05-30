@@ -365,6 +365,24 @@ func _get_requirement_current_value(req_name: String):
 			if MediaManager and MediaManager.has_method("get_media_reputation"):
 				return MediaManager.get_media_reputation()
 			return 50.0
+
+		"world_championship_wins":
+			if TournamentManager and TournamentManager.has_method("get_world_championship_wins"):
+				return TournamentManager.get_world_championship_wins()
+			return 0
+
+		"professional_staff_count":
+			if StaffManager and StaffManager.has_method("get_staff_count"):
+				return StaffManager.get_staff_count()
+			return 0
+
+		"international_reputation":
+			if TournamentManager and TournamentManager.has_method("get_international_reputation"):
+				return TournamentManager.get_international_reputation()
+			return 0.0
+
+		"team_stability":
+			return _compute_team_stability()
 			
 		_:
 			return 0
@@ -439,6 +457,37 @@ func _count_player_world_firsts() -> int:
 		if firsts[content_id] == GuildManager.guild.name:
 			count += 1
 	return count
+
+func get_requirements_progress(phase: GamePhase) -> Dictionary:
+	"""Progression des requirements d'une phase. Utilisable pour la phase finale Esport,
+	dont check_phase_progression() sort tot faute de phase suivante."""
+	var requirements: Dictionary = get_phase_requirements(phase)
+	var progress: Dictionary = {}
+	for req_name in requirements:
+		var required_value = requirements[req_name]
+		var current_value = _get_requirement_current_value(req_name)
+		progress[req_name] = {
+			"required": required_value,
+			"current": current_value,
+			"met": _check_requirement_met(req_name, current_value, required_value),
+			"progress_percent": _calculate_requirement_progress(req_name, current_value, required_value),
+		}
+	return progress
+
+func _compute_team_stability() -> float:
+	"""Stabilité d'équipe (0-100) : bien-être moyen (moral + intégration) pénalisé par le
+	stress et le burnout, augmenté du bonus de stabilité du staff (manager)."""
+	if not GuildManager or GuildManager.guild_members.is_empty():
+		return 0.0
+	var members: Array = GuildManager.guild_members
+	var total: float = 0.0
+	for m in members:
+		var wellbeing: float = (m.mood + m.integration) / 2.0
+		var stress_pen: float = m.stress_level * 0.3
+		var burnout_pen: float = float(m.burnout_level) * 8.0
+		total += clampf(wellbeing - stress_pen - burnout_pen, 0.0, 100.0)
+	var staff_bonus: float = StaffManager.get_total_stability_bonus() if StaffManager else 0.0
+	return clampf(total / float(members.size()) + staff_bonus, 0.0, 100.0)
 
 func _on_week_changed(week: int, year: int):
 	"""Appelé chaque semaine"""

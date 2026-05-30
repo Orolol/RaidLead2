@@ -84,11 +84,12 @@ func _setup_energy_display(parent: VBoxContainer):
 	energy_progress.set_colors(Color.GREEN, Color.ORANGE, Color.RED)
 	energy_container.add_child(energy_progress)
 	
-	# Label avec valeurs
+	# Label avec valeurs (masqué : la barre affiche déjà la valeur, évite la superposition)
 	energy_label = Label.new()
 	energy_label.text = "100 / 100"
 	energy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	energy_label.add_theme_font_size_override("font_size", 12)
+	energy_label.visible = false
 	energy_container.add_child(energy_label)
 
 func _setup_activity_selector(parent: VBoxContainer):

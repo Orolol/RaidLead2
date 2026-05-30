@@ -151,8 +151,28 @@ func open_window(window_name: String, force_new: bool = false) -> Control:
 	return instance
 
 func show_window(window_name: String):
-	"""Méthode de compatibilité avec l'ancien système"""
-	open_window(window_name)
+	"""Navigation par menu : affiche cette fenêtre seule (cache les autres ouvertes)
+	puis rafraîchit son contenu. Le multi-fenêtres reste possible via open_window()."""
+	# Navigation exclusive : cacher les autres fenêtres pour éviter l'empilement
+	for other_name in open_windows.keys():
+		if other_name == window_name:
+			continue
+		for inst_data in open_windows[other_name]:
+			if is_instance_valid(inst_data.instance):
+				inst_data.instance.hide()
+	var instance: Control = open_window(window_name)
+	# Rafraîchir le contenu une fois la fenêtre affichée et dimensionnée
+	_refresh_window_content.call_deferred(instance)
+	return instance
+
+func _refresh_window_content(instance) -> void:
+	"""Appelle la méthode de rafraîchissement d'une fenêtre si elle en expose une."""
+	if not is_instance_valid(instance):
+		return
+	for method_name in ["refresh_window", "_refresh_all", "refresh_display"]:
+		if instance.has_method(method_name):
+			instance.call(method_name)
+			return
 
 func close_window(window_name: String, instance_id: String = ""):
 	"""Ferme une fenêtre ou instance spécifique"""

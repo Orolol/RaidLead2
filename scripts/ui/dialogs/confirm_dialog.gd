@@ -1,5 +1,5 @@
 extends BaseDialog
-class_name ConfirmDialog
+class_name ModalConfirmDialog
 
 # Dialogue de confirmation avec options personnalisables
 # Utilisé pour demander une confirmation utilisateur avec callbacks
@@ -269,9 +269,9 @@ func _unhandled_key_input(event: InputEvent):
 
 # ==================== MÉTHODES STATIQUES ====================
 
-static func show_question(title: String, question: String, on_yes: Callable = Callable(), on_no: Callable = Callable(), parent: Node = null) -> ConfirmDialog:
+static func show_question(title: String, question: String, on_yes: Callable = Callable(), on_no: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche une question simple"""
-	var dialog = ConfirmDialog.new()
+	var dialog = ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_question(question, on_yes, on_no)
 	
@@ -283,9 +283,9 @@ static func show_question(title: String, question: String, on_yes: Callable = Ca
 	dialog.open_dialog()
 	return dialog
 
-static func show_warning(title: String, warning: String, on_proceed: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ConfirmDialog:
+static func show_warning(title: String, warning: String, on_proceed: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche un avertissement"""
-	var dialog = ConfirmDialog.new()
+	var dialog = ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_warning(warning, on_proceed, on_cancel)
 	
@@ -297,9 +297,9 @@ static func show_warning(title: String, warning: String, on_proceed: Callable = 
 	dialog.open_dialog()
 	return dialog
 
-static func show_delete_confirmation(title: String, item_name: String, on_delete: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ConfirmDialog:
+static func show_delete_confirmation(title: String, item_name: String, on_delete: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche une confirmation de suppression"""
-	var dialog = ConfirmDialog.new()
+	var dialog = ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_delete_confirmation(item_name, on_delete, on_cancel)
 	
@@ -311,9 +311,9 @@ static func show_delete_confirmation(title: String, item_name: String, on_delete
 	dialog.open_dialog()
 	return dialog
 
-static func show_save_confirmation(title: String = "Sauvegarder", on_save: Callable = Callable(), on_dont_save: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ConfirmDialog:
+static func show_save_confirmation(title: String = "Sauvegarder", on_save: Callable = Callable(), on_dont_save: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche une confirmation de sauvegarde"""
-	var dialog = ConfirmDialog.new()
+	var dialog = ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_save_confirmation(on_save, on_dont_save, on_cancel)
 	

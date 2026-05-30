@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://csocialwindow1"]
+
+[ext_resource type="Script" path="res://scripts/ui/windows/fenetre_social.gd" id="1_soc"]
+
+[node name="root" type="PanelContainer"]
+script = ExtResource("1_soc")

@@ -68,6 +68,9 @@ const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.
 @export var celebrity_level: float = 0.0  # 0-100
 @export var salary_demand: int = 0  # or/semaine pour recrues nationales (0 = pas d'exigence)
 
+# Phase Esport - Stress competitif et burnout
+@export var stress_level: float = 0.0  # 0-100, pression competitive (distinct de fatigue_accumulated)
+
 # Propriétés pour la compatibilité
 
 func _init():
@@ -246,6 +249,7 @@ func trigger_loot_conflict():
 func trigger_wipe():
 	wipes_experienced += 1
 	mood = max(0, mood - 20)  # Baisse de moral importante
+	add_stress(4.0)  # La pression des wipes alimente le stress competitif
 	last_wipe_day = _get_current_day()
 	
 	# Réaction selon le profil comportemental
@@ -260,9 +264,10 @@ func trigger_raid_success():
 	raid_successes += 1
 	mood = min(100, mood + 15)  # Boost de moral
 	last_raid_success_day = _get_current_day()
-	
-	# Réduction de fatigue après succès
+
+	# Réduction de fatigue et de stress après succès
 	fatigue_accumulated = max(0, fatigue_accumulated - 10)
+	reduce_stress(5.0)
 	
 	_check_tag_reveals()
 
@@ -428,6 +433,58 @@ func tick_celebrity_weekly() -> void:
 	# Bonus si haut skill
 	if skill > 80:
 		update_celebrity(0.5)
+
+# --- Stress competitif & Burnout (Phase Esport) ---
+
+const ESPORT_BASELINE_STRESS := 3.0
+
+func add_stress(delta: float) -> void:
+	"""Augmente le stress competitif (0-100)."""
+	stress_level = clampf(stress_level + delta, 0.0, 100.0)
+
+func reduce_stress(delta: float) -> void:
+	"""Reduit le stress competitif (0-100)."""
+	stress_level = clampf(stress_level - delta, 0.0, 100.0)
+
+func get_burnout_risk() -> float:
+	"""Risque de burnout (0-1) combinant stress competitif et fatigue accumulee,
+	module par la tolerance au stress du profil comportemental."""
+	var tolerance: float = behavior_profile.stress_tolerance if behavior_profile else 0.5
+	var raw: float = (stress_level * 0.6 + fatigue_accumulated * 0.4) / 100.0
+	raw *= (1.3 - tolerance * 0.6)  # tolerance 0 -> x1.3, tolerance 1 -> x0.7
+	return clampf(raw, 0.0, 1.0)
+
+func get_stress_tier() -> String:
+	if stress_level >= 80.0:
+		return "Critique"
+	elif stress_level >= 60.0:
+		return "Élevé"
+	elif stress_level >= 35.0:
+		return "Modéré"
+	else:
+		return "Maîtrisé"
+
+func get_esport_performance_factor() -> float:
+	"""Facteur multiplicatif de performance en competition selon le stress (0.7-1.0)."""
+	if stress_level <= 40.0:
+		return 1.0
+	return clampf(1.0 - (stress_level - 40.0) * 0.005, 0.7, 1.0)  # 40 -> 1.0, 100 -> 0.7
+
+func tick_wellbeing_weekly(stress_relief: float, morale_bonus: float, in_esport: bool) -> void:
+	"""Mise a jour hebdomadaire du bien-etre, orchestree par StaffManager.
+	En phase Esport, une pression de base s'accumule ; le psychologue et le repos la reduisent.
+	Un stress severe degrade le moral et alimente la fatigue (qui pilote le burnout existant)."""
+	if in_esport:
+		var tolerance: float = behavior_profile.stress_tolerance if behavior_profile else 0.5
+		add_stress(ESPORT_BASELINE_STRESS * (1.2 - tolerance * 0.6))
+	if stress_relief > 0.0:
+		reduce_stress(stress_relief)
+	if morale_bonus != 0.0:
+		update_mood(morale_bonus)
+	if stress_level >= 60.0:
+		update_mood(-(stress_level - 60.0) * 0.1)
+	if stress_level >= 75.0:
+		fatigue_accumulated = clampf(fatigue_accumulated + 4.0, 0.0, 100.0)
 
 func equip_item(item) -> bool:
 	"""Fait équiper un objet au joueur"""
