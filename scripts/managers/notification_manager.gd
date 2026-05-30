@@ -336,40 +336,39 @@ func _remove_notification(notification_instance: Dictionary):
 	
 	if notification_instance not in active_notifications:
 		return
-	
+
 	var toast = notification_instance.toast
-	var index = active_notifications.find(notification_instance)
-	
-	# Animation de sortie
+	# Retirer immédiatement de la liste active : évite qu'un autre repositionnement
+	# accède à ce toast pendant son animation de sortie (accès après libération).
+	active_notifications.erase(notification_instance)
+
+	if not is_instance_valid(toast):
+		_reposition_notifications()
+		_process_notification_queue()
+		notification_dismissed.emit(notification_instance.data)
+		return
+
+	# Animation de sortie puis libération
 	_animate_notification_out(toast, func():
-		# Supprimer de la liste
-		active_notifications.erase(notification_instance)
-		
-		# Supprimer l'élément visuel
 		if is_instance_valid(toast):
 			toast.queue_free()
-		
-		# Repositionner les notifications restantes
 		_reposition_notifications()
-		
-		# Afficher une notification de la queue si disponible
 		_process_notification_queue()
-		
-		# Émettre le signal
 		notification_dismissed.emit(notification_instance.data)
 	)
 
 func _reposition_notifications():
-	"""Repositionne toutes les notifications actives"""
+	"""Repositionne toutes les notifications actives (en ignorant les toasts libérés)."""
+	# Purge défensive : retire les notifications dont le toast a déjà été libéré
+	active_notifications = active_notifications.filter(func(n): return is_instance_valid(n.toast))
 	for i in range(active_notifications.size()):
-		var notif = active_notifications[i]
+		var toast = active_notifications[i].toast
 		var target_pos = Vector2(
-			notif.toast.position.x,
+			toast.position.x,
 			NOTIFICATION_MARGIN_TOP + i * (NOTIFICATION_HEIGHT + VERTICAL_SPACING)
 		)
-		
 		var tween = create_tween()
-		tween.tween_property(notif.toast, "position", target_pos, ANIMATION_DURATION * 0.5).set_ease(Tween.EASE_OUT)
+		tween.tween_property(toast, "position", target_pos, ANIMATION_DURATION * 0.5).set_ease(Tween.EASE_OUT)
 
 func _process_notification_queue():
 	"""Traite la queue de notifications en attente"""
