@@ -4,10 +4,37 @@ extends Node
 ## Sauvegarde en JSON dans user://savegame.json.
 
 const SAVE_PATH := "user://savegame.json"
+const BACKUP_PATH := "user://savegame_backup.json"
 const SAVE_VERSION := 1
+const AUTOSAVE_WEEK_INTERVAL := 4  # auto-sauvegarde périodique (toutes les 4 semaines de jeu)
 
 signal save_completed(success: bool)
 signal load_completed(success: bool)
+
+func _ready() -> void:
+	# Connexion différée : garantit que PhaseManager et GameTime existent (ordre des autoloads).
+	call_deferred("_setup_autosave")
+
+func _setup_autosave() -> void:
+	"""Auto-sauvegarde aux moments critiques (changement de phase) et périodiquement (US 6.3)."""
+	if PhaseManager and PhaseManager.has_signal("phase_changed") \
+			and not PhaseManager.phase_changed.is_connected(_on_phase_changed_autosave):
+		PhaseManager.phase_changed.connect(_on_phase_changed_autosave)
+	if GameTime and GameTime.has_signal("week_changed") \
+			and not GameTime.week_changed.is_connected(_on_week_changed_autosave):
+		GameTime.week_changed.connect(_on_week_changed_autosave)
+
+func _on_phase_changed_autosave(_new_phase, _old_phase) -> void:
+	"""Moment critique : on sauvegarde et on le signale au joueur."""
+	if save_game():
+		var nm: Node = get_node_or_null("/root/NotificationManager")
+		if nm:
+			nm.show_success("Progression sauvegardée (nouvelle phase)", "Sauvegarde auto")
+
+func _on_week_changed_autosave(week: int, _year: int) -> void:
+	"""Sauvegarde périodique silencieuse."""
+	if week % AUTOSAVE_WEEK_INTERVAL == 0:
+		save_game()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -37,6 +64,10 @@ func save_game() -> bool:
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
+
+	# Backup de la sauvegarde précédente avant écrasement (filet de sécurité).
+	_backup_existing_save()
+
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if not file:
 		push_error("SaveManager: impossible d'ouvrir %s en écriture" % SAVE_PATH)
@@ -49,35 +80,59 @@ func save_game() -> bool:
 	save_completed.emit(true)
 	return true
 
-func load_game() -> bool:
-	"""Charge la progression depuis le fichier JSON."""
+func _backup_existing_save() -> void:
+	"""Copie la sauvegarde existante vers le fichier de backup avant de l'écraser."""
 	if not FileAccess.file_exists(SAVE_PATH):
-		print("SaveManager: pas de sauvegarde trouvée, nouvelle partie")
-		load_completed.emit(false)
-		return false
+		return
+	var src := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if not src:
+		return
+	var content: String = src.get_as_text()
+	src.close()
+	var dst := FileAccess.open(BACKUP_PATH, FileAccess.WRITE)
+	if dst:
+		dst.store_string(content)
+		dst.close()
 
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+func load_game() -> bool:
+	"""Charge la progression, avec repli sur le backup si la sauvegarde principale est illisible."""
+	if _try_load(SAVE_PATH):
+		return true
+	if FileAccess.file_exists(BACKUP_PATH):
+		push_warning("SaveManager: sauvegarde principale illisible, tentative de restauration du backup")
+		if _try_load(BACKUP_PATH):
+			return true
+	print("SaveManager: pas de sauvegarde valide, nouvelle partie")
+	load_completed.emit(false)
+	return false
+
+func _try_load(path: String) -> bool:
+	"""Tente de charger une sauvegarde depuis un chemin. Retourne false si absente/corrompue."""
+	if not FileAccess.file_exists(path):
+		return false
+	var file := FileAccess.open(path, FileAccess.READ)
 	if not file:
-		push_error("SaveManager: impossible d'ouvrir %s en lecture" % SAVE_PATH)
-		load_completed.emit(false)
 		return false
 
 	var json_string: String = file.get_as_text()
 	file.close()
 
 	var json := JSON.new()
-	var error: int = json.parse(json_string)
-	if error != OK:
-		push_error("SaveManager: erreur de parsing JSON ligne %d" % json.get_error_line())
-		load_completed.emit(false)
+	if json.parse(json_string) != OK:
+		push_error("SaveManager: erreur de parsing JSON (%s) ligne %d" % [path, json.get_error_line()])
 		return false
 
-	var data: Dictionary = json.data
-	if not data.has("save_version"):
-		push_error("SaveManager: format de sauvegarde invalide")
-		load_completed.emit(false)
+	var data = json.data
+	if not (data is Dictionary) or not data.has("save_version"):
+		push_error("SaveManager: format de sauvegarde invalide (%s)" % path)
 		return false
 
+	_apply_save_data(data)
+	print("SaveManager: chargement réussi (version %d) depuis %s" % [data.save_version, path])
+	load_completed.emit(true)
+	return true
+
+func _apply_save_data(data: Dictionary) -> void:
 	# Charger chaque système
 	if data.has("game_time"):
 		GameTime.load_time_data(data.game_time)
@@ -113,10 +168,6 @@ func load_game() -> bool:
 		LegacyManager.deserialize(data.legacy)
 	if data.has("culture"):
 		GuildCultureManager.deserialize(data.culture)
-
-	print("SaveManager: chargement réussi (version %d)" % data.save_version)
-	load_completed.emit(true)
-	return true
 
 func has_save() -> bool:
 	"""Vérifie si une sauvegarde existe."""

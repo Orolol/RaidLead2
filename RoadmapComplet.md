@@ -494,42 +494,41 @@
 - ✅ **Déclenchement dynamique** : plus le moral est bas, plus des tensions éclatent
 - 📋 **Conflits leadership / formation staff** : non implémentés (recoupent Milestone 4 staff)
 
-## 5. Milestone 6 : Polish et Équilibrage (0%)
+## 5. Milestone 6 : Polish et Équilibrage (60% ✅)
 **Temps estimé : 3-5 jours**
 
-### US 6.1 : Système de Conseils et Tutoriels Adaptatifs
-- 📋 **IA conseil** : analyse état actuel + suggestions
-- 📋 **Tutoriels intégrés** : nouvelles mécaniques par phase
-- 📋 **Alertes prédictives** : risques à venir
-- 📋 **Aide désactivable** : pour joueurs expérimentés
+> **MàJ 30 mai 2026** — Conseiller adaptatif + dashboard de stats + auto-sauvegarde implémentés et validés en jeu (MCP).
+> - ✅ **Nouvel autoload** `AdvisorManager` : analyse l'état réel de la guilde et produit des conseils priorisés (alerte/attention/astuce/opportunité).
+> - ✅ **Fenêtre `Conseils`** (`Fenetre_Conseils.tscn`, onglets Conseils / Statistiques) + bouton menu + raccourci **Ctrl+A**.
+> - ✅ **Auto-sauvegarde** (changement de phase + toutes les 4 semaines) avec **backup** de la save précédente et **repli automatique** sur le backup si la sauvegarde principale est corrompue.
+> - ✅ **Validation runtime** : conseil contextuel correct par phase, dashboard live (refresh au changement de phase), backup créé à la sauvegarde — vérifiés par screenshots.
 
-### US 6.2 : Outils d'Analyse et Statistiques
-- 📋 **Dashboard métriques** : détaillées par membre/global
-- 📋 **Graphiques évolution** : performance, moral, progression
-- 📋 **Comparaisons** : moyennes phase, guildes similaires
-- 📋 **Projections** : basées sur tendances
-- 📋 **Export données** : analyse externe
+### US 6.1 : Système de Conseils et Tutoriels Adaptatifs ✅
+- ✅ **IA conseil** : `AdvisorManager` analyse trésorerie/salaires, burnout/stress, moral, tensions, recrutement, équipement et progression de phase → conseils priorisés par sévérité
+- ✅ **Conseils par phase** : guidage contextuel (ex. « compléter un donjon héroïque » en Phase 0, objectifs de maîtrise en Esport)
+- ✅ **Alertes prédictives** : l'alerte la plus critique est poussée en notification chaque semaine (anti-spam)
+- ✅ **Interface dédiée** : onglet Conseils avec pastilles de sévérité colorées
+- 📋 **Tutoriels intégrés pas-à-pas / aide désactivable** : non implémentés (extension future)
 
-### US 6.3 : Système de Sauvegarde de Progression
-- 📋 **Extension SaveLoadManager** : données phases
-- 📋 **Historique achievements** : milestones
-- 📋 **Continuité** : relations, réputation entre phases
-- 📋 **Backup automatique** : moments critiques
-- 📋 **Multiple saves** : expérimentation
+### US 6.2 : Outils d'Analyse et Statistiques ✅
+- ✅ **Dashboard métriques** : vue d'ensemble (phase, niveau, or, réputation, moral) + effectif (moyennes niveau/skill/intégration/moral/stress)
+- ✅ **Détail par membre** : table triée (niveau, skill, moral, énergie, stress, intégration) avec code couleur
+- 📋 **Graphiques d'évolution / projections / export** : non implémentés (extension future)
 
-### US 6.4 : Équilibrage de la Courbe de Difficulté
-- 📋 **Analyse playtest** : ajuster difficultés
-- 📋 **Scaling adaptatif** : basé sur performance joueur
-- 📋 **Catch-up** : joueurs en difficulté
-- 📋 **Défis optionnels** : joueurs avancés
-- 📋 **Feedback loops** : engagement optimal
+### US 6.3 : Système de Sauvegarde de Progression ✅
+- ✅ **Auto-sauvegarde** : aux moments critiques (changement de phase) + périodique (toutes les 4 semaines)
+- ✅ **Backup automatique** : la sauvegarde précédente est copiée avant écrasement
+- ✅ **Repli sur backup** : chargement automatique du backup si la save principale est illisible/corrompue
+- ✅ **Continuité inter-phases** : phases, relations, réputation déjà sauvegardées (SaveManager existant)
+- 📋 **Slots de sauvegarde multiples** : non implémentés (nécessite une UI de gestion des saves)
 
-### US 6.5 : Tests et Validation Finale
-- 📋 **Tests automatisés** : mécaniques principales
-- 📋 **Validation équilibrage** : différents styles
-- 📋 **Tests intégration** : tous systèmes
-- 📋 **Performance** : optimisation sessions longues
-- 📋 **Validation UX** : playtests externes
+### US 6.4 : Équilibrage de la Courbe de Difficulté (📋 partiel)
+- 📋 **Analyse playtest / scaling adaptatif / catch-up / défis optionnels** : non implémentés (nécessite des données de playtest réelles)
+
+### US 6.5 : Tests et Validation Finale (📋 partiel)
+- ✅ **Validation runtime via MCP** : chaque milestone validé en jeu (screenshots, scripts d'inspection)
+- 📋 **Framework de tests automatisés (GUT)** : non mis en place
+- 📋 **Playtests externes / optimisation perf sessions longues** : à faire
 
 ## 6. Améliorations Long Terme (priorité basse)
 
@@ -576,7 +575,7 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~82% terminé *(+Milestone 5 Transversales 100% : système social réveillé, moral de guilde, contagion, team-building, traditions, conflits ; validé dans Godot 4.6)*
+- **Global** : ~88% terminé *(+Milestone 6 Polish 60% : conseiller adaptatif, dashboard de statistiques, auto-sauvegarde + backup ; validé dans Godot 4.6)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
@@ -591,7 +590,7 @@
 - **Milestone 3** : 100% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires, progression Phase 2→3 branchée)*
 - **Milestone 4** : 100% ✅ *(Esport : staff pro, tournois internationaux, burnout/stress, transferts internationaux, legacy/Hall of Fame)*
 - **Milestone 5** : 100% ✅ *(Transversales : dynamiques de groupe, moral collectif + contagion, team-building, traditions, gestion des conflits)*
-- **Milestone 6** : 0% 📋
+- **Milestone 6** : 60% ✅ *(Polish : conseiller adaptatif AdvisorManager, dashboard de stats, auto-sauvegarde + backup ; équilibrage 6.4 et tests auto 6.5 restants)*
 
 ### Dépendances Critiques (Mises à jour)
 - ✅ Milestone 1 requis avant tous (FAIT)

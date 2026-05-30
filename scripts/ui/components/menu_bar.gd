@@ -8,6 +8,7 @@ signal organisation_button_pressed
 signal national_button_pressed
 signal esport_button_pressed
 signal cohesion_button_pressed
+signal conseils_button_pressed
 
 var _buttons: Dictionary = {}  # window_name -> Button
 
@@ -34,6 +35,7 @@ func _ready():
 	var national_btn = _create_menu_button("National", "national", _on_national_pressed)
 	var esport_btn = _create_menu_button("Esport", "esport", _on_esport_pressed)
 	var cohesion_btn = _create_menu_button("Cohésion", "cohesion", _on_cohesion_pressed)
+	var conseils_btn = _create_menu_button("Conseils", "conseils", _on_conseils_pressed)
 
 	hbox.add_child(personnage_btn)
 	hbox.add_child(guilde_btn)
@@ -42,6 +44,7 @@ func _ready():
 	hbox.add_child(national_btn)
 	hbox.add_child(esport_btn)
 	hbox.add_child(cohesion_btn)
+	hbox.add_child(conseils_btn)
 
 	# Verrouillage des fenêtres selon la phase de jeu
 	if PhaseManager and not PhaseManager.phase_changed.is_connected(_on_phase_changed_lock):
@@ -108,3 +111,6 @@ func _on_esport_pressed():
 
 func _on_cohesion_pressed():
 	cohesion_button_pressed.emit()
+
+func _on_conseils_pressed():
+	conseils_button_pressed.emit()

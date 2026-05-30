@@ -148,6 +148,7 @@ func _connect_menu_signals():
 	menu_bar.national_button_pressed.connect(_on_national_button_pressed)
 	menu_bar.esport_button_pressed.connect(_on_esport_button_pressed)
 	menu_bar.cohesion_button_pressed.connect(_on_cohesion_button_pressed)
+	menu_bar.conseils_button_pressed.connect(_on_conseils_button_pressed)
 
 func _on_personnage_button_pressed():
 	window_manager.show_window("personnage")
@@ -170,6 +171,9 @@ func _on_esport_button_pressed():
 func _on_cohesion_button_pressed():
 	window_manager.show_window("cohesion")
 
+func _on_conseils_button_pressed():
+	window_manager.show_window("conseils")
+
 func _register_windows():
 	window_manager.register_window("personnage", "res://scenes/Fenetre_Personnage.tscn")
 	window_manager.register_window("guilde", "res://scenes/Fenetre_Guilde.tscn")
@@ -178,6 +182,7 @@ func _register_windows():
 	window_manager.register_window("national", "res://scenes/Fenetre_National.tscn")
 	window_manager.register_window("esport", "res://scenes/Fenetre_Esport.tscn")
 	window_manager.register_window("cohesion", "res://scenes/Fenetre_Social.tscn")
+	window_manager.register_window("conseils", "res://scenes/Fenetre_Conseils.tscn")
 
 func _connect_window_signals():
 	# Écouter l'ouverture des fenêtres pour connecter leurs signaux
@@ -354,6 +359,9 @@ func _input(event: InputEvent) -> void:
 			KEY_K:  # K pour Cohésion
 				if Input.is_key_pressed(KEY_CTRL):
 					menu_bar._on_cohesion_pressed()
+			KEY_A:  # A pour Conseils (conseiller / aide)
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_conseils_pressed()
 			KEY_SPACE:  # Espace pour pause
 				var game_time_node = GameTime
 				if game_time_node:
