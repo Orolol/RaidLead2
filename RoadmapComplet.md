@@ -494,14 +494,16 @@
 - ✅ **Déclenchement dynamique** : plus le moral est bas, plus des tensions éclatent
 - 📋 **Conflits leadership / formation staff** : non implémentés (recoupent Milestone 4 staff)
 
-## 5. Milestone 6 : Polish et Équilibrage (60% ✅)
+## 5. Milestone 6 : Polish et Équilibrage (95% ✅)
 **Temps estimé : 3-5 jours**
 
-> **MàJ 30 mai 2026** — Conseiller adaptatif + dashboard de stats + auto-sauvegarde implémentés et validés en jeu (MCP).
+> **MàJ 30 mai 2026** — Polish complet : conseiller adaptatif, dashboard de stats, auto-sauvegarde, équilibrage adaptatif et tests automatisés. Validé en jeu (MCP) et en headless.
 > - ✅ **Nouvel autoload** `AdvisorManager` : analyse l'état réel de la guilde et produit des conseils priorisés (alerte/attention/astuce/opportunité).
-> - ✅ **Fenêtre `Conseils`** (`Fenetre_Conseils.tscn`, onglets Conseils / Statistiques) + bouton menu + raccourci **Ctrl+A**.
+> - ✅ **Nouvel autoload** `BalanceManager` : difficulté réglable + catch-up (joueur à la traîne) + rubber-band (IA quand le joueur domine), branchés sur le recrutement et la progression PvE des IA.
+> - ✅ **Fenêtre `Conseils`** (`Fenetre_Conseils.tscn`, onglets Conseils / Statistiques / Équilibrage) + bouton menu + raccourci **Ctrl+A**.
 > - ✅ **Auto-sauvegarde** (changement de phase + toutes les 4 semaines) avec **backup** de la save précédente et **repli automatique** sur le backup si la sauvegarde principale est corrompue.
-> - ✅ **Validation runtime** : conseil contextuel correct par phase, dashboard live (refresh au changement de phase), backup créé à la sauvegarde — vérifiés par screenshots.
+> - ✅ **Tests automatisés** : harnais maison `res://tests/` (36 assertions, 100 % vertes) lançable en headless (`tests/run_tests.ps1`).
+> - ✅ **Validation runtime** : conseil contextuel par phase, dashboard live, équilibrage (catch-up/rubber-band), backup à la sauvegarde — vérifiés par screenshots et tests.
 
 ### US 6.1 : Système de Conseils et Tutoriels Adaptatifs ✅
 - ✅ **IA conseil** : `AdvisorManager` analyse trésorerie/salaires, burnout/stress, moral, tensions, recrutement, équipement et progression de phase → conseils priorisés par sévérité
@@ -522,13 +524,20 @@
 - ✅ **Continuité inter-phases** : phases, relations, réputation déjà sauvegardées (SaveManager existant)
 - 📋 **Slots de sauvegarde multiples** : non implémentés (nécessite une UI de gestion des saves)
 
-### US 6.4 : Équilibrage de la Courbe de Difficulté (📋 partiel)
-- 📋 **Analyse playtest / scaling adaptatif / catch-up / défis optionnels** : non implémentés (nécessite des données de playtest réelles)
+### US 6.4 : Équilibrage de la Courbe de Difficulté ✅
+- ✅ **Difficulté réglable** : `BalanceManager` (autoload) avec 3 presets (Détendu / Normal / Difficile) modifiant catch-up, recrutement, progression IA et stipend hebdomadaire
+- ✅ **Scaling adaptatif / catch-up** : aide douce (or + soutien moral) quand le joueur décroche (rang, trésorerie, moral), proportionnelle à la galère et à la difficulté
+- ✅ **Rubber-band IA** : les guildes IA progressent plus vite (`AIGuild._simulate_pve_progression`) quand le joueur domine durablement le classement
+- ✅ **Bonus de recrutement** : `RecruitmentPool.attempt_recruitment` lit le multiplicateur catch-up (joueur uniquement)
+- ✅ **Interface** : onglet Équilibrage (sélecteur de difficulté + statut d'adaptation en direct) ; réglage sauvegardé
+- 📋 **Défis optionnels / analyse de playtest fine** : non implémentés (calibrage à affiner avec des données réelles)
 
-### US 6.5 : Tests et Validation Finale (📋 partiel)
+### US 6.5 : Tests et Validation Finale ✅
+- ✅ **Framework de tests automatisés** : harnais léger maison dans `res://tests/` (`test_framework.gd` + `run_tests.gd` + `TestRunner.tscn`), lançable en headless
+- ✅ **Suites** : Item/Equipment, SimulatedPlayer (stress/burnout), BalanceManager, AdvisorManager, SaveManager (round-trip), PhaseManager — **36 assertions, 100 % vertes**
+- ✅ **Exécution CI-friendly** : `tests/run_tests.ps1` (détecte Godot, code de sortie 0/1) + `tests/README.md`
 - ✅ **Validation runtime via MCP** : chaque milestone validé en jeu (screenshots, scripts d'inspection)
-- 📋 **Framework de tests automatisés (GUT)** : non mis en place
-- 📋 **Playtests externes / optimisation perf sessions longues** : à faire
+- 📋 **Playtests externes / optimisation perf sessions longues** : à faire (hors automatisation)
 
 ## 6. Améliorations Long Terme (priorité basse)
 
@@ -575,7 +584,7 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~88% terminé *(+Milestone 6 Polish 60% : conseiller adaptatif, dashboard de statistiques, auto-sauvegarde + backup ; validé dans Godot 4.6)*
+- **Global** : ~92% terminé *(+Milestone 6 Polish 95% : conseiller adaptatif, dashboard de statistiques, auto-sauvegarde + backup, équilibrage adaptatif, tests automatisés ; validé dans Godot 4.6 et en headless)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
@@ -590,7 +599,7 @@
 - **Milestone 3** : 100% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires, progression Phase 2→3 branchée)*
 - **Milestone 4** : 100% ✅ *(Esport : staff pro, tournois internationaux, burnout/stress, transferts internationaux, legacy/Hall of Fame)*
 - **Milestone 5** : 100% ✅ *(Transversales : dynamiques de groupe, moral collectif + contagion, team-building, traditions, gestion des conflits)*
-- **Milestone 6** : 60% ✅ *(Polish : conseiller adaptatif AdvisorManager, dashboard de stats, auto-sauvegarde + backup ; équilibrage 6.4 et tests auto 6.5 restants)*
+- **Milestone 6** : 95% ✅ *(Polish : conseiller adaptatif, dashboard de stats, auto-sauvegarde + backup, équilibrage adaptatif BalanceManager, harnais de tests automatisés 36/36 ; calibrage fin et playtests externes restants)*
 
 ### Dépendances Critiques (Mises à jour)
 - ✅ Milestone 1 requis avant tous (FAIT)

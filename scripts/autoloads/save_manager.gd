@@ -61,6 +61,7 @@ func save_game() -> bool:
 		"transfers": TransferManager.serialize(),
 		"legacy": LegacyManager.serialize(),
 		"culture": GuildCultureManager.serialize(),
+		"balance": BalanceManager.serialize(),
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
@@ -168,6 +169,8 @@ func _apply_save_data(data: Dictionary) -> void:
 		LegacyManager.deserialize(data.legacy)
 	if data.has("culture"):
 		GuildCultureManager.deserialize(data.culture)
+	if data.has("balance"):
+		BalanceManager.deserialize(data.balance)
 
 func has_save() -> bool:
 	"""Vérifie si une sauvegarde existe."""

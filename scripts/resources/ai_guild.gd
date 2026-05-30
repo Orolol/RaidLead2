@@ -226,7 +226,12 @@ func _simulate_pve_progression():
 	"""Simule la progression PvE de la guilde"""
 	var config = STRATEGY_CONFIG[ai_strategy]
 	var success_chance = success_rate * config.raid_focus
-	
+
+	# Équilibrage adaptatif : rubber-band — les IA progressent plus vite si le joueur domine (US 6.4)
+	var balance_manager = Singletons.get_autoload("BalanceManager")
+	if balance_manager:
+		success_chance *= balance_manager.get_ai_progression_mult()
+
 	# Tentatives de progression selon le focus actuel
 	var progression_attempts = 1
 	if current_focus == "raids":

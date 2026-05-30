@@ -255,7 +255,13 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 	
 	# Ajuste selon la difficulté
 	var final_chance = base_chance * (1.0 - recruitment_difficulty)
-	
+
+	# Équilibrage adaptatif : bonus de recrutement si le joueur est à la traîne (US 6.4)
+	var balance_manager = get_node_or_null("/root/BalanceManager")
+	if balance_manager:
+		final_chance *= balance_manager.get_recruit_chance_mult()
+	final_chance = clamp(final_chance, 0.0, 1.0)
+
 	var success = randf() < final_chance
 	
 	if success:

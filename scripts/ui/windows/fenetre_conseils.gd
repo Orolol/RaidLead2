@@ -9,12 +9,14 @@ const DIM := Color(0.62, 0.65, 0.71)
 const GOLD := Color(1.0, 0.82, 0.30)
 const GREEN := Color(0.55, 0.82, 0.55)
 const RED := Color(0.88, 0.45, 0.45)
+const STRUGGLE_HINT := 0.3  # seuil d'affichage "sous pression"
 
 var advanced_tabs: AdvancedTabs
 var _drag_active: bool = false
 
 var _advice_box: VBoxContainer
 var _stats_box: VBoxContainer
+var _balance_box: VBoxContainer
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -33,6 +35,7 @@ func _ready() -> void:
 
 	_advice_box = _add_scroll_tab("Conseils")
 	_stats_box = _add_scroll_tab("Statistiques")
+	_balance_box = _add_scroll_tab("Équilibrage")
 
 	_connect_signals()
 	_refresh_all()
@@ -87,6 +90,8 @@ func _connect_signals() -> void:
 		GameTime.week_changed.connect(func(_w, _y): _on_changed())
 	if PhaseManager and PhaseManager.has_signal("phase_changed"):
 		PhaseManager.phase_changed.connect(func(_n, _o): _on_changed())
+	if BalanceManager and BalanceManager.has_signal("difficulty_changed"):
+		BalanceManager.difficulty_changed.connect(func(_d): _on_changed())
 
 func _on_changed() -> void:
 	if visible:
@@ -99,6 +104,7 @@ func refresh_window() -> void:
 func _refresh_all() -> void:
 	_build_advice()
 	_build_stats()
+	_build_balance()
 
 # --- Helpers UI partagés ---
 
@@ -331,6 +337,86 @@ func _cell(text: String, width: int, color: Color = Color.WHITE) -> Label:
 	label.clip_text = true
 	label.modulate = color
 	return label
+
+# --- Onglet Équilibrage (US 6.4) ---
+
+func _build_balance() -> void:
+	_clear(_balance_box)
+	if not BalanceManager:
+		_empty_hint(_balance_box, "Système d'équilibrage indisponible.")
+		return
+
+	_section(_balance_box, "Difficulté", ACCENT)
+	var current: int = BalanceManager.get_difficulty()
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+	_balance_box.add_child(btn_row)
+	for d in [BalanceManager.Difficulty.RELAXED, BalanceManager.Difficulty.NORMAL, BalanceManager.Difficulty.HARD]:
+		var preset: Dictionary = BalanceManager.DIFFICULTY_PRESETS[d]
+		var btn := Button.new()
+		btn.text = preset.get("name", "?")
+		btn.toggle_mode = true
+		btn.button_pressed = (d == current)
+		btn.custom_minimum_size = Vector2(130, 34)
+		var dref: int = d
+		btn.pressed.connect(func():
+			BalanceManager.set_difficulty(dref)
+			_build_balance()
+		)
+		btn_row.add_child(btn)
+
+	var desc := Label.new()
+	desc.text = BalanceManager.get_difficulty_desc()
+	desc.modulate = DIM
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_balance_box.add_child(desc)
+
+	_balance_box.add_child(HSeparator.new())
+	_section(_balance_box, "Adaptation en cours", ACCENT)
+	var st: Dictionary = BalanceManager.get_status()
+	var card := _card(_balance_box)
+	_kv(card, "Classement actuel", _ordinal(st.get("rank", 0)))
+	_kv(card, "Situation", _standing_label(st), _standing_color(st))
+	_kv(card, "Bonus de recrutement", "x%.2f" % st.get("recruit_mult", 1.0), _mult_color(st.get("recruit_mult", 1.0), true))
+	_kv(card, "Progression des IA", "x%.2f" % st.get("ai_progression_mult", 1.0), _mult_color(st.get("ai_progression_mult", 1.0), false))
+	if st.get("weeks_dominating", 0) > 0:
+		_kv(card, "Domination", "%d semaine(s) en tête" % st.weeks_dominating, GOLD)
+	if st.get("total_catchup_gold", 0) > 0:
+		_kv(card, "Aide catch-up cumulée", "%s or" % _fmt_int(st.total_catchup_gold), GREEN)
+
+	_empty_hint(_balance_box, "Le catch-up vous aide (or, moral, recrutement) quand vous décrochez. Le rubber-band rend les IA plus tenaces quand vous dominez durablement.")
+
+func _ordinal(rank: int) -> String:
+	if rank <= 0:
+		return "Non classé"
+	return "%d%s" % [rank, "er" if rank == 1 else "e"]
+
+func _standing_label(st: Dictionary) -> String:
+	var struggle: float = st.get("struggle", 0.0)
+	var dominance: float = st.get("dominance", 0.0)
+	if struggle >= 0.5:
+		return "En difficulté — catch-up actif"
+	elif struggle >= STRUGGLE_HINT:
+		return "Sous pression"
+	elif dominance >= 0.5:
+		return "En domination"
+	return "Équilibré"
+
+func _standing_color(st: Dictionary) -> Color:
+	var struggle: float = st.get("struggle", 0.0)
+	if struggle >= 0.5:
+		return RED
+	elif struggle >= STRUGGLE_HINT:
+		return GOLD
+	elif st.get("dominance", 0.0) >= 0.5:
+		return GOLD
+	return GREEN
+
+func _mult_color(m: float, higher_is_good: bool) -> Color:
+	if absf(m - 1.0) < 0.02:
+		return DIM
+	var good: bool = (m > 1.0) == higher_is_good
+	return GREEN if good else GOLD
 
 # --- Couleurs ---
 
