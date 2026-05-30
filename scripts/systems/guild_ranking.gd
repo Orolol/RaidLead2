@@ -173,7 +173,9 @@ func update_rankings():
 	var current_phase = PhaseManager.get_current_phase() if PhaseManager else PhaseManager.GamePhase.SERVEUR
 	
 	match current_phase:
-		PhaseManager.GamePhase.SERVEUR:
+		PhaseManager.GamePhase.LEVELING, PhaseManager.GamePhase.SERVEUR:
+			# Le classement serveur est calculé dès la phase Leveling pour rester
+			# cohérent avec la fenêtre Monde et alimenter get_player_guild_position().
 			_update_server_rankings()
 		PhaseManager.GamePhase.NATIONAL:
 			_update_national_rankings()
