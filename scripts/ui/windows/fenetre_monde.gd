@@ -2,6 +2,7 @@ extends PanelContainer
 
 var close_button: Button
 var title_label: Label
+var _drag_active: bool = false
 var advanced_tabs: AdvancedTabs
 
 var guild_ranking_list: ItemList
@@ -49,6 +50,13 @@ func _ready():
 	_generate_competing_guilds()
 	_refresh_recruitment_from_pool()
 
+func _on_header_drag(event: InputEvent) -> void:
+	"""Permet de déplacer la fenêtre en glissant sur la barre de titre."""
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
+
 func _setup_header(parent: VBoxContainer):
 	var header = HBoxContainer.new()
 	parent.add_child(header)
@@ -56,6 +64,10 @@ func _setup_header(parent: VBoxContainer):
 	title_label = Label.new()
 	title_label.text = "Vue du Monde"
 	title_label.add_theme_font_size_override("font_size", 20)
+	title_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	title_label.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title_label.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title_label.gui_input.connect(_on_header_drag)
 	header.add_child(title_label)
 	
 	header.add_spacer(false)

@@ -11,6 +11,9 @@ signal cohesion_button_pressed
 
 var _buttons: Dictionary = {}  # window_name -> Button
 
+# Fenêtres débloquées à partir d'une phase (window_name -> phase min). Les autres restent toujours accessibles.
+const PHASE_LOCKS := {"national": 2, "esport": 3}
+
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	custom_minimum_size.y = 80
@@ -39,6 +42,30 @@ func _ready():
 	hbox.add_child(national_btn)
 	hbox.add_child(esport_btn)
 	hbox.add_child(cohesion_btn)
+
+	# Verrouillage des fenêtres selon la phase de jeu
+	if PhaseManager and not PhaseManager.phase_changed.is_connected(_on_phase_changed_lock):
+		PhaseManager.phase_changed.connect(_on_phase_changed_lock)
+	_update_phase_locks()
+
+func _on_phase_changed_lock(_new_phase, _old_phase) -> void:
+	_update_phase_locks()
+
+func _update_phase_locks() -> void:
+	"""Grise les boutons des fenêtres non encore débloquées par la phase actuelle."""
+	if not PhaseManager:
+		return
+	var current: int = PhaseManager.get_current_phase()
+	for wname in PHASE_LOCKS:
+		if not _buttons.has(wname):
+			continue
+		var btn: Button = _buttons[wname]
+		var locked: bool = current < int(PHASE_LOCKS[wname])
+		btn.disabled = locked
+		if locked:
+			btn.tooltip_text = "Débloqué en %s" % PhaseManager.get_phase_name(PHASE_LOCKS[wname])
+		else:
+			btn.tooltip_text = ""
 
 func _create_menu_button(text: String, window_name: String, callback: Callable) -> Button:
 	var button = Button.new()

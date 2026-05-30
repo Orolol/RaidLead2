@@ -4,6 +4,7 @@ var close_button: Button
 var title_label: Label
 var content_container: VBoxContainer
 var advanced_tabs: AdvancedTabs
+var _drag_active: bool = false
 
 var classe_label: Label
 var niveau_label: Label
@@ -76,6 +77,10 @@ func _setup_header(parent: VBoxContainer):
 	title_label = Label.new()
 	title_label.text = "Informations du Personnage"
 	title_label.add_theme_font_size_override("font_size", 20)
+	title_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	title_label.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title_label.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title_label.gui_input.connect(_on_header_drag)
 	header.add_child(title_label)
 	
 	header.add_spacer(false)
@@ -85,6 +90,13 @@ func _setup_header(parent: VBoxContainer):
 	close_button.custom_minimum_size = Vector2(30, 30)
 	close_button.pressed.connect(_on_close_pressed)
 	header.add_child(close_button)
+
+func _on_header_drag(event: InputEvent) -> void:
+	"""Permet de déplacer la fenêtre en glissant sur la barre de titre."""
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
 
 func _setup_content(parent: VBoxContainer):
 	# Utiliser AdvancedTabs pour organiser les informations
@@ -107,15 +119,29 @@ func _setup_character_info_tab():
 	advanced_tabs.add_tab("Personnage", info_tab, false)
 	
 	var info_panel = PanelContainer.new()
+	info_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_tab.add_child(info_panel)
-	
+
+	# Disposition en deux colonnes : identité (gauche) / état (droite)
+	var columns = HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 24)
+	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_panel.add_child(columns)
+
 	var info_vbox = VBoxContainer.new()
 	info_vbox.add_theme_constant_override("separation", 10)
-	info_panel.add_child(info_vbox)
-	
-	# Header avec portrait
+	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(info_vbox)
+
+	columns.add_child(VSeparator.new())
+
+	var right_vbox = VBoxContainer.new()
+	right_vbox.add_theme_constant_override("separation", 12)
+	right_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(right_vbox)
+
+	# Header avec portrait (colonne gauche)
 	var header_hbox = HBoxContainer.new()
-	header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	header_hbox.add_theme_constant_override("separation", 15)
 	info_vbox.add_child(header_hbox)
 
@@ -151,15 +177,30 @@ func _setup_character_info_tab():
 	equipement_label.add_theme_font_size_override("font_size", 16)
 	info_vbox.add_child(equipement_label)
 	
-	info_vbox.add_child(HSeparator.new())
-	
-	# Progression XP
-	_setup_xp_display(info_vbox)
-	
-	info_vbox.add_child(HSeparator.new())
-	
-	# Stats du joueur
-	_setup_player_stats(info_vbox)
+	# Colonne droite : progression XP + état actuel
+	_setup_xp_display(right_vbox)
+	right_vbox.add_child(HSeparator.new())
+	_setup_player_stats(right_vbox)
+
+	# Aperçu de la phase actuelle (sous les deux colonnes)
+	var phase_panel = PanelContainer.new()
+	info_tab.add_child(phase_panel)
+	var phase_vbox = VBoxContainer.new()
+	phase_vbox.add_theme_constant_override("separation", 4)
+	phase_panel.add_child(phase_vbox)
+	var ph_title = Label.new()
+	ph_title.text = "Phase actuelle"
+	ph_title.add_theme_font_size_override("font_size", 14)
+	ph_title.modulate = Color(1.0, 0.82, 0.3)
+	phase_vbox.add_child(ph_title)
+	var ph_name = Label.new()
+	if PhaseManager:
+		var cur_phase = PhaseManager.get_current_phase()
+		ph_name.text = "%s — %s" % [PhaseManager.get_phase_name(cur_phase), PhaseManager.get_phase_description(cur_phase)]
+	ph_name.add_theme_font_size_override("font_size", 12)
+	ph_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ph_name.modulate = Color(0.72, 0.74, 0.80)
+	phase_vbox.add_child(ph_name)
 
 func _setup_xp_display(parent: VBoxContainer):
 	"""Configure l'affichage de progression XP"""
