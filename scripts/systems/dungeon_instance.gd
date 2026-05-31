@@ -323,7 +323,8 @@ func _on_boss_defeated() -> void:
 				# Émettre le signal de distribution de loot pour le chat
 				loot_distributed.emit(loot_winner, looted_item)
 
-	boss_defeated.emit(current_boss_index, boss_name, loot_winner, looted_item)
+	# Le signal boss_defeated ne déclare que 3 paramètres (boss_index, boss_name, loot_winner)
+	boss_defeated.emit(current_boss_index, boss_name, loot_winner)
 	
 	# Réinitialiser le compteur de wipes pour ce boss
 	wipe_count = 0

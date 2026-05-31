@@ -454,15 +454,19 @@ func _on_dungeon_started(dungeon_instance):
 	var group_names = []
 	for member in dungeon_instance.group_members:
 		group_names.append(member.nom)
-	show_info("Donjon %s démarré avec : %s" % [dungeon_instance.instance_data.name, ", ".join(group_names)], "Donjon démarré")
+	# DungeonInstance expose dungeon_data (Dictionary), pas instance_data
+	show_info("Donjon %s démarré avec : %s" % [dungeon_instance.dungeon_data.get("name", "Donjon"), ", ".join(group_names)], "Donjon démarré")
 
 func _on_dungeon_ended(dungeon_instance):
 	"""Quand un donjon se termine"""
-	var success = dungeon_instance.defeated_bosses.size() == dungeon_instance.instance_data.bosses.size()
+	var total: int = dungeon_instance.dungeon_data.get("bosses", []).size()
+	var defeated: int = dungeon_instance.current_boss_index
+	var dname: String = dungeon_instance.dungeon_data.get("name", "Donjon")
+	var success: bool = total > 0 and defeated >= total
 	if success:
-		show_success("Donjon %s terminé avec succès !" % dungeon_instance.instance_data.name, "Victoire!")
+		show_success("Donjon %s terminé avec succès !" % dname, "Victoire!")
 	else:
-		show_warning("Donjon %s échoué (%d/%d boss vaincus)" % [dungeon_instance.instance_data.name, dungeon_instance.defeated_bosses.size(), dungeon_instance.instance_data.bosses.size()], "Défaite")
+		show_warning("Donjon %s échoué (%d/%d boss vaincus)" % [dname, defeated, total], "Défaite")
 
 func _on_recruitment_pool_updated(_pool):
 	"""Quand le pool de recrutement est mis à jour"""
