@@ -502,7 +502,7 @@
 > - ✅ **Nouvel autoload** `BalanceManager` : difficulté réglable + catch-up (joueur à la traîne) + rubber-band (IA quand le joueur domine), branchés sur le recrutement et la progression PvE des IA.
 > - ✅ **Fenêtre `Conseils`** (`Fenetre_Conseils.tscn`, onglets Conseils / Statistiques / Équilibrage) + bouton menu + raccourci **Ctrl+A**.
 > - ✅ **Auto-sauvegarde** (changement de phase + toutes les 4 semaines) avec **backup** de la save précédente et **repli automatique** sur le backup si la sauvegarde principale est corrompue.
-> - ✅ **Tests automatisés** : harnais maison `res://tests/` (42 assertions, 100 % vertes) lançable en headless (`tests/run_tests.ps1`).
+> - ✅ **Tests automatisés** : harnais maison `res://tests/` (46 assertions, 100 % vertes) lançable en headless (`tests/run_tests.ps1`).
 > - ✅ **Validation runtime** : conseil contextuel par phase, dashboard live, équilibrage (catch-up/rubber-band), backup à la sauvegarde — vérifiés par screenshots et tests.
 
 ### US 6.1 : Système de Conseils et Tutoriels Adaptatifs ✅
@@ -534,7 +534,7 @@
 
 ### US 6.5 : Tests et Validation Finale ✅
 - ✅ **Framework de tests automatisés** : harnais léger maison dans `res://tests/` (`test_framework.gd` + `run_tests.gd` + `TestRunner.tscn`), lançable en headless
-- ✅ **Suites** : GameTime, Item/Equipment, SimulatedPlayer (stress/burnout), BalanceManager, AdvisorManager, SaveManager (round-trip), AIGuild, PhaseManager — **42 assertions, 100 % vertes**
+- ✅ **Suites** : GameTime, Item/Equipment, SimulatedPlayer (stress/burnout), BalanceManager, AdvisorManager, SaveManager (round-trip), AIGuild, PvE Progression, PhaseManager — **46 assertions, 100 % vertes**
 - ✅ **Exécution CI-friendly** : `tests/run_tests.ps1` (détecte Godot, code de sortie 0/1) + `tests/README.md`
 - ✅ **Validation runtime via MCP** : chaque milestone validé en jeu (screenshots, scripts d'inspection)
 - ✅ **Playtest interne complet (MCP)** : parcours des 4 phases ; **5 bugs corrigés** dont 1 bloquant critique (voir ci-dessous)
@@ -607,7 +607,7 @@
 - **Milestone 3** : 100% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires, progression Phase 2→3 branchée)*
 - **Milestone 4** : 100% ✅ *(Esport : staff pro, tournois internationaux, burnout/stress, transferts internationaux, legacy/Hall of Fame)*
 - **Milestone 5** : 100% ✅ *(Transversales : dynamiques de groupe, moral collectif + contagion, team-building, traditions, gestion des conflits)*
-- **Milestone 6** : 95% ✅ *(Polish : conseiller adaptatif, dashboard de stats, auto-sauvegarde + backup, équilibrage adaptatif BalanceManager, harnais de tests automatisés 42/42 ; calibrage fin et playtests externes restants)*
+- **Milestone 6** : 95% ✅ *(Polish : conseiller adaptatif, dashboard de stats, auto-sauvegarde + backup, équilibrage adaptatif BalanceManager, harnais de tests automatisés 46/46 ; calibrage fin et playtests externes restants)*
 
 ### Dépendances Critiques (Mises à jour)
 - ✅ Milestone 1 requis avant tous (FAIT)
@@ -648,7 +648,8 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 - **Scènes** : UID invalides nettoyés dans `Main.tscn` et `Fenetre_Personnage.tscn`.
 - **CustomProgressBar** : positionnement du label corrigé pour supprimer le warning d'ancrage au lancement.
 - **AIGuild** : restauration de save sans génération temporaire de guildes ni logs `Ma Guilde` parasites.
-- **Tests** : suite automatisée étendue à 42 assertions, validée avec Godot 4.6.2.
+- **PvE minimal** : clears joueur enregistrés depuis `DungeonInstance`, sauvegardés dans `GuildRanking`, utilisés par le ranking et `PhaseManager.content_cleared_percent`.
+- **Tests** : suite automatisée étendue à 46 assertions, validée avec Godot 4.6.2.
 
 ### Infrastructure UI Phases 1 & 2 (9 jours)
 - **NotificationManager** : Système toast professionnel avec 5 types et animations

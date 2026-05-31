@@ -22,6 +22,7 @@ func _run_all() -> void:
 	_suite_advisor(tf)
 	_suite_save(tf)
 	_suite_ai_guild(tf)
+	_suite_pve_progression(tf)
 	_suite_phase(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
@@ -162,6 +163,36 @@ func _suite_ai_guild(tf) -> void:
 	tf.eq(restored.name, "Guilde Restaurée", "restauration conserve le nom sans génération")
 	tf.eq(restored.ai_strategy, AIGuild.Strategy.HARDCORE, "restauration conserve la stratégie")
 	tf.eq(restored.members.size(), 0, "restauration ne génère pas de membres temporaires")
+
+func _suite_pve_progression(tf) -> void:
+	tf.suite("PvE Progression")
+	var saved_cleared: Dictionary = GuildRanking.player_cleared_content.duplicate(true)
+	var saved_recent: Array = GuildRanking.player_recent_clears.duplicate(true)
+	var saved_firsts: Dictionary = GuildRanking.server_firsts.duplicate(true)
+	
+	GuildRanking.player_cleared_content = {}
+	GuildRanking.player_recent_clears = []
+	GuildRanking.server_firsts["deadmines"] = "Autre Guilde"
+	var before_percent: float = GuildRanking.get_player_content_cleared_percent()
+	
+	GuildRanking.register_player_content_clear(
+		"deadmines",
+		"Les Mortemines",
+		DungeonData.InstanceType.DUNGEON,
+		false,
+		["Joueur"]
+	)
+	
+	var cleared: Array = GuildRanking.get_player_cleared_content()
+	var percent: float = GuildRanking.get_player_content_cleared_percent()
+	tf.ok(cleared.has("deadmines"), "clear PvE enregistré par content_id")
+	tf.ok(percent > before_percent, "pourcentage de contenu clear augmente")
+	tf.approx(float(PhaseManager._get_requirement_current_value("content_cleared_percent")), percent, "PhaseManager lit le tracking PvE", 0.01)
+	tf.eq(GuildRanking.get_player_recent_clears().size(), 1, "clear récent exposé au ranking")
+	
+	GuildRanking.player_cleared_content = saved_cleared
+	GuildRanking.player_recent_clears = saved_recent
+	GuildRanking.server_firsts = saved_firsts
 
 func _suite_phase(tf) -> void:
 	tf.suite("PhaseManager")

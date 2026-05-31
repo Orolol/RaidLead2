@@ -322,8 +322,9 @@ func _get_requirement_current_value(req_name: String):
 			return 0.0
 			
 		"content_cleared_percent":
-			# TODO: Sera calculé avec le système de progression PvE
-			return 0.0 # Placeholder
+			if GuildRanking and GuildRanking.has_method("get_player_content_cleared_percent"):
+				return GuildRanking.get_player_content_cleared_percent()
+			return 0.0
 			
 		"national_rank_position":
 			if GuildRanking:

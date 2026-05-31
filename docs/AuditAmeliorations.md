@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 42 total | 42 réussis | 0 échoués
+TESTS : 46 total | 46 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -60,10 +60,11 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - Scènes: nettoyage des UID invalides signalés dans `Main.tscn` et `Fenetre_Personnage.tscn`; le lancement court de `Main.tscn` ne remonte plus ces warnings.
 - CustomProgressBar: le label interne est maintenant positionné par offsets plutôt que par modification directe de taille après ancrage, ce qui supprime le warning d'ancrage au lancement.
 - AIGuild: la restauration depuis une save n'appelle plus la génération complète du constructeur; les logs `Ma Guilde` parasites disparaissent et un test verrouille le mode de restauration sans membres temporaires.
+- PvE minimal: les clears réels de la guilde joueur sont maintenant enregistrés par `DungeonInstance`, sauvegardés dans `GuildRanking`, exposés au ranking et lus par `PhaseManager.content_cleared_percent`.
 
 ### Toujours ouvert
 
-- Le chantier PvE reste le prochain gros morceau: tracking réel des clears, rapport de run, branchement `GuildRanking`/`PhaseManager`.
+- Le chantier PvE reste le prochain gros morceau: le tracking de clears existe maintenant, mais il manque encore un vrai rapport de run, une vue d'historique et une résolution PvE plus centrale.
 - Les chemins UI directs hors `main.gd` restent à auditer plus largement, même si le cas `PhaseManager -> ChatPanel` est bouclé.
 - L'UX des fenêtres principales reste à reprendre, mais l'onglet Progression de `Fenetre_Personnage` a reçu une première stabilisation de lisibilité.
 
@@ -91,19 +92,19 @@ L'organisation de groupe, les donjons, les raids, le loot et les phases existent
 Points vus:
 
 - `scripts/systems/activity_manager.gd`: dans `_decide_next_activity()`, les choix `DUNGEON` et `RAID` retombent encore sur du farming.
-- `scripts/systems/guild_ranking.gd`: `_get_player_guild_cleared_content()` retourne un placeholder basé sur le niveau de guilde.
-- `scripts/systems/guild_ranking.gd`: `_get_recent_clears()` retourne toujours un tableau vide.
-- `scripts/systems/phase_manager.gd`: `content_cleared_percent` retourne encore `0.0`.
+- `scripts/systems/guild_ranking.gd`: `_get_player_guild_cleared_content()` retournait un placeholder basé sur le niveau de guilde. Corrigé pour la guilde joueur via clears réels.
+- `scripts/systems/guild_ranking.gd`: `_get_recent_clears()` retournait toujours un tableau vide. Corrigé pour la guilde joueur; l'IA garde ses données propres via `AIGuild`.
+- `scripts/systems/phase_manager.gd`: `content_cleared_percent` retournait encore `0.0`. Corrigé via `GuildRanking.get_player_content_cleared_percent()`.
 - `scripts/ui/windows/fenetre_organisation_groupe.gd`: l'UI de composition existe, avec drag/drop et auto-assignation, mais elle devrait devenir le centre de la promesse "raid lead".
 
 ### Pistes concrètes
 
-Créer une source de vérité pour la progression PvE:
+Étendre la source de vérité PvE maintenant amorcée dans `GuildRanking`:
 
-- un autoload `PveProgression` ou une responsabilité claire dans `GuildManager`;
-- enregistrer chaque run terminé: `content_id`, type, difficulté, succès, wipes, durée, participants, boss tués, loot obtenu, date;
-- exposer `get_cleared_content()`, `get_recent_clears(days)`, `get_content_cleared_percent(phase)`, `get_best_clear(content_id)`;
-- brancher `GuildRanking` et `PhaseManager` dessus.
+- enregistrer plus que le clear simple: wipes, durée, boss tués, loot obtenu, difficulté, score de performance;
+- exposer une vraie vue `get_run_history()`, `get_best_clear(content_id)`, `get_recent_clears(days)`;
+- décider si ce tracking reste dans `GuildRanking` ou devient un autoload `PveProgression` quand l'historique devient plus riche;
+- brancher une UI de rapport de run et d'historique.
 
 Faire de `Fenetre_OrganisationGroupe` le vrai bouton de jeu:
 
@@ -429,7 +430,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 42 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 46 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -679,11 +680,12 @@ Ces tâches sont petites mais utiles:
 - [x] nettoyer les UID invalides signalés par Godot au lancement de `Main.tscn`;
 - [x] corriger le warning d'ancrage de `CustomProgressBar`;
 - [x] éviter la génération temporaire de guildes IA lors du chargement de save;
+- [x] brancher un tracking minimal des clears PvE joueur dans `GuildRanking` et `PhaseManager`;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
 - [x] ajouter un test de base pour le compteur de jours absolus utilisé par `RecruitmentPool`;
-- ajouter un test pour `PhaseManager.content_cleared_percent` dès que le tracking PvE existe.
+- [x] ajouter un test pour `PhaseManager.content_cleared_percent` dès que le tracking PvE existe.
 
 ## Conclusion
 

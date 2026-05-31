@@ -4,6 +4,7 @@ extends Node
 # Gère la compétition entre la guilde du joueur et les guildes IA
 
 const AIGuild = preload("res://scripts/resources/ai_guild.gd")
+const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
 
 signal ranking_updated(rankings: Array)
 signal guild_position_changed(guild_name: String, old_position: int, new_position: int)
@@ -39,6 +40,8 @@ const SCORE_WEIGHTS = {
 # Données des achievements de contenu
 var content_achievements: Dictionary = {}
 var server_firsts: Dictionary = {}  # Qui a fait le premier clear de chaque contenu
+var player_cleared_content: Dictionary = {}
+var player_recent_clears: Array = []
 
 func _ready():
 	# Se connecter aux signaux nécessaires
@@ -269,29 +272,12 @@ func _get_player_guild_data() -> Dictionary:
 
 func _get_player_guild_cleared_content() -> Array:
 	"""Retourne le contenu cleared par la guilde du joueur"""
-	# TODO: Intégrer avec le système de donjons/raids
-	# Pour l'instant, retourner un placeholder basé sur le niveau de la guilde
-	var cleared = []
-	
-	if GuildManager and GuildManager.guild:
-		var level = GuildManager.guild.get_level()
-		# Ajouter du contenu fictif basé sur le niveau
-		if level >= 2:
-			cleared.append("deadmines")
-		if level >= 5:
-			cleared.append("wailing_caverns")
-		if level >= 10:
-			cleared.append("scarlet_monastery")
-		if level >= 15:
-			cleared.append("uldaman")
-		if level >= 20:
-			cleared.append("molten_core")
-	
-	return cleared
+	return get_player_cleared_content()
 
 func _get_recent_clears(guild_name: String) -> Array:
 	"""Retourne les clears récents d'une guilde (7 derniers jours)"""
-	# TODO: Implémenter avec un vrai tracking des clears
+	if guild_name == "player_guild" or (GuildManager and GuildManager.guild and guild_name == GuildManager.guild.name):
+		return get_player_recent_clears()
 	return []
 
 func _calculate_turnover_rate(members: Array) -> float:
@@ -426,6 +412,66 @@ func get_server_firsts() -> Dictionary:
 	"""Retourne tous les server firsts enregistrés"""
 	return server_firsts.duplicate()
 
+func register_player_content_clear(content_id: String, content_name: String = "", instance_type: int = -1, is_heroic: bool = false, participants: Array = []) -> void:
+	"""Enregistre un clear PvE réel de la guilde du joueur."""
+	if content_id.strip_edges() == "":
+		return
+	
+	var clear_data: Dictionary = {
+		"content_id": content_id,
+		"name": content_name if content_name != "" else content_id,
+		"type": instance_type,
+		"is_heroic": is_heroic,
+		"participants": participants.duplicate(),
+		"date": _get_current_date(),
+		"total_day": GameTime.get_total_days_elapsed() if GameTime and GameTime.has_method("get_total_days_elapsed") else 0
+	}
+	
+	player_cleared_content[content_id] = clear_data
+	player_recent_clears.append(clear_data)
+	_prune_player_recent_clears()
+	
+	if GuildManager and GuildManager.guild and not server_firsts.has(content_id):
+		register_server_first(GuildManager.guild.name, content_id)
+	else:
+		call_deferred("update_rankings")
+
+func get_player_cleared_content() -> Array:
+	"""Retourne les IDs de contenu déjà clear par la guilde du joueur."""
+	return player_cleared_content.keys()
+
+func get_player_recent_clears(days: int = 7) -> Array:
+	"""Retourne les clears du joueur dans la fenêtre récente demandée."""
+	var current_total_day: int = GameTime.get_total_days_elapsed() if GameTime and GameTime.has_method("get_total_days_elapsed") else 0
+	var cutoff_day: int = current_total_day - days
+	var recent: Array = []
+	for clear_data in player_recent_clears:
+		if int(clear_data.get("total_day", 0)) >= cutoff_day:
+			recent.append(clear_data)
+	return recent
+
+func get_player_content_cleared_percent() -> float:
+	"""Pourcentage du contenu actuellement disponible clear par la guilde du joueur."""
+	var available_content: Dictionary = DungeonDataScript.get_available_instances()
+	if available_content.is_empty():
+		return 0.0
+	
+	var cleared_count: int = 0
+	for content_id in available_content:
+		if player_cleared_content.has(content_id):
+			cleared_count += 1
+	
+	return (float(cleared_count) / float(available_content.size())) * 100.0
+
+func _prune_player_recent_clears(days: int = 14) -> void:
+	var current_total_day: int = GameTime.get_total_days_elapsed() if GameTime and GameTime.has_method("get_total_days_elapsed") else 0
+	var cutoff_day: int = current_total_day - days
+	var pruned: Array = []
+	for clear_data in player_recent_clears:
+		if int(clear_data.get("total_day", 0)) >= cutoff_day:
+			pruned.append(clear_data)
+	player_recent_clears = pruned
+
 # Callbacks des signaux
 
 func _on_week_changed(week: int, year: int):
@@ -495,6 +541,8 @@ func save_ranking_data() -> Dictionary:
 		"world_rankings": world_rankings,
 		"ranking_history": ranking_history,
 		"server_firsts": server_firsts,
+		"player_cleared_content": player_cleared_content,
+		"player_recent_clears": player_recent_clears,
 		"last_ranking_update": last_ranking_update
 	}
 
@@ -505,6 +553,8 @@ func load_ranking_data(data: Dictionary):
 	world_rankings = data.get("world_rankings", [])
 	ranking_history = data.get("ranking_history", {})
 	server_firsts = data.get("server_firsts", {})
+	player_cleared_content = data.get("player_cleared_content", {})
+	player_recent_clears = data.get("player_recent_clears", [])
 	last_ranking_update = data.get("last_ranking_update", _get_current_date())
 	
 	print("Données de classement chargées - %d server firsts, %d guildes trackées" % [server_firsts.size(), ranking_history.size()])

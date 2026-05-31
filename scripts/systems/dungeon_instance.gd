@@ -398,6 +398,18 @@ func _complete_dungeon() -> void:
 		member.mood = min(100, member.mood + 20)
 		
 	dungeon_completed.emit(total_time, gold_reward)
+	
+	if GuildRanking:
+		var participant_names: Array = []
+		for member in group_members:
+			participant_names.append(member.nom)
+		GuildRanking.register_player_content_clear(
+			dungeon_id,
+			dungeon_data.get("name", ""),
+			dungeon_data.get("type", -1),
+			DungeonDataScript.is_heroic_dungeon(dungeon_id),
+			participant_names
+		)
 
 	# Progression de phase : compléter un donjon héroïque fait avancer la Phase 0 -> Serveur
 	if DungeonDataScript.is_heroic_dungeon(dungeon_id) and PhaseManager:
