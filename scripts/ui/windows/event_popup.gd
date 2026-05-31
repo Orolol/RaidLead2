@@ -203,22 +203,24 @@ func _create_number_shortcut(number: int) -> Shortcut:
 	return shortcut
 
 func _adjust_window_size():
-	# Calculer la taille nécessaire
-	var base_height = 200  # Taille de base
-	
+	# Hauteur estimée : titre + description + bouton fermer + marges
+	var base_height := 300
+
 	# Ajouter la hauteur des choix
-	base_height += choice_buttons.size() * 60
-	
-	# Ajouter la hauteur de l'image si présente
-	if current_event.image:
-		base_height += 150
-	
-	# Limiter la taille
-	var final_height = min(base_height, 800)
-	var final_width = min(600, get_viewport().size.x * 0.8)
-	
-	size = Vector2(final_width, final_height)
-	position = (get_viewport().size - size) / 2
+	base_height += choice_buttons.size() * 64
+
+	# Ajouter la hauteur de l'image si une image est affichée — image propre OU
+	# fallback de catégorie. Avant, seul current_event.image était compté, ce qui
+	# laissait la fenêtre 150px trop courte (et tronquait les boutons) pour les
+	# événements utilisant l'image générique de catégorie.
+	if image_container and image_container.visible:
+		base_height += 160
+
+	# Bornes fixes : pour un nœud Window, get_viewport() renvoie la fenêtre elle-même
+	# (pas l'écran) — on évite donc toute dépendance au viewport ici.
+	var final_height: int = clampi(base_height, 360, 760)
+	size = Vector2i(620, final_height)
+	# Le centrage est géré par popup_centered() dans show_event().
 
 func _on_choice_selected(choice: EventChoiceResource):
 	print("EventPopup: Choix sélectionné - %s" % choice.text)
