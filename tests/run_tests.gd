@@ -169,10 +169,12 @@ func _suite_pve_progression(tf) -> void:
 	tf.suite("PvE Progression")
 	var saved_cleared: Dictionary = GuildRanking.player_cleared_content.duplicate(true)
 	var saved_recent: Array = GuildRanking.player_recent_clears.duplicate(true)
+	var saved_history: Array = GuildRanking.player_run_history.duplicate(true)
 	var saved_firsts: Dictionary = GuildRanking.server_firsts.duplicate(true)
 	
 	GuildRanking.player_cleared_content = {}
 	GuildRanking.player_recent_clears = []
+	GuildRanking.player_run_history = []
 	GuildRanking.server_firsts["deadmines"] = "Autre Guilde"
 	var before_percent: float = GuildRanking.get_player_content_cleared_percent()
 	
@@ -181,7 +183,8 @@ func _suite_pve_progression(tf) -> void:
 		"Les Mortemines",
 		DungeonData.InstanceType.DUNGEON,
 		false,
-		["Joueur"]
+		["Joueur"],
+		{"duration_seconds": 1800.0, "wipes": 1}
 	)
 	
 	var cleared: Array = GuildRanking.get_player_cleared_content()
@@ -190,9 +193,12 @@ func _suite_pve_progression(tf) -> void:
 	tf.ok(percent > before_percent, "pourcentage de contenu clear augmente")
 	tf.approx(float(PhaseManager._get_requirement_current_value("content_cleared_percent")), percent, "PhaseManager lit le tracking PvE", 0.01)
 	tf.eq(GuildRanking.get_player_recent_clears().size(), 1, "clear récent exposé au ranking")
+	tf.eq(GuildRanking.get_player_run_history().size(), 1, "historique de run exposé")
+	tf.eq(GuildRanking.get_player_best_clear("deadmines").get("wipes", 0), 1, "meilleur clear conserve les détails")
 	
 	GuildRanking.player_cleared_content = saved_cleared
 	GuildRanking.player_recent_clears = saved_recent
+	GuildRanking.player_run_history = saved_history
 	GuildRanking.server_firsts = saved_firsts
 
 func _suite_activity_manager(tf) -> void:

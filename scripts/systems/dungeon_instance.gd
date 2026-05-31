@@ -408,7 +408,14 @@ func _complete_dungeon() -> void:
 			dungeon_data.get("name", ""),
 			dungeon_data.get("type", -1),
 			DungeonDataScript.is_heroic_dungeon(dungeon_id),
-			participant_names
+			participant_names,
+			{
+				"duration_seconds": total_time,
+				"gold_reward": gold_reward,
+				"wipes": total_wipes,
+				"bosses_defeated": dungeon_data.get("bosses", []).size(),
+				"total_bosses": dungeon_data.get("bosses", []).size()
+			}
 		)
 
 	# Progression de phase : compléter un donjon héroïque fait avancer la Phase 0 -> Serveur

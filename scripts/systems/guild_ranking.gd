@@ -42,6 +42,7 @@ var content_achievements: Dictionary = {}
 var server_firsts: Dictionary = {}  # Qui a fait le premier clear de chaque contenu
 var player_cleared_content: Dictionary = {}
 var player_recent_clears: Array = []
+var player_run_history: Array = []
 
 func _ready():
 	# Se connecter aux signaux nécessaires
@@ -412,7 +413,7 @@ func get_server_firsts() -> Dictionary:
 	"""Retourne tous les server firsts enregistrés"""
 	return server_firsts.duplicate()
 
-func register_player_content_clear(content_id: String, content_name: String = "", instance_type: int = -1, is_heroic: bool = false, participants: Array = []) -> void:
+func register_player_content_clear(content_id: String, content_name: String = "", instance_type: int = -1, is_heroic: bool = false, participants: Array = [], run_details: Dictionary = {}) -> void:
 	"""Enregistre un clear PvE réel de la guilde du joueur."""
 	if content_id.strip_edges() == "":
 		return
@@ -426,10 +427,14 @@ func register_player_content_clear(content_id: String, content_name: String = ""
 		"date": _get_current_date(),
 		"total_day": GameTime.get_total_days_elapsed() if GameTime and GameTime.has_method("get_total_days_elapsed") else 0
 	}
+	for key in run_details:
+		clear_data[key] = run_details[key]
 	
 	player_cleared_content[content_id] = clear_data
 	player_recent_clears.append(clear_data)
+	player_run_history.append(clear_data)
 	_prune_player_recent_clears()
+	_trim_player_run_history()
 	
 	if GuildManager and GuildManager.guild and not server_firsts.has(content_id):
 		register_server_first(GuildManager.guild.name, content_id)
@@ -449,6 +454,27 @@ func get_player_recent_clears(days: int = 7) -> Array:
 		if int(clear_data.get("total_day", 0)) >= cutoff_day:
 			recent.append(clear_data)
 	return recent
+
+func get_player_run_history(limit: int = 0) -> Array:
+	"""Retourne l'historique des runs PvE du joueur, du plus ancien au plus récent."""
+	if limit <= 0 or player_run_history.size() <= limit:
+		return player_run_history.duplicate(true)
+	return player_run_history.slice(player_run_history.size() - limit, player_run_history.size()).duplicate(true)
+
+func get_player_best_clear(content_id: String) -> Dictionary:
+	"""Retourne le meilleur clear connu pour un contenu, basé sur la durée la plus courte."""
+	var best: Dictionary = {}
+	for run_data in player_run_history:
+		if run_data.get("content_id", "") != content_id:
+			continue
+		if best.is_empty():
+			best = run_data
+			continue
+		var run_duration: float = float(run_data.get("duration_seconds", INF))
+		var best_duration: float = float(best.get("duration_seconds", INF))
+		if run_duration < best_duration:
+			best = run_data
+	return best.duplicate(true)
 
 func get_player_content_cleared_percent() -> float:
 	"""Pourcentage du contenu actuellement disponible clear par la guilde du joueur."""
@@ -471,6 +497,10 @@ func _prune_player_recent_clears(days: int = 14) -> void:
 		if int(clear_data.get("total_day", 0)) >= cutoff_day:
 			pruned.append(clear_data)
 	player_recent_clears = pruned
+
+func _trim_player_run_history(max_runs: int = 100) -> void:
+	if player_run_history.size() > max_runs:
+		player_run_history = player_run_history.slice(player_run_history.size() - max_runs, player_run_history.size())
 
 # Callbacks des signaux
 
@@ -543,6 +573,7 @@ func save_ranking_data() -> Dictionary:
 		"server_firsts": server_firsts,
 		"player_cleared_content": player_cleared_content,
 		"player_recent_clears": player_recent_clears,
+		"player_run_history": player_run_history,
 		"last_ranking_update": last_ranking_update
 	}
 
@@ -555,6 +586,7 @@ func load_ranking_data(data: Dictionary):
 	server_firsts = data.get("server_firsts", {})
 	player_cleared_content = data.get("player_cleared_content", {})
 	player_recent_clears = data.get("player_recent_clears", [])
+	player_run_history = data.get("player_run_history", [])
 	last_ranking_update = data.get("last_ranking_update", _get_current_date())
 	
 	print("Données de classement chargées - %d server firsts, %d guildes trackées" % [server_firsts.size(), ranking_history.size()])

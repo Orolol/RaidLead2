@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 49 total | 49 réussis | 0 échoués
+TESTS : 51 total | 51 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -62,10 +62,11 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - AIGuild: la restauration depuis une save n'appelle plus la génération complète du constructeur; les logs `Ma Guilde` parasites disparaissent et un test verrouille le mode de restauration sans membres temporaires.
 - PvE minimal: les clears réels de la guilde joueur sont maintenant enregistrés par `DungeonInstance`, sauvegardés dans `GuildRanking`, exposés au ranking et lus par `PhaseManager.content_cleared_percent`.
 - ActivityManager: les préférences automatiques `DUNGEON`/`RAID` créent maintenant des activités PvE dédiées au lieu de retomber sur du farming.
+- Historique PvE: `GuildRanking` conserve aussi un historique des runs joueur avec durée, wipes, récompense et accès au meilleur clear connu.
 
 ### Toujours ouvert
 
-- Le chantier PvE reste le prochain gros morceau: le tracking de clears existe maintenant, mais il manque encore un vrai rapport de run, une vue d'historique et une résolution PvE plus centrale.
+- Le chantier PvE reste le prochain gros morceau: le tracking et l'historique existent maintenant, mais il manque encore un vrai rapport de run affiché au joueur et une résolution PvE plus centrale.
 - Les chemins UI directs hors `main.gd` restent à auditer plus largement, même si le cas `PhaseManager -> ChatPanel` est bouclé.
 - L'UX des fenêtres principales reste à reprendre, mais l'onglet Progression de `Fenetre_Personnage` a reçu une première stabilisation de lisibilité.
 
@@ -102,8 +103,8 @@ Points vus:
 
 Étendre la source de vérité PvE maintenant amorcée dans `GuildRanking`:
 
-- enregistrer plus que le clear simple: wipes, durée, boss tués, loot obtenu, difficulté, score de performance;
-- exposer une vraie vue `get_run_history()`, `get_best_clear(content_id)`, `get_recent_clears(days)`;
+- enrichir encore le run: loot obtenu, difficulté, score de performance, incidents sociaux;
+- brancher `get_player_run_history()` et `get_player_best_clear(content_id)` dans une UI;
 - décider si ce tracking reste dans `GuildRanking` ou devient un autoload `PveProgression` quand l'historique devient plus riche;
 - brancher une UI de rapport de run et d'historique.
 
@@ -431,7 +432,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 49 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 51 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -683,6 +684,7 @@ Ces tâches sont petites mais utiles:
 - [x] éviter la génération temporaire de guildes IA lors du chargement de save;
 - [x] brancher un tracking minimal des clears PvE joueur dans `GuildRanking` et `PhaseManager`;
 - [x] empêcher les préférences automatiques Donjon/Raid de retomber sur du farming;
+- [x] enregistrer un historique minimal des runs PvE joueur;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
