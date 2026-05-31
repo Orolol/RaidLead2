@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 46 total | 46 réussis | 0 échoués
+TESTS : 49 total | 49 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -61,6 +61,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - CustomProgressBar: le label interne est maintenant positionné par offsets plutôt que par modification directe de taille après ancrage, ce qui supprime le warning d'ancrage au lancement.
 - AIGuild: la restauration depuis une save n'appelle plus la génération complète du constructeur; les logs `Ma Guilde` parasites disparaissent et un test verrouille le mode de restauration sans membres temporaires.
 - PvE minimal: les clears réels de la guilde joueur sont maintenant enregistrés par `DungeonInstance`, sauvegardés dans `GuildRanking`, exposés au ranking et lus par `PhaseManager.content_cleared_percent`.
+- ActivityManager: les préférences automatiques `DUNGEON`/`RAID` créent maintenant des activités PvE dédiées au lieu de retomber sur du farming.
 
 ### Toujours ouvert
 
@@ -91,7 +92,7 @@ L'organisation de groupe, les donjons, les raids, le loot et les phases existent
 
 Points vus:
 
-- `scripts/systems/activity_manager.gd`: dans `_decide_next_activity()`, les choix `DUNGEON` et `RAID` retombent encore sur du farming.
+- `scripts/systems/activity_manager.gd`: dans `_decide_next_activity()`, les choix `DUNGEON` et `RAID` retombaient encore sur du farming. Corrigé en activité PvE dédiée; le vrai lancement automatique d'un groupe reste à concevoir.
 - `scripts/systems/guild_ranking.gd`: `_get_player_guild_cleared_content()` retournait un placeholder basé sur le niveau de guilde. Corrigé pour la guilde joueur via clears réels.
 - `scripts/systems/guild_ranking.gd`: `_get_recent_clears()` retournait toujours un tableau vide. Corrigé pour la guilde joueur; l'IA garde ses données propres via `AIGuild`.
 - `scripts/systems/phase_manager.gd`: `content_cleared_percent` retournait encore `0.0`. Corrigé via `GuildRanking.get_player_content_cleared_percent()`.
@@ -430,7 +431,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 46 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 49 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -681,6 +682,7 @@ Ces tâches sont petites mais utiles:
 - [x] corriger le warning d'ancrage de `CustomProgressBar`;
 - [x] éviter la génération temporaire de guildes IA lors du chargement de save;
 - [x] brancher un tracking minimal des clears PvE joueur dans `GuildRanking` et `PhaseManager`;
+- [x] empêcher les préférences automatiques Donjon/Raid de retomber sur du farming;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;

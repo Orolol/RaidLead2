@@ -53,6 +53,20 @@ func _setup_activity_defaults():
 			energy_cost_per_hour = 5.0
 			mood_change_per_hour = 20.0
 			integration_gain_per_hour = 5.0
+		
+		ActivityType.DUNGEON:
+			name = "Donjon" if name == "" else name
+			description = "Préparer ou participer à une sortie donjon"
+			energy_cost_per_hour = 25.0
+			mood_change_per_hour = -2.0
+			integration_gain_per_hour = 3.0
+		
+		ActivityType.RAID:
+			name = "Raid" if name == "" else name
+			description = "Préparer ou participer à une sortie raid"
+			energy_cost_per_hour = 35.0
+			mood_change_per_hour = -5.0
+			integration_gain_per_hour = 4.0
 			
 		ActivityType.OFFLINE:
 			name = "Hors ligne" if name == "" else name

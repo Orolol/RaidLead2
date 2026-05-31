@@ -23,6 +23,7 @@ func _run_all() -> void:
 	_suite_save(tf)
 	_suite_ai_guild(tf)
 	_suite_pve_progression(tf)
+	_suite_activity_manager(tf)
 	_suite_phase(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
@@ -193,6 +194,19 @@ func _suite_pve_progression(tf) -> void:
 	GuildRanking.player_cleared_content = saved_cleared
 	GuildRanking.player_recent_clears = saved_recent
 	GuildRanking.server_firsts = saved_firsts
+
+func _suite_activity_manager(tf) -> void:
+	tf.suite("ActivityManager")
+	var p: SimulatedPlayer = SimulatedPlayer.new()
+	p.nom = "TestDonjonAuto"
+	p.personnage_niveau = 20
+	p.is_online = true
+	ActivityManager.start_activity(p, Activity.ActivityType.DUNGEON)
+	var activity = ActivityManager.active_activities.get(p)
+	tf.eq(activity.type, Activity.ActivityType.DUNGEON, "préférence donjon reste une activité donjon")
+	tf.ok(activity.location != "", "activité donjon reçoit une destination")
+	tf.ok(activity.has_meta("planned_duration"), "activité donjon reçoit une durée planifiée")
+	ActivityManager.interrupt_activity(p, "Nettoyage test")
 
 func _suite_phase(tf) -> void:
 	tf.suite("PhaseManager")

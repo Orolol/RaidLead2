@@ -63,6 +63,20 @@ func start_activity(player, activity_type, params: Dictionary = {}):
 			activity.name = params.get("name", "Duel amical devant Orgrimmar")
 			activity.participants = params.get("participants", [])
 			activity.set_meta("planned_duration", randi_range(15, 45))  # 15-45 minutes
+		
+		ActivityScript.ActivityType.DUNGEON:
+			activity.location = params.get(
+				"location",
+				_get_instance_activity_location(player, DungeonDataScript.InstanceType.DUNGEON)
+			)
+			activity.set_meta("planned_duration", randi_range(45, 120))
+		
+		ActivityScript.ActivityType.RAID:
+			activity.location = params.get(
+				"location",
+				_get_instance_activity_location(player, DungeonDataScript.InstanceType.RAID)
+			)
+			activity.set_meta("planned_duration", randi_range(90, 180))
 	
 	activity.start_time = {
 		"hour": game_time.current_hour,
@@ -246,10 +260,10 @@ func _decide_next_activity(player):
 						start_activity(player, ActivityScript.ActivityType.LEVELING)
 					"FARMING":
 						start_activity(player, ActivityScript.ActivityType.FARMING)
-					"DUNGEON", "RAID":
-						# Pour l'instant, on fait du farming si donjon/raid sélectionné
-						# (nécessite un groupe pour vraiment faire un donjon/raid)
-						start_activity(player, ActivityScript.ActivityType.FARMING)
+					"DUNGEON":
+						start_activity(player, ActivityScript.ActivityType.DUNGEON)
+					"RAID":
+						start_activity(player, ActivityScript.ActivityType.RAID)
 				
 				# Mettre à jour les préférences selon l'expérience
 				if behavior_system:
@@ -283,6 +297,19 @@ func _get_farming_location(level: int) -> String:
 		return ["Tanaris", "Féralas", "Azshara"].pick_random()
 	else:
 		return ["Maleterres de l'Ouest", "Maleterres de l'Est", "Berceau-de-l'Hiver"].pick_random()
+
+func _get_instance_activity_location(player, instance_type: int) -> String:
+	var level: int = player.personnage_niveau if player else 60
+	var instances: Array = DungeonDataScript.get_instances_for_level(level, instance_type, true)
+	if not instances.is_empty():
+		var picked: Dictionary = instances.pick_random()
+		return picked.get("data", {}).get("name", "Instance inconnue")
+	
+	match instance_type:
+		DungeonDataScript.InstanceType.RAID:
+			return "Préparation raid"
+		_:
+			return "Recherche de groupe donjon"
 
 func _calculate_xp_per_hour(level: int) -> int:
 	# XP/heure avec courbe plus réaliste
