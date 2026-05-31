@@ -52,6 +52,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - PhaseManager/Main: la notification de changement de phase dans le chat passe maintenant par le signal `phase_changed`; `PhaseManager` ne cherche plus `ChatPanel` via un chemin de node UI.
 - Main/tests: ajout du flag `--no-save-autoload` pour lancer la scène principale sans charger `user://savegame.json`, et documentation de la commande headless de vérification.
 - Scènes: nettoyage des UID invalides signalés dans `Main.tscn` et `Fenetre_Personnage.tscn`; le lancement court de `Main.tscn` ne remonte plus ces warnings.
+- CustomProgressBar: le label interne est maintenant positionné par offsets plutôt que par modification directe de taille après ancrage, ce qui supprime le warning d'ancrage au lancement.
 
 ### Toujours ouvert
 
@@ -64,7 +65,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - Lancement court de `res://scenes/Main.tscn`: les `ext_resource` avec UID invalides ont été nettoyés sur les scènes chargées au démarrage.
 - Le lancement de la scène principale chargeait automatiquement `user://savegame.json`, ce qui rendait les vérifications headless dépendantes de la machine locale. Le flag `--no-save-autoload` couvre maintenant ce besoin pour les runs de contrôle.
 - Pendant ce chargement, les logs d'`AIGuildManager` affichent plusieurs créations de guildes IA nommées `Ma Guilde` avant d'enregistrer des noms de guildes IA existantes. À vérifier côté sérialisation/restauration des guildes IA.
-- Le lancement de `Main.tscn` signale aussi un warning d'ancrage dans `custom_progress_bar.gd`: certains `Control` avec ancres opposées non égales reçoivent une taille en `_ready()`. À traiter dans une passe UI dédiée.
+- Le warning d'ancrage dans `custom_progress_bar.gd` vu au lancement de `Main.tscn` est corrigé.
 
 ## Impression générale
 
@@ -669,6 +670,7 @@ Ces tâches sont petites mais utiles:
 - [x] corriger le layout des requirements dans `Fenetre_Personnage`;
 - [x] ajouter un mode de lancement sans auto-load de save pour les vérifications headless;
 - [x] nettoyer les UID invalides signalés par Godot au lancement de `Main.tscn`;
+- [x] corriger le warning d'ancrage de `CustomProgressBar`;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
