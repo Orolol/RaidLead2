@@ -48,12 +48,13 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - Ranking: la guilde du joueur utilise maintenant sa vraie réputation au lieu d'une valeur fixe à `75.0`.
 - WindowManager: ajout de `get_window_instance()` et `refresh_window()` comme API publique, puis remplacement des appels directs à `_get_existing_instance()` dans `main.gd`.
 - Debug UI: le menu Debug, les raccourcis F1/F2 et le bouton `Next Version` du time display sont maintenant limités aux builds debug.
+- Fenêtre Personnage: l'onglet Progression utilise maintenant des blocs d'objectifs stables avec largeur minimale, barre intégrée, détails sous la ligne et scroll vertical pour éviter les textes cassés lettre par lettre.
 
 ### Toujours ouvert
 
 - Le chantier PvE reste le prochain gros morceau: tracking réel des clears, rapport de run, branchement `GuildRanking`/`PhaseManager`.
 - Les chemins UI directs hors `main.gd` restent à auditer plus largement.
-- L'UX des fenêtres principales reste à reprendre, surtout l'onglet Progression de `Fenetre_Personnage`.
+- L'UX des fenêtres principales reste à reprendre, mais l'onglet Progression de `Fenetre_Personnage` a reçu une première stabilisation de lisibilité.
 
 ## Impression générale
 
@@ -655,7 +656,7 @@ Ces tâches sont petites mais utiles:
 - [x] corriger le bug de refresh recrutement hebdomadaire;
 - [x] rendre `WindowManager.get_window_instance()` public;
 - remplacer le chemin `/root/Main/VBoxContainer/ChatPanel` par un signal;
-- corriger le layout des requirements dans `Fenetre_Personnage`;
+- [x] corriger le layout des requirements dans `Fenetre_Personnage`;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;

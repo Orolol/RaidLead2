@@ -254,13 +254,16 @@ func _setup_player_stats(parent: VBoxContainer):
 
 func _setup_phase_progression_tab():
 	"""Configure l'onglet de progression de phase"""
-	var progress_tab = VBoxContainer.new()
+	var progress_tab: VBoxContainer = VBoxContainer.new()
 	progress_tab.name = "Progression"
 	progress_tab.add_theme_constant_override("separation", 15)
+	progress_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress_tab.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	advanced_tabs.add_tab("Progression", progress_tab, false)
 	
 	# Header avec phase actuelle
-	var phase_header = HBoxContainer.new()
+	var phase_header: HBoxContainer = HBoxContainer.new()
+	phase_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	progress_tab.add_child(phase_header)
 	
 	current_phase_label = Label.new()
@@ -279,8 +282,10 @@ func _setup_phase_progression_tab():
 	progress_tab.add_child(HSeparator.new())
 	
 	# Container pour le contenu de progression
-	var progress_content = HSplitContainer.new()
+	var progress_content: HSplitContainer = HSplitContainer.new()
 	progress_content.split_offset = 400
+	progress_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	progress_tab.add_child(progress_content)
 	
 	# Côté gauche : Requirements
@@ -291,7 +296,11 @@ func _setup_phase_progression_tab():
 
 func _setup_requirements_section(parent: HSplitContainer):
 	"""Configure la section des requirements"""
-	var requirements_panel = VBoxContainer.new()
+	var requirements_panel: VBoxContainer = VBoxContainer.new()
+	requirements_panel.custom_minimum_size = Vector2(420, 0)
+	requirements_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	requirements_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	requirements_panel.add_theme_constant_override("separation", 8)
 	parent.add_child(requirements_panel)
 	
 	var req_title = Label.new()
@@ -299,13 +308,23 @@ func _setup_requirements_section(parent: HSplitContainer):
 	req_title.add_theme_font_size_override("font_size", 16)
 	requirements_panel.add_child(req_title)
 	
+	var requirements_scroll: ScrollContainer = ScrollContainer.new()
+	requirements_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	requirements_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	requirements_panel.add_child(requirements_scroll)
+	
 	requirements_container = VBoxContainer.new()
-	requirements_container.add_theme_constant_override("separation", 5)
-	requirements_panel.add_child(requirements_container)
+	requirements_container.add_theme_constant_override("separation", 8)
+	requirements_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	requirements_scroll.add_child(requirements_container)
 
 func _setup_achievements_section(parent: HSplitContainer):
 	"""Configure la section des achievements"""
-	var achievements_panel = VBoxContainer.new()
+	var achievements_panel: VBoxContainer = VBoxContainer.new()
+	achievements_panel.custom_minimum_size = Vector2(260, 0)
+	achievements_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	achievements_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	achievements_panel.add_theme_constant_override("separation", 8)
 	parent.add_child(achievements_panel)
 	
 	var ach_title = Label.new()
@@ -314,7 +333,9 @@ func _setup_achievements_section(parent: HSplitContainer):
 	achievements_panel.add_child(ach_title)
 	
 	achievements_list = ItemList.new()
-	achievements_list.custom_minimum_size = Vector2(300, 200)
+	achievements_list.custom_minimum_size = Vector2(260, 200)
+	achievements_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	achievements_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	achievements_panel.add_child(achievements_list)
 
 func _on_close_pressed():
@@ -419,11 +440,10 @@ func _update_requirements_display():
 	if not PhaseManager:
 		return
 	
-	var requirements = PhaseManager.get_current_requirements()
-	var current_phase = PhaseManager.get_current_phase()
+	var requirements: Dictionary = PhaseManager.get_current_requirements()
 	
 	# Vérifier si on est déjà en phase finale
-	var phase_config = PhaseManager.get_current_phase_config()
+	var phase_config: Dictionary = PhaseManager.get_current_phase_config()
 	if not phase_config.has("next_phase") or phase_config.next_phase == null:
 		var final_label = Label.new()
 		final_label.text = "🎉 Vous avez atteint la phase finale !"
@@ -435,7 +455,7 @@ func _update_requirements_display():
 	# Lecture sans effet de bord : check_phase_progression() émet phase_requirements_met,
 	# qui rappelle _on_requirements_met -> _refresh_phase_progression -> récursion infinie.
 	# get_requirements_progress() calcule la progression sans émettre de signal.
-	var progress_data = PhaseManager.get_requirements_progress(PhaseManager.get_current_phase())
+	var progress_data: Dictionary = PhaseManager.get_requirements_progress(PhaseManager.get_current_phase())
 	
 	if requirements.is_empty():
 		var no_req_label = Label.new()
@@ -445,33 +465,47 @@ func _update_requirements_display():
 		return
 	
 	for req_name in requirements:
-		var req_container = HBoxContainer.new()
-		requirements_container.add_child(req_container)
+		var requirement_card: PanelContainer = PanelContainer.new()
+		requirement_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirements_container.add_child(requirement_card)
+		
+		var requirement_box: VBoxContainer = VBoxContainer.new()
+		requirement_box.add_theme_constant_override("separation", 5)
+		requirement_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirement_card.add_child(requirement_box)
+		
+		var req_container: HBoxContainer = HBoxContainer.new()
+		req_container.add_theme_constant_override("separation", 8)
+		req_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirement_box.add_child(req_container)
 		
 		# Statut (✓ ou ✗)
-		var status_label = Label.new()
-		var progress_item = progress_data.get(req_name, {})
-		var is_met = progress_item.get("met", false)
-		var current_value = progress_item.get("current", 0)
-		var required_value = progress_item.get("required", 0)
-		var progress_percent = progress_item.get("progress_percent", 0.0)
+		var status_label: Label = Label.new()
+		var progress_item: Dictionary = progress_data.get(req_name, {})
+		var is_met: bool = bool(progress_item.get("met", false))
+		var current_value: Variant = progress_item.get("current", 0)
+		var required_value: Variant = progress_item.get("required", 0)
+		var progress_percent: float = float(progress_item.get("progress_percent", 0.0))
 		
 		status_label.text = "✓" if is_met else "✗"
 		status_label.modulate = Color.GREEN if is_met else Color.RED
-		status_label.custom_minimum_size = Vector2(20, 0)
+		status_label.custom_minimum_size = Vector2(24, 0)
+		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		req_container.add_child(status_label)
 		
 		# Description du requirement
-		var desc_label = Label.new()
-		desc_label.text = _get_requirement_description(req_name, required_value)
+		var desc_label: Label = Label.new()
+		desc_label.text = _get_requirement_description(str(req_name), required_value)
 		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_label.custom_minimum_size = Vector2(220, 0)
+		desc_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		req_container.add_child(desc_label)
 		
-		req_container.add_spacer(false)
-		
 		# Progression
-		var progress_label = Label.new()
+		var progress_label: Label = Label.new()
 		progress_label.text = "%.0f%%" % progress_percent
+		progress_label.custom_minimum_size = Vector2(56, 0)
+		progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if is_met:
 			progress_label.modulate = Color.GREEN
 		elif progress_percent > 50:
@@ -481,20 +515,22 @@ func _update_requirements_display():
 		req_container.add_child(progress_label)
 		
 		# Barre de progression
-		var progress_bar = ProgressBar.new()
+		var progress_bar: ProgressBar = ProgressBar.new()
 		progress_bar.min_value = 0
 		progress_bar.max_value = 100
 		progress_bar.value = progress_percent
-		progress_bar.custom_minimum_size = Vector2(100, 20)
-		requirements_container.add_child(progress_bar)
+		progress_bar.custom_minimum_size = Vector2(0, 18)
+		progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirement_box.add_child(progress_bar)
 		
 		# Détails numériques
 		if not is_met:
-			var detail_label = Label.new()
-			detail_label.text = "   → Actuel: %s / Requis: %s" % [str(current_value), str(required_value)]
+			var detail_label: Label = Label.new()
+			detail_label.text = "Actuel: %s / Requis: %s" % [str(current_value), str(required_value)]
 			detail_label.add_theme_font_size_override("font_size", 12)
 			detail_label.modulate = Color(0.8, 0.8, 0.8)
-			requirements_container.add_child(detail_label)
+			detail_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			requirement_box.add_child(detail_label)
 
 func _get_requirement_description(req_name: String, required_value) -> String:
 	"""Retourne une description lisible du requirement"""
