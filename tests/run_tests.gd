@@ -21,6 +21,7 @@ func _run_all() -> void:
 	_suite_balance(tf)
 	_suite_advisor(tf)
 	_suite_save(tf)
+	_suite_ai_guild(tf)
 	_suite_phase(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
@@ -154,6 +155,13 @@ func _suite_save(tf) -> void:
 	tf.eq(p2.skill, 77, "round-trip skill")
 	var cdata = GuildCultureManager.serialize()
 	tf.ok(cdata.has("guild_morale"), "culture sérialise guild_morale")
+
+func _suite_ai_guild(tf) -> void:
+	tf.suite("AIGuild")
+	var restored: AIGuild = AIGuild.new("Guilde Restaurée", AIGuild.Strategy.HARDCORE, false)
+	tf.eq(restored.name, "Guilde Restaurée", "restauration conserve le nom sans génération")
+	tf.eq(restored.ai_strategy, AIGuild.Strategy.HARDCORE, "restauration conserve la stratégie")
+	tf.eq(restored.members.size(), 0, "restauration ne génère pas de membres temporaires")
 
 func _suite_phase(tf) -> void:
 	tf.suite("PhaseManager")

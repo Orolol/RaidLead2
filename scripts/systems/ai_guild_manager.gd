@@ -431,9 +431,9 @@ func load_ai_guilds_data(data: Dictionary):
 	var guilds_data = data.get("ai_guilds", [])
 	
 	for guild_data in guilds_data:
-		var ai_guild = AIGuild.new()
-		ai_guild.name = guild_data.get("name", "Guilde IA")
-		ai_guild.ai_strategy = guild_data.get("ai_strategy", AIGuild.Strategy.BALANCED)
+		var guild_name: String = guild_data.get("name", "Guilde IA")
+		var strategy: AIGuild.Strategy = guild_data.get("ai_strategy", AIGuild.Strategy.BALANCED)
+		var ai_guild: AIGuild = AIGuild.new(guild_name, strategy, false)
 		ai_guild.reputation = guild_data.get("reputation", 50.0)
 		ai_guild.success_rate = guild_data.get("success_rate", 0.6)
 		ai_guild.aggressiveness = guild_data.get("aggressiveness", 0.5)

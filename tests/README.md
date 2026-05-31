@@ -44,6 +44,7 @@ Le code de sortie vaut `0` si tous les tests passent, `1` sinon — pratique pou
 | BalanceManager | presets de difficulté, multiplicateurs bornés, catch-up, rubber-band, save round-trip |
 | AdvisorManager | tri par priorité, libellés de sévérité, alerte trésorerie |
 | SaveManager | sérialisation/désérialisation d'un membre (round-trip) |
+| AIGuild | construction de restauration sans génération de membres temporaires |
 | PhaseManager | valeurs d'enum, objectifs de phase, sémantique du rang (plus petit = meilleur) |
 
 ## Ajouter un test

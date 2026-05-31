@@ -36,6 +36,12 @@ Résultat après la première passe de corrections:
 TESTS : 39 total | 39 réussis | 0 échoués
 ```
 
+Résultat après les chantiers de stabilisation suivants:
+
+```text
+TESTS : 42 total | 42 réussis | 0 échoués
+```
+
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
 
 ## Suivi des corrections
@@ -53,6 +59,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - Main/tests: ajout du flag `--no-save-autoload` pour lancer la scène principale sans charger `user://savegame.json`, et documentation de la commande headless de vérification.
 - Scènes: nettoyage des UID invalides signalés dans `Main.tscn` et `Fenetre_Personnage.tscn`; le lancement court de `Main.tscn` ne remonte plus ces warnings.
 - CustomProgressBar: le label interne est maintenant positionné par offsets plutôt que par modification directe de taille après ancrage, ce qui supprime le warning d'ancrage au lancement.
+- AIGuild: la restauration depuis une save n'appelle plus la génération complète du constructeur; les logs `Ma Guilde` parasites disparaissent et un test verrouille le mode de restauration sans membres temporaires.
 
 ### Toujours ouvert
 
@@ -64,7 +71,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 
 - Lancement court de `res://scenes/Main.tscn`: les `ext_resource` avec UID invalides ont été nettoyés sur les scènes chargées au démarrage.
 - Le lancement de la scène principale chargeait automatiquement `user://savegame.json`, ce qui rendait les vérifications headless dépendantes de la machine locale. Le flag `--no-save-autoload` couvre maintenant ce besoin pour les runs de contrôle.
-- Pendant ce chargement, les logs d'`AIGuildManager` affichent plusieurs créations de guildes IA nommées `Ma Guilde` avant d'enregistrer des noms de guildes IA existantes. À vérifier côté sérialisation/restauration des guildes IA.
+- Pendant ce chargement, les logs d'`AIGuildManager` affichaient plusieurs créations de guildes IA nommées `Ma Guilde` avant d'enregistrer des noms de guildes IA existantes. La restauration utilise maintenant un constructeur sans génération initiale.
 - Le warning d'ancrage dans `custom_progress_bar.gd` vu au lancement de `Main.tscn` est corrigé.
 
 ## Impression générale
@@ -422,7 +429,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 39 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 42 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -671,6 +678,7 @@ Ces tâches sont petites mais utiles:
 - [x] ajouter un mode de lancement sans auto-load de save pour les vérifications headless;
 - [x] nettoyer les UID invalides signalés par Godot au lancement de `Main.tscn`;
 - [x] corriger le warning d'ancrage de `CustomProgressBar`;
+- [x] éviter la génération temporaire de guildes IA lors du chargement de save;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;

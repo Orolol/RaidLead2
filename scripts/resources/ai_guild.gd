@@ -70,12 +70,13 @@ const STRATEGY_CONFIG = {
 	}
 }
 
-func _init(guild_name: String = "", strategy: Strategy = Strategy.BALANCED):
+func _init(guild_name: String = "", strategy: Strategy = Strategy.BALANCED, initialize_members: bool = true):
 	super._init()
 	if guild_name != "":
 		name = guild_name
 	ai_strategy = strategy
-	_initialize_ai_guild()
+	if initialize_members:
+		_initialize_ai_guild()
 
 func _initialize_ai_guild():
 	"""Initialise la guilde IA avec des membres de départ"""
