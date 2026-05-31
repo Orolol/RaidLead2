@@ -398,6 +398,10 @@ func _complete_dungeon() -> void:
 		
 	dungeon_completed.emit(total_time, gold_reward)
 
+	# Progression de phase : compléter un donjon héroïque fait avancer la Phase 0 -> Serveur
+	if DungeonDataScript.is_heroic_dungeon(dungeon_id) and PhaseManager:
+		PhaseManager.complete_heroic_dungeon(dungeon_data.get("name", ""))
+
 func _abandon_dungeon(reason: String) -> void:
 	is_active = false
 	

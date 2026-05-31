@@ -432,10 +432,10 @@ func _update_requirements_display():
 		requirements_container.add_child(final_label)
 		return
 	
-	# Forcer une vérification de progression pour avoir les données à jour
-	PhaseManager.check_phase_progression()
-	var progress_info = PhaseManager.get_current_progress_info()
-	var progress_data = progress_info.get("requirements_progress", {})
+	# Lecture sans effet de bord : check_phase_progression() émet phase_requirements_met,
+	# qui rappelle _on_requirements_met -> _refresh_phase_progression -> récursion infinie.
+	# get_requirements_progress() calcule la progression sans émettre de signal.
+	var progress_data = PhaseManager.get_requirements_progress(PhaseManager.get_current_phase())
 	
 	if requirements.is_empty():
 		var no_req_label = Label.new()

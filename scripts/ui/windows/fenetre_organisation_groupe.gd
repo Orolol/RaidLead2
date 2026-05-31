@@ -220,6 +220,12 @@ func _populate_dungeon_list():
 		instance_option.add_item(text)
 		instance_option.set_item_metadata(instance_option.get_item_count() - 1, dungeon.id)
 
+	# Donjons héroïques (niveau 60) — requis pour progresser vers la Phase Serveur
+	var heroics = DungeonDataScript.get_heroic_dungeons()
+	for hid in heroics:
+		instance_option.add_item(heroics[hid].name)
+		instance_option.set_item_metadata(instance_option.get_item_count() - 1, hid)
+
 func _populate_raid_list():
 	instance_option.add_item("Sélectionner un raid...")
 	

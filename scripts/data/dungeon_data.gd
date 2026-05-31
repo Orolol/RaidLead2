@@ -270,6 +270,11 @@ static func get_instance_data(instance_id: String) -> Dictionary:
 		return DUNGEONS[instance_id]
 	elif RAIDS.has(instance_id):
 		return RAIDS[instance_id]
+	elif instance_id.ends_with("_heroic"):
+		# Les variantes héroïques sont générées dynamiquement (pas dans DUNGEONS)
+		var heroics = get_heroic_dungeons()
+		if heroics.has(instance_id):
+			return heroics[instance_id]
 	return {}
 
 static func is_instance_available(instance_id: String) -> bool:

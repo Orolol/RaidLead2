@@ -112,7 +112,8 @@ func _update_player_activity(player):
 	var time_factor = 5.0 / 60.0  # 5 minutes sur 60
 	
 	# Applique les effets de l'activité proportionnellement au temps écoulé
-	player.energy = max(0, player.energy - (activity.energy_cost_per_hour * time_factor))
+	# clamp [0,100] : certaines activités (repos/offline) ont un coût négatif (restaurent l'énergie)
+	player.energy = clampf(player.energy - (activity.energy_cost_per_hour * time_factor), 0.0, 100.0)
 	player.mood = clamp(player.mood + (activity.mood_change_per_hour * time_factor), 0, 100)
 	player.update_integration(activity.integration_gain_per_hour * time_factor)
 	
