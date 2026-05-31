@@ -537,7 +537,15 @@
 - ✅ **Suites** : Item/Equipment, SimulatedPlayer (stress/burnout), BalanceManager, AdvisorManager, SaveManager (round-trip), PhaseManager — **36 assertions, 100 % vertes**
 - ✅ **Exécution CI-friendly** : `tests/run_tests.ps1` (détecte Godot, code de sortie 0/1) + `tests/README.md`
 - ✅ **Validation runtime via MCP** : chaque milestone validé en jeu (screenshots, scripts d'inspection)
+- ✅ **Playtest interne complet (MCP)** : parcours des 4 phases ; **5 bugs corrigés** dont 1 bloquant critique (voir ci-dessous)
 - 📋 **Playtests externes / optimisation perf sessions longues** : à faire (hors automatisation)
+
+> **Playtest 31 mai 2026 — bugs trouvés & corrigés**
+> - 🔴 **CRITIQUE (corrigé)** : récursion infinie figeant le jeu dès qu'une phase remplit ses objectifs (`check_phase_progression` → `phase_requirements_met` → `fenetre_personnage._on_requirements_met` → `_refresh_phase_progression` → `check_phase_progression`). **Bloquait toute progression de phase.** Fix : la fenêtre lit `get_requirements_progress()` (sans effet de bord).
+> - 🟠 **Donjons héroïques inatteignables (corrigé)** : `get_instance_data` ne résolvait pas les ids `_heroic`, l'UI ne les listait pas, et `DungeonInstance` ne déclenchait pas `complete_heroic_dungeon`. La Phase 0→1 était donc impossible en jeu normal. Fix en 3 points.
+> - 🟠 **Énergie qui explose (corrigé)** : les activités reposantes ajoutaient de l'énergie sans plafond (978, 1009…). Fix : `clampf(0,100)`.
+> - 🟡 **Erreurs de notification de donjon (corrigées)** : `instance_data`/`defeated_bosses` (DungeonRun) lus sur un `DungeonInstance` ; signal `boss_defeated` émis avec 4 args pour 3 déclarés.
+> - **Observations (non corrigées, mineures/équilibrage)** : carte « Phase actuelle » de la fenêtre Personnage non rafraîchie au chargement ; connexions des membres concentrées en soirée (early-game peu peuplé) ; à haute vitesse les événements pausent le jeu en continu (slider de test) ; 99 guildes IA en phase Esport.
 
 ## 6. Améliorations Long Terme (priorité basse)
 
