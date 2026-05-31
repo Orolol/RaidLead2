@@ -241,22 +241,7 @@ func is_feature_unlocked(feature_name: String) -> bool:
 
 func try_advance_phase() -> bool:
 	"""Tente de faire progresser vers la phase suivante"""
-	if check_phase_progression():
-		# Afficher notification dans le chat
-		var chat_panel = get_node_or_null("/root/Main/VBoxContainer/ChatPanel")
-		if not chat_panel:
-			# Essayer un autre chemin si le premier ne marche pas
-			var main_node = get_tree().get_first_node_in_group("main")
-			if main_node:
-				chat_panel = main_node.get_node_or_null("chat_panel")
-		
-		if unlock_next_phase():
-			# Notification de progression de phase
-			if chat_panel and chat_panel.has_method("add_phase_notification"):
-				var phase_name = get_phase_name(current_phase)
-				chat_panel.add_phase_notification(phase_name)
-			return true
-	return false
+	return unlock_next_phase()
 
 func complete_heroic_dungeon(dungeon_name: String = ""):
 	"""Marque un donjon héroïque comme complété"""

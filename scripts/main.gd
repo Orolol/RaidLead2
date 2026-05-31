@@ -32,6 +32,7 @@ func _ready():
 	_setup_background()
 	_setup_time_display()
 	_setup_chat_panel()
+	_connect_phase_notifications()
 	if _is_debug_ui_enabled():
 		_setup_debug_menu()
 	_connect_menu_signals()
@@ -95,6 +96,18 @@ func _setup_chat_panel():
 	chat_panel.offset_right = -20
 	chat_panel.offset_bottom = -20
 	chat_panel.z_index = 10  # Au-dessus du background mais sous les fenêtres
+
+func _connect_phase_notifications() -> void:
+	if PhaseManager and PhaseManager.has_signal("phase_changed") and not PhaseManager.phase_changed.is_connected(_on_phase_changed_for_chat):
+		PhaseManager.phase_changed.connect(_on_phase_changed_for_chat)
+
+func _on_phase_changed_for_chat(new_phase: Variant, _old_phase: Variant) -> void:
+	if not chat_panel or not chat_panel.has_method("add_phase_notification"):
+		return
+	var phase_name: String = str(new_phase)
+	if PhaseManager and PhaseManager.has_method("get_phase_name"):
+		phase_name = PhaseManager.get_phase_name(new_phase)
+	chat_panel.add_phase_notification(phase_name)
 
 func _setup_debug_menu():
 	# Créer un conteneur pour le menu debug

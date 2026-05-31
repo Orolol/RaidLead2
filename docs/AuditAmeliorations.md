@@ -49,12 +49,19 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - WindowManager: ajout de `get_window_instance()` et `refresh_window()` comme API publique, puis remplacement des appels directs à `_get_existing_instance()` dans `main.gd`.
 - Debug UI: le menu Debug, les raccourcis F1/F2 et le bouton `Next Version` du time display sont maintenant limités aux builds debug.
 - Fenêtre Personnage: l'onglet Progression utilise maintenant des blocs d'objectifs stables avec largeur minimale, barre intégrée, détails sous la ligne et scroll vertical pour éviter les textes cassés lettre par lettre.
+- PhaseManager/Main: la notification de changement de phase dans le chat passe maintenant par le signal `phase_changed`; `PhaseManager` ne cherche plus `ChatPanel` via un chemin de node UI.
 
 ### Toujours ouvert
 
 - Le chantier PvE reste le prochain gros morceau: tracking réel des clears, rapport de run, branchement `GuildRanking`/`PhaseManager`.
-- Les chemins UI directs hors `main.gd` restent à auditer plus largement.
+- Les chemins UI directs hors `main.gd` restent à auditer plus largement, même si le cas `PhaseManager -> ChatPanel` est bouclé.
 - L'UX des fenêtres principales reste à reprendre, mais l'onglet Progression de `Fenetre_Personnage` a reçu une première stabilisation de lisibilité.
+
+### Observations ajoutées en cours de chantier
+
+- Lancement court de `res://scenes/Main.tscn`: Godot signale plusieurs `ext_resource` avec UID invalides et retombe sur les chemins texte. Ce n'est pas bloquant, mais il faudra probablement réenregistrer les scènes/imports pour nettoyer ces warnings.
+- Le lancement de la scène principale charge automatiquement `user://savegame.json`, ce qui peut rendre les vérifications headless dépendantes de la machine locale. Un mode test/dev sans auto-load de save serait utile.
+- Pendant ce chargement, les logs d'`AIGuildManager` affichent plusieurs créations de guildes IA nommées `Ma Guilde` avant d'enregistrer des noms de guildes IA existantes. À vérifier côté sérialisation/restauration des guildes IA.
 
 ## Impression générale
 
@@ -655,7 +662,7 @@ Ces tâches sont petites mais utiles:
 - [x] cacher le menu debug hors debug build;
 - [x] corriger le bug de refresh recrutement hebdomadaire;
 - [x] rendre `WindowManager.get_window_instance()` public;
-- remplacer le chemin `/root/Main/VBoxContainer/ChatPanel` par un signal;
+- [x] remplacer le chemin `/root/Main/VBoxContainer/ChatPanel` par un signal;
 - [x] corriger le layout des requirements dans `Fenetre_Personnage`;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;

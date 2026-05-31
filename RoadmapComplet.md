@@ -643,6 +643,7 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 - **WindowManager** : API publique `get_window_instance()` et `refresh_window()` pour éviter les appels externes à `_get_existing_instance()`.
 - **Debug UI** : menu Debug, raccourcis F1/F2 et bouton `Next Version` limités aux builds debug.
 - **Fenetre_Personnage** : onglet Progression stabilisé avec objectifs lisibles, largeur minimale, barre par objectif et scroll vertical.
+- **PhaseManager/Main** : notification de changement de phase relayée par `phase_changed` au lieu d'un chemin direct vers `ChatPanel`.
 - **Tests** : suite automatisée étendue à 39 assertions, validée avec Godot 4.6.2.
 
 ### Infrastructure UI Phases 1 & 2 (9 jours)
