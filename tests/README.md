@@ -13,7 +13,7 @@ powershell -ExecutionPolicy Bypass -File tests\run_tests.ps1
 **Commande directe** (headless, scène principale = autoloads disponibles) :
 
 ```powershell
-& "C:\chemin\vers\Godot_v4.6.2-stable_win64_console.exe" --headless --path . res://tests/TestRunner.tscn
+& "C:\chemin\vers\Godot_v4.6.2-stable_win64_console.exe" --rendering-driver opengl3 --headless --path . res://tests/TestRunner.tscn
 ```
 
 Le code de sortie vaut `0` si tous les tests passent, `1` sinon — pratique pour un pipeline CI.
@@ -21,6 +21,12 @@ Le code de sortie vaut `0` si tous les tests passent, `1` sinon — pratique pou
 > Important : on lance **la scène `TestRunner.tscn`**, pas le script via `-s`. Un script
 > `-s` (SceneTree) est compilé avant l'enregistrement des autoloads, qui deviennent alors
 > introuvables. En passant par une scène normale, les singletons globaux sont disponibles.
+
+**Vérification courte de la scène principale sans charger la save locale** :
+
+```powershell
+& "C:\chemin\vers\Godot_v4.6.2-stable_win64_console.exe" --rendering-driver opengl3 --headless --path . --scene res://scenes/Main.tscn --quit-after 2 -- --no-save-autoload
+```
 
 ## Structure
 

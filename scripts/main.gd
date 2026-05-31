@@ -7,6 +7,7 @@ const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
 const EventPopupWindow = preload("res://scripts/ui/windows/event_popup.gd")
 const PlayerControlPanelScript = preload("res://scripts/ui/components/player_control_panel.gd")
 # const FastForwardDialog = preload("res://scripts/ui/windows/fast_forward_dialog.gd")  # Supprimé - système simplifié
+const NO_SAVE_AUTOLOAD_ARG: String = "--no-save-autoload"
 
 var window_manager: Node
 var menu_bar: Control
@@ -47,7 +48,7 @@ func _ready():
 
 	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
 	get_tree().create_timer(0.2).timeout.connect(func():
-		if SaveManager.has_save():
+		if _should_auto_load_save() and SaveManager.has_save():
 			SaveManager.load_game()
 	)
 	
@@ -156,6 +157,11 @@ func _setup_debug_menu():
 
 func _is_debug_ui_enabled() -> bool:
 	return OS.is_debug_build()
+
+func _should_auto_load_save() -> bool:
+	var args: PackedStringArray = OS.get_cmdline_args()
+	var user_args: PackedStringArray = OS.get_cmdline_user_args()
+	return not args.has(NO_SAVE_AUTOLOAD_ARG) and not user_args.has(NO_SAVE_AUTOLOAD_ARG)
 
 func _connect_menu_signals():
 	menu_bar.personnage_button_pressed.connect(_on_personnage_button_pressed)
