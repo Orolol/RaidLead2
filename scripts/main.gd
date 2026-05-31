@@ -32,7 +32,8 @@ func _ready():
 	_setup_background()
 	_setup_time_display()
 	_setup_chat_panel()
-	_setup_debug_menu()
+	if _is_debug_ui_enabled():
+		_setup_debug_menu()
 	_connect_menu_signals()
 	_register_windows()
 	_connect_window_signals()
@@ -140,6 +141,9 @@ func _setup_debug_menu():
 	
 	add_child(debug_container)
 
+func _is_debug_ui_enabled() -> bool:
+	return OS.is_debug_build()
+
 func _connect_menu_signals():
 	menu_bar.personnage_button_pressed.connect(_on_personnage_button_pressed)
 	menu_bar.guilde_button_pressed.connect(_on_guilde_button_pressed)
@@ -198,7 +202,7 @@ func _connect_window_signals():
 
 func _on_window_opened(window_name: String) -> void:
 	# Connecter les signaux spécifiques quand une fenêtre est ouverte
-	var instance: Control = window_manager._get_existing_instance(window_name)
+	var instance: Control = window_manager.get_window_instance(window_name)
 	if not instance:
 		return
 
@@ -216,10 +220,10 @@ func _on_player_recruited(player: SimulatedPlayer) -> void:
 	if guild_manager_node:
 		guild_manager_node.add_member(player)
 		# Rafraîchir les fenêtres ouvertes via leurs instances dans le WindowManager
-		var guilde_inst: Control = window_manager._get_existing_instance("guilde")
+		var guilde_inst: Control = window_manager.get_window_instance("guilde")
 		if guilde_inst:
 			guilde_inst._refresh_member_list()
-		var org_inst: Control = window_manager._get_existing_instance("organisation")
+		var org_inst: Control = window_manager.get_window_instance("organisation")
 		if org_inst:
 			org_inst.set_guild_members(guild_manager_node.guild_members)
 
@@ -323,7 +327,7 @@ func _on_debug_menu_pressed(id: int):
 				print("Debug: Test notification ACHIEVEMENT")
 	
 	# Rafraîchir la fenêtre guilde si elle est ouverte
-	var guilde_inst: Control = window_manager._get_existing_instance("guilde")
+	var guilde_inst: Control = window_manager.get_window_instance("guilde")
 	if guilde_inst and guilde_inst.visible:
 		guilde_inst._refresh_member_list()
 		guilde_inst._update_guild_info()
@@ -369,11 +373,13 @@ func _input(event: InputEvent) -> void:
 			KEY_ESCAPE:  # Échap pour fermer la fenêtre active
 				window_manager.close_active_window()
 			KEY_F1:  # F1 pour déclencher un événement test
-				print("F1 pressed - Tentative de déclencher un événement")
-				_on_debug_menu_pressed(8)  # ID 8 = Déclencher événement test
+				if _is_debug_ui_enabled():
+					print("F1 pressed - Tentative de déclencher un événement")
+					_on_debug_menu_pressed(8)  # ID 8 = Déclencher événement test
 			KEY_F2:  # F2 pour afficher les stats
-				print("F2 pressed - Affichage des stats")
-				_on_debug_menu_pressed(9)  # ID 9 = Afficher stats événements
+				if _is_debug_ui_enabled():
+					print("F2 pressed - Affichage des stats")
+					_on_debug_menu_pressed(9)  # ID 9 = Afficher stats événements
 			KEY_F5:  # F5 pour sauvegarder
 				SaveManager.save_game()
 

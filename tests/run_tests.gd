@@ -15,6 +15,7 @@ func _run_all() -> void:
 	var TF = load("res://tests/test_framework.gd")
 	var tf = TF.new()
 
+	_suite_time(tf)
 	_suite_item_equipment(tf)
 	_suite_player(tf)
 	_suite_balance(tf)
@@ -28,6 +29,31 @@ func _run_all() -> void:
 	get_tree().quit(1 if tf.failed > 0 else 0)
 
 # --- Suites ---
+
+func _suite_time(tf) -> void:
+	tf.suite("GameTime")
+	var saved: Dictionary = GameTime.save_time_data()
+	var saved_paused: bool = GameTime.is_paused
+	var saved_accumulated: float = GameTime.accumulated_time
+
+	GameTime.current_year = 1
+	GameTime.current_week = 1
+	GameTime.current_day = 1
+	tf.eq(GameTime.get_total_days_elapsed(), 0, "jour initial = 0")
+
+	GameTime.current_year = 1
+	GameTime.current_week = 2
+	GameTime.current_day = 1
+	tf.eq(GameTime.get_total_days_elapsed(), 7, "semaine 2 commence au jour absolu 7")
+
+	GameTime.current_year = 2
+	GameTime.current_week = 1
+	GameTime.current_day = 1
+	tf.eq(GameTime.get_total_days_elapsed(), 364, "annee 2 commence apres 52 semaines")
+
+	GameTime.load_time_data(saved)
+	GameTime.is_paused = saved_paused
+	GameTime.accumulated_time = saved_accumulated
 
 func _suite_item_equipment(tf) -> void:
 	tf.suite("Item/Equipment")

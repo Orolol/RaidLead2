@@ -32,6 +32,7 @@ Le code de sortie vaut `0` si tous les tests passent, `1` sinon — pratique pou
 
 | Suite | Vérifie |
 |-------|---------|
+| GameTime | compteur de jours absolus, passage de semaine/année |
 | Item/Equipment | construction d'objets, iLvl total, cumul des stats |
 | SimulatedPlayer | stress (bornes/paliers), risque de burnout, facteur de performance esport |
 | BalanceManager | presets de difficulté, multiplicateurs bornés, catch-up, rubber-band, save round-trip |

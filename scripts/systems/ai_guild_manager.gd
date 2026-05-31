@@ -102,10 +102,6 @@ func _initialize_guilds_for_current_phase():
 		var ai_guild = AIGuild.new(guild_name, strategy)
 		ai_guilds.append(ai_guild)
 		
-		# Enregistrer dans le système de classement
-		if GuildRanking:
-			GuildRanking.register_guild(guild_name, false)
-		
 		ai_guild_created.emit(ai_guild)
 	
 	print("Créé %d guildes IA pour la phase %s" % [guild_count, PhaseManager.get_phase_name(current_phase) if PhaseManager else "Serveur"])
@@ -285,14 +281,10 @@ func _run_daily_checks():
 		if not aggressive_guilds.is_empty():
 			_attempt_poaching_by_guild(aggressive_guilds.pick_random())
 
-func _update_guild_rankings(guilds_data: Array):
+func _update_guild_rankings(_guilds_data: Array):
 	"""Met à jour le système de classement avec les données des guildes IA"""
 	if not GuildRanking:
 		return
-	
-	# Enregistrer les données de toutes les guildes IA
-	for guild_data in guilds_data:
-		GuildRanking.register_guild(guild_data.name, false)
 	
 	# Forcer une mise à jour du classement
 	GuildRanking.update_rankings()

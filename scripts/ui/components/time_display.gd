@@ -23,7 +23,9 @@ func _ready():
 		
 		# Configure les contrôles
 		pause_button.pressed.connect(_on_pause_button_pressed)
-		debug_version_button.pressed.connect(_on_debug_version_button_pressed)
+		debug_version_button.visible = OS.is_debug_build()
+		if debug_version_button.visible:
+			debug_version_button.pressed.connect(_on_debug_version_button_pressed)
 		speed_slider.value_changed.connect(_on_speed_changed)
 		speed_slider.min_value = 0.1
 		speed_slider.max_value = 2400.0

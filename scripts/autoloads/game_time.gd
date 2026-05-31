@@ -135,12 +135,16 @@ func is_morning() -> bool:
 func is_afternoon() -> bool:
 	return current_hour >= 12 and current_hour < 19
 
+func get_total_days_elapsed() -> int:
+	return (
+		(current_year - 1) * WEEKS_PER_YEAR * DAYS_PER_WEEK
+		+ (current_week - 1) * DAYS_PER_WEEK
+		+ (current_day - 1)
+	)
+
 func get_current_timestamp() -> float:
 	# Retourne le timestamp total en secondes depuis le début du jeu
-	var total_minutes = 0
-	total_minutes += (current_year - 1) * WEEKS_PER_YEAR * DAYS_PER_WEEK * HOURS_PER_DAY * MINUTES_PER_HOUR
-	total_minutes += (current_week - 1) * DAYS_PER_WEEK * HOURS_PER_DAY * MINUTES_PER_HOUR
-	total_minutes += (current_day - 1) * HOURS_PER_DAY * MINUTES_PER_HOUR
+	var total_minutes: int = get_total_days_elapsed() * HOURS_PER_DAY * MINUTES_PER_HOUR
 	total_minutes += current_hour * MINUTES_PER_HOUR
 	total_minutes += current_minute
 	

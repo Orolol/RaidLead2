@@ -6,7 +6,7 @@ signal player_lost_to_competition(player, guild_name)
 
 var available_players: Array = []
 var game_time: Node
-var last_refresh_day: int = 0
+var last_refresh_total_day: int = 0
 
 # Configuration du pool (sera ajustée selon la version serveur)
 const BASE_MIN_POOL_SIZE = 15
@@ -30,6 +30,7 @@ var competitor_guilds = [
 func _ready():
 	game_time = GameTime
 	if game_time:
+		last_refresh_total_day = _get_total_days_elapsed()
 		game_time.day_changed.connect(_on_day_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 	
@@ -144,7 +145,7 @@ func _on_day_changed(_day: int, _week: int, _year: int):
 			available_players.append(new_player)
 	
 	# Refresh complet périodiquement
-	if game_time.current_day - last_refresh_day >= REFRESH_INTERVAL_DAYS:
+	if _get_total_days_elapsed() - last_refresh_total_day >= REFRESH_INTERVAL_DAYS:
 		_refresh_pool()
 
 func _on_hour_changed(_hour: int):
@@ -153,7 +154,7 @@ func _on_hour_changed(_hour: int):
 		_simulate_competition()
 
 func _refresh_pool():
-	last_refresh_day = game_time.current_day
+	last_refresh_total_day = _get_total_days_elapsed()
 	var pool_limits = _get_current_pool_limits()
 	
 	# Retire certains joueurs (recrutés ailleurs, ont arrêté, etc.)
@@ -173,6 +174,17 @@ func _refresh_pool():
 		available_players.append(_spawn_player())
 	
 	pool_refreshed.emit()
+
+func _get_total_days_elapsed() -> int:
+	if game_time and game_time.has_method("get_total_days_elapsed"):
+		return game_time.get_total_days_elapsed()
+	if not game_time:
+		return 0
+	return (
+		(game_time.current_year - 1) * game_time.WEEKS_PER_YEAR * game_time.DAYS_PER_WEEK
+		+ (game_time.current_week - 1) * game_time.DAYS_PER_WEEK
+		+ (game_time.current_day - 1)
+	)
 
 func _simulate_competition():
 	if available_players.is_empty():

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 RaidLead is a guild management simulation game built with Godot Engine. Players manage a high-level guild in a fictional MMORPG world, inspired by sports management games like Football Manager.
 
 **Key Technologies:**
-- Engine: Godot Engine 4.5 (stable)
+- Engine: Godot Engine 4.6.2 (stable)
 - Primary Language: GDScript (static typing systématique)
 - Renderer: Compatibility / OpenGL3 (obligatoire en WSL2)
 - Platform: PC (Steam distribution planned)
@@ -153,7 +153,7 @@ Simulated players have:
 
 1. The project has core systems implemented - UI, time, NPCs, activities, dungeons, recruitment
 2. Documentation (GameIdea.md, Implementation.md) is in French
-3. Godot 4.5 is being used with GDScript (static typing)
+3. Godot 4.6.2 is being used with GDScript (static typing)
 4. Follow Godot's scene-based architecture patterns
 5. Use GDScript naming conventions (snake_case for variables/functions, PascalCase for classes)
 

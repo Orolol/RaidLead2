@@ -262,7 +262,7 @@ func _get_player_guild_data() -> Dictionary:
 		"total_members_count": total_members,
 		"cleared_content": cleared_content,
 		"recent_clears": recent_clears,
-		"reputation": 75.0, # TODO: Calculer vraiment
+		"reputation": guild.reputation,
 		"monthly_turnover": turnover,
 		"special_achievements": []
 	}

@@ -287,6 +287,12 @@ func is_window_open(window_name: String) -> bool:
 	"""Vérifie si une fenêtre est ouverte"""
 	return open_windows.has(window_name) and not open_windows[window_name].is_empty()
 
+func get_window_instance(window_name: String) -> Control:
+	return _get_existing_instance(window_name)
+
+func refresh_window(window_name: String) -> void:
+	_refresh_window_content(get_window_instance(window_name))
+
 # ==================== MINIMISATION ET TASKBAR ====================
 
 func minimize_window(window_name: String, instance_id: String = ""):
