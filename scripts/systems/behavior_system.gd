@@ -309,7 +309,7 @@ func trigger_personal_event(player, event_type: String):
 			if player.scheduled_absences == null:
 				player.scheduled_absences = []
 			player.scheduled_absences.append({
-				"start_day": game_time.current_day + event.get("delay_days", 0),
+				"start_day": _absolute_day() + event.get("delay_days", 0),
 				"duration_days": event.get("duration_days", 1)
 			})
 		
@@ -518,23 +518,47 @@ func _initialize_activity_preferences(player) -> Dictionary:
 	
 	return prefs
 
+func _absolute_day() -> int:
+	if game_time and game_time.has_method("get_total_days_elapsed"):
+		return game_time.get_total_days_elapsed()
+	return 0
+
+func _is_member_absent_today(member) -> bool:
+	"""Vrai si le membre a une absence planifiée (événement personnel) couvrant le jour courant."""
+	if not ("scheduled_absences" in member):
+		return false
+	var absences: Array = member.scheduled_absences
+	if absences.is_empty():
+		return false
+	var today: int = _absolute_day()
+	for a in absences:
+		var start: int = int(a.get("start_day", -1))
+		var dur: int = int(a.get("duration_days", 0))
+		if start >= 0 and today >= start and today < start + dur:
+			return true
+	return false
+
 func _check_scheduled_connections():
 	"""Vérifie et exécute les connexions/déconnexions planifiées"""
-	
+
 	var current_time = game_time.current_hour * 60 + game_time.current_minute
-	
+
 	for member in guild_manager.guild_members:
 		# Ne pas gérer le joueur
 		if member.get_meta("is_player", false):
 			continue
-		
+
 		# Initialiser les horaires si nécessaire
 		if not player_scheduled_times.has(member):
 			_schedule_next_connection_time(member)
 			continue
-		
+
 		var schedule = player_scheduled_times[member]
-		
+
+		# Absence planifiée (événement personnel) : le membre ne se connecte pas ce jour-là.
+		if not member.is_online and _is_member_absent_today(member):
+			continue
+
 		# Vérifier connexion
 		if not member.is_online and schedule.has("next_connection"):
 			var connection_time = schedule["next_connection"]

@@ -602,6 +602,15 @@ func _suite_facades(tf) -> void:
 		morning.circadian_type = "morning"
 		tf.ok(bs2.apply_circadian_modifier(morning, 8) > 1.0, "circadien matin : bonus le matin")
 		tf.ok(bs2.apply_circadian_modifier(morning, 23) < 1.0, "circadien matin : malus tard le soir")
+	# Absences planifiées désormais consommées par le système de connexion.
+	var bs3 = GuildManager.behavior_system if GuildManager else null
+	if bs3 and bs3.has_method("_is_member_absent_today"):
+		var absent := SimulatedPlayer.new()
+		var today_abs: int = GameTime.get_total_days_elapsed()
+		absent.scheduled_absences = [{"start_day": today_abs, "duration_days": 2}]
+		tf.ok(bs3._is_member_absent_today(absent), "absence planifiée = membre absent aujourd'hui")
+		absent.scheduled_absences = [{"start_day": today_abs + 5, "duration_days": 1}]
+		tf.ok(not bs3._is_member_absent_today(absent), "absence future != absent aujourd'hui")
 
 func _make_group(roles: Array, level: int, skill: int) -> Array:
 	"""Construit un groupe de SimulatedPlayer avec rôles/niveau/skill fixés (tests PvE)."""

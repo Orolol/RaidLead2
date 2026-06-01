@@ -52,7 +52,7 @@ func _initialize_system():
 		last_day_count = game_time.current_day
 
 func _on_hour_changed(hour: int):
-	print("EventManager: Vérification horaire (heure %d)" % hour)
+	if OS.is_debug_build(): print("EventManager: Vérification horaire (heure %d)" % hour)
 	_check_for_events()
 
 func _on_day_changed(day: int, week: int, year: int):
@@ -99,7 +99,7 @@ func _should_trigger_event(delta_hours: float) -> bool:
 	
 	# Appliquer la probabilité
 	var random_roll = randf()
-	print("EventManager: Roll probabilité: %.3f vs %.3f" % [random_roll, adjusted_probability])
+	if OS.is_debug_build(): print("EventManager: Roll probabilité: %.3f vs %.3f" % [random_roll, adjusted_probability])
 	
 	return random_roll < adjusted_probability
 

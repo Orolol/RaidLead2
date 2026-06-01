@@ -192,7 +192,7 @@ func _decide_next_activity(player):
 		return
 	
 	# Obtenir le système de comportement
-	var behavior_system = get_node_or_null("/root/GuildManager/BehaviorSystem")
+	var behavior_system = (GuildManager.behavior_system if GuildManager else null)
 	
 	if player.energy < 20:
 		# Trop fatigué, se déconnecte
@@ -372,7 +372,7 @@ func complete_activity(player) -> void:
 		active_activities.erase(player)
 		
 		# Évaluer l'expérience et mettre à jour les préférences
-		var behavior_system = get_node_or_null("/root/GuildManager/BehaviorSystem")
+		var behavior_system = (GuildManager.behavior_system if GuildManager else null)
 		if behavior_system and player.has_meta("last_activity_choice"):
 			var activity_type = player.get_meta("last_activity_choice")
 			var experience_quality = _evaluate_activity_experience(player, activity)
