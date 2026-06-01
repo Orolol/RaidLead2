@@ -5,8 +5,19 @@ extends Node
 
 const SAVE_PATH := "user://savegame.json"
 const BACKUP_PATH := "user://savegame_backup.json"
-const SAVE_VERSION := 1
+## Version du format de sauvegarde écrite par ce build. À incrémenter à chaque
+## changement de format, en ajoutant la migration correspondante dans _build_migrations().
+const CURRENT_SAVE_VERSION := 2
 const AUTOSAVE_WEEK_INTERVAL := 4  # auto-sauvegarde périodique (toutes les 4 semaines de jeu)
+
+## Blocs systèmes (clés de save) — utilisés par les migrations pour normaliser
+## les anciennes sauvegardes qui précèdent l'ajout d'un système.
+const _DICT_SYSTEM_BLOCKS := [
+	"game_time", "server_version", "phase", "ranking", "ai_guilds", "guild",
+	"media", "sponsors", "dramas", "staff", "tournaments", "transfers",
+	"legacy", "culture", "balance",
+]
+const _ARRAY_SYSTEM_BLOCKS := ["members", "loot_history"]
 
 signal save_completed(success: bool)
 signal load_completed(success: bool)
@@ -43,7 +54,7 @@ func _notification(what: int) -> void:
 func save_game() -> bool:
 	"""Sauvegarde l'ensemble de la progression dans un fichier JSON."""
 	var data: Dictionary = {
-		"save_version": SAVE_VERSION,
+		"save_version": CURRENT_SAVE_VERSION,
 		"timestamp": Time.get_unix_time_from_system(),
 		"game_time": GameTime.save_time_data(),
 		"server_version": ServerVersion.save_server_data(),
@@ -128,10 +139,57 @@ func _try_load(path: String) -> bool:
 		push_error("SaveManager: format de sauvegarde invalide (%s)" % path)
 		return false
 
+	var loaded_version: int = int(data.save_version)
+	data = _migrate_save_data(data)
 	_apply_save_data(data)
-	print("SaveManager: chargement réussi (version %d) depuis %s" % [data.save_version, path])
+	print("SaveManager: chargement réussi (format v%d -> v%d) depuis %s" % [loaded_version, CURRENT_SAVE_VERSION, path])
 	load_completed.emit(true)
 	return true
+
+# --- Migrations de format ---
+
+func _build_migrations() -> Dictionary:
+	"""Registre des migrations séquentielles : clé = version source N,
+	valeur = Callable(data) -> data qui fait passer le format de N à N+1.
+	Pour ajouter un futur format : incrémenter CURRENT_SAVE_VERSION et enregistrer
+	une migration `version_courante: _migrate_vX_to_vY`."""
+	return {
+		1: _migrate_v1_to_v2,
+	}
+
+func _migrate_save_data(data: Dictionary) -> Dictionary:
+	"""Fait migrer une sauvegarde de sa version stockée vers CURRENT_SAVE_VERSION."""
+	var from_version: int = int(data.get("save_version", 1))
+
+	if from_version > CURRENT_SAVE_VERSION:
+		# Sauvegarde issue d'un build plus récent : on tente un chargement best-effort
+		# (les blocs inconnus sont ignorés, les manquants prennent leurs défauts).
+		push_warning("SaveManager: sauvegarde v%d plus récente que le build (v%d), chargement best-effort" % [from_version, CURRENT_SAVE_VERSION])
+		return data
+
+	var migrations: Dictionary = _build_migrations()
+	var version: int = from_version
+	while version < CURRENT_SAVE_VERSION:
+		if migrations.has(version):
+			data = migrations[version].call(data)
+			print("SaveManager: migration de sauvegarde v%d -> v%d" % [version, version + 1])
+		version += 1
+		data["save_version"] = version
+	return data
+
+func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
+	"""v1 -> v2 : normalise la présence des blocs systèmes. Les sauvegardes antérieures
+	à l'ajout des systèmes National/Esport/Balance n'avaient pas ces clés ; on les
+	matérialise en blocs vides pour que la désérialisation reparte sur des défauts
+	propres (tous les deserialize() tolèrent un dictionnaire vide). Non destructif :
+	les blocs déjà présents et bien typés sont laissés intacts."""
+	for key in _DICT_SYSTEM_BLOCKS:
+		if not data.has(key) or not (data[key] is Dictionary):
+			data[key] = {}
+	for key in _ARRAY_SYSTEM_BLOCKS:
+		if not data.has(key) or not (data[key] is Array):
+			data[key] = []
+	return data
 
 func _apply_save_data(data: Dictionary) -> void:
 	# Charger chaque système

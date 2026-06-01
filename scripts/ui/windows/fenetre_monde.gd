@@ -668,7 +668,7 @@ func _on_negotiate_pressed() -> void:
 	match result.get("step", ""):
 		"accepted":
 			player_recruited.emit(result.player)
-			_show_recruit_dialog("%s rejoint la guilde pour %d or/semaine !" % [result.player.nom, result.salary])
+			_show_recruit_dialog(_format_national_signing(result))
 			selected_recruit = null
 			_refresh_recruitment_list()
 			_update_recruit_details()
@@ -676,6 +676,8 @@ func _on_negotiate_pressed() -> void:
 			_show_counter_offer_dialog(selected_recruit, result.counter_offer)
 		"rejected":
 			_show_recruit_dialog(result.reason)
+		"error":
+			_show_recruit_dialog(result.get("reason", "Recrutement impossible"))
 		_:
 			# Pas d'exigence salariale → recrutement standard
 			if result.get("success", false):
@@ -696,9 +698,12 @@ func _show_counter_offer_dialog(player, counter: int) -> void:
 		var res: Dictionary = recruitment_pool.accept_counter_offer(player, counter)
 		if res.get("success", false):
 			player_recruited.emit(res.player)
+			_show_recruit_dialog(_format_national_signing(res))
 			selected_recruit = null
 			_refresh_recruitment_list()
 			_update_recruit_details()
+		else:
+			_show_recruit_dialog(res.get("reason", "Recrutement impossible"))
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(dialog.queue_free)
@@ -716,6 +721,14 @@ func _on_scout_pressed() -> void:
 		msg += "\nTraits révélés : " + ", ".join(revealed)
 	_show_recruit_dialog(msg)
 	_update_recruit_details()
+
+func _format_national_signing(result: Dictionary) -> String:
+	var player_name: String = result.player.nom if result.get("player", null) else "La recrue"
+	var text: String = "%s rejoint la guilde pour %d or/semaine !" % [player_name, result.get("salary", 0)]
+	var agent_cost: int = int(result.get("agent_cost", 0))
+	if agent_cost > 0:
+		text += "\nCommission d'agent payée : %d or." % agent_cost
+	return text
 
 func _show_recruit_dialog(text: String) -> void:
 	var dialog = AcceptDialog.new()

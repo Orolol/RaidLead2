@@ -477,22 +477,46 @@ func _update_run_preview() -> void:
 	var avg_level: float = 0.0
 	var avg_equipment: float = 0.0
 	var avg_skill: float = 0.0
+	var avg_energy: float = 0.0
+	var avg_stress: float = 0.0
+	var burnout_count: int = 0
 	for member in group:
 		avg_level += float(member.personnage_niveau)
 		avg_equipment += float(member.get_total_ilvl())
 		avg_skill += float(member.skill)
+		avg_energy += float(member.energy)
+		avg_stress += float(member.stress_level)
+		if member.burnout_level >= 2:
+			burnout_count += 1
 	avg_level /= float(group_count)
 	avg_equipment /= float(group_count)
 	avg_skill /= float(group_count)
-	
+	avg_energy /= float(group_count)
+	avg_stress /= float(group_count)
+
 	var difficulty_score: float = DungeonDataScript.calculate_difficulty_score(selected_instance, group)
 	var composition_factor: float = 1.0 if missing_roles.is_empty() else 0.65
-	var estimated_score: int = int(clamp(difficulty_score * composition_factor * 100.0, 5.0, 95.0))
+	# Reflète les malus appliqués en combat (DungeonRun.simulate_boss_fight) : fatigue et moral.
+	var fatigue_factor: float = 0.7 if avg_energy < 30.0 else 1.0
+	var estimated_score: int = int(clamp(difficulty_score * composition_factor * fatigue_factor * 100.0, 5.0, 95.0))
 	var missing_text: String = "Composition complete"
 	if not missing_roles.is_empty():
 		missing_text = "Manque: %s" % ", ".join(missing_roles)
-	
-	run_preview_label.text = "Apercu %s : %d/%d membres | Score estime %d%%\nNiv. %.1f / iLvl %.1f / Skill %.1f | %s" % [
+
+	var warnings: Array[String] = []
+	if not missing_roles.is_empty():
+		warnings.append("composition incomplete")
+	if avg_energy < 30.0:
+		warnings.append("groupe fatigue (energie %.0f)" % avg_energy)
+	if avg_stress >= 60.0:
+		warnings.append("stress eleve (%.0f)" % avg_stress)
+	if burnout_count > 0:
+		warnings.append("%d membre(s) en burnout" % burnout_count)
+	var warning_text: String = "Aucun risque majeur"
+	if not warnings.is_empty():
+		warning_text = "⚠ " + " · ".join(warnings)
+
+	run_preview_label.text = "Apercu %s : %d/%d membres | Score estime %d%%\nNiv. %.1f / iLvl %.1f / Skill %.1f | %s\nForme: energie %.0f / stress %.0f | %s" % [
 		instance_data.get("name", selected_instance),
 		group_count,
 		required_count,
@@ -500,8 +524,18 @@ func _update_run_preview() -> void:
 		avg_level,
 		avg_equipment,
 		avg_skill,
-		missing_text
+		missing_text,
+		avg_energy,
+		avg_stress,
+		warning_text
 	]
+	# Code couleur du préavis selon le risque global.
+	if warnings.is_empty():
+		run_preview_label.modulate = Color(0.66, 0.86, 0.66)
+	elif missing_roles.is_empty() and burnout_count == 0:
+		run_preview_label.modulate = Color(0.92, 0.86, 0.55)
+	else:
+		run_preview_label.modulate = Color(0.92, 0.6, 0.55)
 
 func _get_assigned_group() -> Array[SimulatedPlayer]:
 	var group: Array[SimulatedPlayer] = []

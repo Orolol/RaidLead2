@@ -14,6 +14,7 @@ const STRUGGLE_HINT := 0.3  # seuil d'affichage "sous pression"
 var advanced_tabs: AdvancedTabs
 var _drag_active: bool = false
 
+var _weekly_box: VBoxContainer
 var _advice_box: VBoxContainer
 var _stats_box: VBoxContainer
 var _balance_box: VBoxContainer
@@ -33,6 +34,7 @@ func _ready() -> void:
 	advanced_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	advanced_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
+	_weekly_box = _add_scroll_tab("Cette semaine")
 	_advice_box = _add_scroll_tab("Conseils")
 	_stats_box = _add_scroll_tab("Statistiques")
 	_balance_box = _add_scroll_tab("Équilibrage")
@@ -102,6 +104,7 @@ func refresh_window() -> void:
 	_refresh_all()
 
 func _refresh_all() -> void:
+	_build_weekly()
 	_build_advice()
 	_build_stats()
 	_build_balance()
@@ -158,6 +161,88 @@ func _fmt_int(n: int) -> String:
 		if count % 3 == 0 and i > 0:
 			out = " " + out
 	return out
+
+# --- Onglet Cette semaine (audit Priorité 9) ---
+
+func _build_weekly() -> void:
+	_clear(_weekly_box)
+	if not AdvisorManager or not AdvisorManager.has_method("get_weekly_summary"):
+		_empty_hint(_weekly_box, "Synthèse hebdomadaire indisponible.")
+		return
+	if not GuildManager or not GuildManager.guild:
+		_empty_hint(_weekly_box, "Données de guilde indisponibles.")
+		return
+
+	_section(_weekly_box, "Cette semaine", GOLD)
+	if PhaseManager and GameTime:
+		var sub := Label.new()
+		sub.text = "%s — Semaine %d, Année %d" % [
+			PhaseManager.get_phase_name(PhaseManager.get_current_phase()),
+			GameTime.current_week, GameTime.current_year]
+		sub.modulate = DIM
+		_weekly_box.add_child(sub)
+	_weekly_box.add_child(HSeparator.new())
+
+	var summary: Dictionary = AdvisorManager.get_weekly_summary()
+
+	# Objectifs accessibles (les plus avancés en premier).
+	_section(_weekly_box, "Objectifs à portée", ACCENT)
+	var objectives: Array = summary.get("objectives", [])
+	if objectives.is_empty():
+		_empty_hint(_weekly_box, "Tous les objectifs de la phase sont remplis — la progression se déclenchera bientôt.")
+	else:
+		var obj_card := _card(_weekly_box)
+		for o in objectives.slice(0, mini(4, objectives.size())):
+			var pct: int = int(o.get("percent", 0.0))
+			_kv(obj_card, o.get("label", "?").capitalize(), "%d%%" % pct, _pct_color(float(pct)))
+
+	# Membres à risque.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Membres à surveiller", ACCENT)
+	var at_risk: Array = summary.get("members_at_risk", [])
+	if at_risk.is_empty():
+		_empty_hint(_weekly_box, "Aucun membre en difficulté particulière. Bon climat d'équipe.")
+	else:
+		var risk_card := _card(_weekly_box)
+		for entry in at_risk.slice(0, mini(6, at_risk.size())):
+			var reasons: Array = entry.get("reasons", [])
+			_kv(risk_card, entry.get("name", "?"), ", ".join(reasons), RED)
+		if at_risk.size() > 6:
+			_empty_hint(_weekly_box, "… et %d autre(s) membre(s) à surveiller." % (at_risk.size() - 6))
+
+	# Recrutement.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Recrutement", ACCENT)
+	var rec: Dictionary = summary.get("recruitment", {})
+	var rec_card := _card(_weekly_box)
+	var free_slots: int = int(rec.get("free_slots", 0))
+	_kv(rec_card, "Places libres", str(free_slots), GREEN if free_slots > 0 else DIM)
+	_kv(rec_card, "Candidats disponibles", str(int(rec.get("pool_size", 0))))
+	if free_slots > 0 and rec.get("can_recruit", false):
+		_empty_hint(_weekly_box, "Des recrues sont disponibles dans la fenêtre Monde pour combler vos rangs.")
+
+	# Contenu conseillé.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Contenu conseillé", ACCENT)
+	var content: Array = summary.get("recommended_content", [])
+	if content.is_empty():
+		_empty_hint(_weekly_box, "Aucun contenu adapté au niveau moyen actuel.")
+	else:
+		var content_card := _card(_weekly_box)
+		for c in content:
+			var status: String = "déjà clear" if c.get("cleared", false) else "à tenter"
+			var col: Color = DIM if c.get("cleared", false) else GREEN
+			_kv(content_card, "%s (niv. %d)" % [c.get("name", "?"), int(c.get("level", 0))], status, col)
+
+	# Activités en cours.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Activités en cours", ACCENT)
+	var act: Dictionary = summary.get("activities", {})
+	var act_card := _card(_weekly_box)
+	_kv(act_card, "Membres en ligne", str(int(act.get("online", 0))), GREEN if int(act.get("online", 0)) > 0 else DIM)
+	var by_type: Dictionary = act.get("by_type", {})
+	for label in by_type:
+		_kv(act_card, label, str(int(by_type[label])))
 
 # --- Onglet Conseils ---
 

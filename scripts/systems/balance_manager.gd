@@ -35,6 +35,40 @@ const STRUGGLE_THRESHOLD := 0.4
 const DOMINANCE_THRESHOLD := 0.5
 const TOTAL_GUILDS := 10  # joueur + 9 IA
 
+## Façade centrale des constantes d'équilibrage (audit Priorité 12).
+## Regroupe les nombres « magiques » les plus susceptibles d'être ajustés, pour
+## équilibrer sans éditer 15 scripts. Les systèmes lisent via BalanceManager.tunable("clé", défaut) ;
+## la valeur par défaut au point d'appel documente la valeur historique. Étendre ce dictionnaire
+## plutôt que de réintroduire des constantes éparpillées.
+const BALANCE := {
+	# Recrutement
+	"recruitment.base_chance": 0.5,          # chance de base d'acceptation (attempt_recruitment)
+	"recruitment.reputation_weight": 0.01,   # poids de (réputation-50) sur la chance
+	# Salaires (non-paiement)
+	"salary.unpaid_mood_penalty": 15.0,      # moral perdu par salarié impayé
+	"salary.unpaid_reputation_loss": 3.0,    # réputation perdue si salaires impayés
+	# Réputation
+	"reputation.scout_cost": 2.0,            # coût en réputation d'un scouting
+	# PvE — malus appliqués en combat / aperçu de run
+	"pve.low_energy_threshold": 30.0,
+	"pve.low_energy_penalty": 0.7,
+	"pve.low_morale_threshold": 40.0,
+	"pve.low_morale_penalty": 0.8,
+	# Classement (poids de score, miroir de GuildRanking.SCORE_WEIGHTS pour référence)
+	"ranking.weight.pve_progress": 0.4,
+	"ranking.weight.guild_level": 0.2,
+	"ranking.weight.member_activity": 0.15,
+	"ranking.weight.reputation": 0.15,
+	"ranking.weight.stability": 0.1,
+}
+
+func tunable(key: String, fallback = null) -> Variant:
+	"""Lit une constante d'équilibrage centralisée (BALANCE), avec repli explicite."""
+	return BALANCE.get(key, fallback)
+
+func tunable_float(key: String, fallback: float) -> float:
+	return float(BALANCE.get(key, fallback))
+
 var current_difficulty: int = Difficulty.NORMAL
 
 # Derniers calculs (exposés à l'UI / debug)

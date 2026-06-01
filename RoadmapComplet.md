@@ -607,7 +607,32 @@
 - **Milestone 3** : 100% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires, progression Phase 2→3 branchée)*
 - **Milestone 4** : 100% ✅ *(Esport : staff pro, tournois internationaux, burnout/stress, transferts internationaux, legacy/Hall of Fame)*
 - **Milestone 5** : 100% ✅ *(Transversales : dynamiques de groupe, moral collectif + contagion, team-building, traditions, gestion des conflits)*
-- **Milestone 6** : 95% ✅ *(Polish : conseiller adaptatif, dashboard de stats, auto-sauvegarde + backup, équilibrage adaptatif BalanceManager, harnais de tests automatisés 57/57 ; calibrage fin et playtests externes restants)*
+- **Milestone 6** : 95% ✅ *(Polish : conseiller adaptatif, dashboard de stats, auto-sauvegarde + backup, équilibrage adaptatif BalanceManager, harnais de tests automatisés ; calibrage fin et playtests externes restants)*
+
+### Statuts détaillés (Implémenté / Jouable / Validé)
+
+> Grille honnête demandée par l'audit (Priorité 6) pour éviter le faux confort du « 100 % ».
+> **Implémenté** = code présent et branché. **Jouable** = accessible et utile dans l'UI.
+> **Validé** = couvert par un test automatisé ou un scénario E2E.
+> *État au 1er juin 2026 — 98 assertions vertes (Godot 4.6.2 headless).*
+
+| Système | Implémenté | Jouable | Validé | Commentaire |
+|---|---|---|---|---|
+| Boucle de temps (GameTime) | Oui | Oui | Oui | jour absolu + calendrier testés |
+| Recrutement serveur | Oui | Oui | Oui | acceptation/refus + difficulté |
+| Recrutement national (salaires/agents) | Oui | Oui | Oui | commission d'agent prélevée **tous chemins** + solvabilité testées |
+| Progression PvE (clears/historique/meilleur clear) | Oui | Oui | Oui | suite PvE dédiée |
+| Composition de groupe + lancement de run | Oui | Oui | Partiel | logique de compo testée ; aperçu de run avec fatigue/stress |
+| Classement serveur | Oui | Oui | Partiel | branché sur clears réels + réputation |
+| Classement national / mondial | Oui | Partiel | Partiel | calcul branché, multiplicateurs de phase ; équilibrage à affiner |
+| Phases 0→1→2→3 | Oui | Oui | Partiel | 0→1 (héroïque) testé ; transitions supérieures non E2E |
+| Médias / Sponsors / Dramas (National) | Oui | Oui | Partiel | back-ends branchés ; peu de tests dédiés |
+| Staff / Tournois / Transferts / Legacy (Esport) | Oui | Oui | Partiel | boucle validée en éditeur ; tests unitaires partiels |
+| Cohésion / Culture (Milestone 5) | Oui | Oui | Partiel | relations/cliques/traditions ; sérialisation testée |
+| Conseiller + vue « Cette semaine » | Oui | Oui | Oui | conseils priorisés + synthèse hebdo testés (unit + smoke UI) |
+| Équilibrage adaptatif (BalanceManager) | Oui | Oui | Oui | presets + catch-up + rubber-band testés |
+| Sauvegarde + migration + backup | Oui | Oui | Oui | round-trip + migration v1→v2 + repli backup testés |
+| RNG déterministe (GameRandom.seed_rng) | Oui | — | Oui | séquence reproductible testée |
 
 ### Dépendances Critiques (Mises à jour)
 - ✅ Milestone 1 requis avant tous (FAIT)
@@ -634,6 +659,19 @@
 RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les **fondations sont excellentes** avec tous les systèmes core opérationnels, les 2 premières milestones complètes et **l'infrastructure UI moderne** implémentée.
 
 ## Accomplissements Récents ✅
+
+### Implémentation de l'audit AuditAmeliorations.md (1er juin 2026)
+*Suite de tests : 57 → 101 assertions, 100 % vertes (Godot 4.6.2 headless).*
+- **Recrutement national (P5)** : la commission d'agent est désormais prélevée sur l'or dans **tous** les chemins d'acceptation (offre directe ET contre-proposition), avec contrôle de solvabilité, centralisé dans `RecruitmentPool._finalize_national_recruit()` (à l'image de `TransferManager`). UI mise à jour (message de signature + cas « inabordable »).
+- **RNG déterministe (P5)** : `GameRandom.seed_rng()/randomize_rng()/get_seed()/is_seeded()` ; en fixant le générateur global, **toute** la simulation devient reproductible (tests/E2E rejouables).
+- **Sources de vérité (P3)** : suppression du chemin de node mort `/root/root2` dans `EventManager` (la popup passe uniquement par le signal `event_triggered`) ; lookups autoload→autoload (`MediaManager`/`SponsorshipManager`) convertis en références globales ; E2E migrés vers `WindowManager.get_window_instance()`.
+- **Sauvegarde versionnée (P11)** : mécanisme de **migration** (`CURRENT_SAVE_VERSION=2`, registre de migrations séquentielles, garde « save plus récente que le build ») ; migration v1→v2 qui normalise les blocs systèmes manquants des anciennes saves.
+- **Façade d'équilibrage (P12)** : `BalanceManager.BALANCE` + `tunable()/tunable_float()` centralisent les nombres magiques (recrutement, salaires, réputation, PvE, poids de ranking) ; points d'appel clés routés sans changement de comportement.
+- **Conseiller « Cette semaine » (P9)** : `AdvisorManager.get_weekly_summary()` (membres à risque, objectifs accessibles, recrutement, contenu conseillé, activités) + nouvel onglet dans `Fenetre_Conseils`.
+- **Boucle PvE (P1)** : aperçu de run enrichi (énergie/stress moyens, alertes de fatigue/burnout, score ajusté, code couleur) dans `Fenetre_OrganisationGroupe`.
+- **Tests (P10)** : nouvelles suites PvE (composition, run reproductible, phase 0→1), calendrier (salaires, refresh), économie de recrutement, RNG, migration de save, smoke UI.
+- **Typage GDScript (P7)** : types de retour ajoutés aux 6 fichiers centraux (`main`, `guild_manager`, `recruitment_pool`, `activity_manager`, `phase_manager`, `guild_ranking`).
+- **Outillage** : `tests/CheckScripts.tscn` — validateur de syntaxe terminant (alternative à `--check-only` qui peut se suspendre sous Windows) ; docs mises à jour (grille Implémenté/Jouable/Validé, note Windows vs WSL).
 
 ### Stabilisation technique (31 mai 2026)
 - **GameTime** : ajout d'un compteur de jours absolus (`get_total_days_elapsed`) pour fiabiliser les systèmes calendaires.
@@ -662,7 +700,7 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 - **Fenetre_Loot/Fenetre_Donjon** : rapport PvE dédié en fin de run avec score de performance, boss, wipes, participants et butin.
 - **PveRunReport** : calcul de score de performance partagé entre rapport, historique et tests.
 - **Fenetre_Personnage** : historique PvE enrichi avec score de performance persisté.
-- **Tests** : suite automatisée étendue à 57 assertions, validée avec Godot 4.6.2.
+- **Tests** : suite automatisée étendue à 98 assertions (PvE, calendrier, économie de recrutement, RNG déterministe, migration de save, smoke UI), validée avec Godot 4.6.2.
 
 ### Infrastructure UI Phases 1 & 2 (9 jours)
 - **NotificationManager** : Système toast professionnel avec 5 types et animations

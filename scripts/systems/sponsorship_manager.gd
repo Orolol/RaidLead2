@@ -62,8 +62,8 @@ func _tick_active_sponsors() -> void:
 	var reputation: float = GuildManager.guild.reputation if GuildManager.guild else 50.0
 	var member_count: int = GuildManager.guild_members.size()
 	var total_audience: int = 0
-	if has_node("/root/MediaManager"):
-		total_audience = get_node("/root/MediaManager").get_total_audience()
+	if MediaManager:
+		total_audience = MediaManager.get_total_audience()
 
 	var expired: Array = []
 	for sponsor in active_sponsors:
@@ -104,8 +104,8 @@ func try_sign_sponsor(sponsor: Sponsor) -> bool:
 	var reputation: float = GuildManager.guild.reputation if GuildManager.guild else 50.0
 	var member_count: int = GuildManager.guild_members.size()
 	var total_audience: int = 0
-	if has_node("/root/MediaManager"):
-		total_audience = get_node("/root/MediaManager").get_total_audience()
+	if MediaManager:
+		total_audience = MediaManager.get_total_audience()
 
 	if not sponsor.check_requirements(reputation, member_count, total_audience, weeks_since_last_scandal):
 		return false

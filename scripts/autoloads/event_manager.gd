@@ -213,21 +213,10 @@ func _trigger_event(event: RandomEventResource):
 			active_chains[event.event_chain_id]["current_event_id"] = event.id
 			active_chains[event.event_chain_id]["position"] = event.chain_position
 	
-	# Émettre le signal
-	print("EventManager: Émission du signal event_triggered")
+	# Émettre le signal — la diffusion vers l'UI passe uniquement par ce signal.
+	# main.gd écoute event_triggered et affiche la popup ; pas de chemin de node
+	# en dur vers la scène principale (anti-pattern source d'erreurs).
 	event_triggered.emit(event)
-	
-	# Afficher la popup (sera géré par l'UI)
-	_show_event_popup(event)
-
-func _show_event_popup(event: RandomEventResource):
-	# Cette méthode sera appelée par l'UI pour afficher la popup
-	var main_scene = get_node("/root/root2")
-	if main_scene and main_scene.has_method("show_event_popup"):
-		print("EventManager: Affichage de la popup pour %s" % event.title)
-		main_scene.show_event_popup(event)
-	else:
-		print("EventManager: Impossible d'afficher la popup pour %s - Main scene non trouvée" % event.title)
 
 func resolve_event(event: RandomEventResource, choice: EventChoiceResource) -> Dictionary:
 	if pending_event != event:

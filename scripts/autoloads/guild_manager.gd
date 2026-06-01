@@ -21,7 +21,7 @@ var game_time: Node
 var player_character: PlayerCharacterScript
 var behavior_system: Node
 
-func _ready(): 
+func _ready() -> void:
 	# Créer la guilde
 	# Créer la guilde - on utilise la classe directement sans preload
 	var guild_class = load("res://scripts/resources/guild.gd")
@@ -60,21 +60,21 @@ func _ready():
 	# Créer les membres initiaux
 	GuildInitializer.create_initial_members()
 
-func _on_minute_changed(_minute: int, _hour: int):
+func _on_minute_changed(_minute: int, _hour: int) -> void:
 	# Le BehaviorSystem gère maintenant les connexions/déconnexions granulaires
 	# On ne fait plus rien ici pour éviter les doublons
 	pass
 
-func _on_hour_changed(_hour: int):
+func _on_hour_changed(_hour: int) -> void:
 	# Mise à jour horaire pour les activités et stats
 	_update_all_members()
 
-func _on_day_changed(_day: int, _week: int, _year: int):
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	# Incrémente les jours dans la guilde pour tous les membres
 	for member in guild_members:
 		member.increment_days_in_guild()
 
-func _on_week_changed(_week: int, _year: int):
+func _on_week_changed(_week: int, _year: int) -> void:
 	# Verse les salaires des recrues semi-pro (Phase Nationale)
 	_pay_salaries()
 
@@ -98,15 +98,16 @@ func _pay_salaries() -> void:
 			notification_manager.show_info("Salaires versés : %d or" % total, "Masse salariale")
 	else:
 		# Impossible de payer : impact moral des salariés + réputation
+		var mood_penalty: float = BalanceManager.tunable_float("salary.unpaid_mood_penalty", 15.0)
 		for member in guild_members:
 			if member.get_meta("salary", 0) > 0:
-				member.mood = maxf(0.0, member.mood - 15.0)
+				member.mood = maxf(0.0, member.mood - mood_penalty)
 		if guild:
-			guild.lose_reputation(3.0, "Salaires impayés")
+			guild.lose_reputation(BalanceManager.tunable_float("salary.unpaid_reputation_loss", 3.0), "Salaires impayés")
 		if notification_manager:
 			notification_manager.show_warning("Salaires impayés (%d or manquants) ! Moral en baisse." % (total - guild.gold), "Budget")
 
-func _update_all_members():
+func _update_all_members() -> void:
 	# Les connexions/déconnexions sont maintenant gérées par le BehaviorSystem
 	# avec granularité à la minute
 	for member in guild_members:
@@ -119,7 +120,7 @@ func _update_all_members():
 		if member.is_online and member.current_activity == null:
 			_assign_default_activity(member)
 
-func _update_player_character(player: PlayerCharacterScript):
+func _update_player_character(player: PlayerCharacterScript) -> void:
 	"""Met à jour le personnage joueur"""
 	if not player.is_player_controlled:
 		return
@@ -132,12 +133,12 @@ func _update_player_character(player: PlayerCharacterScript):
 	if not player.is_online:
 		player.try_reconnect()
 
-func _connect_member(player):
+func _connect_member(player) -> void:
 	player.go_online()
 	member_connected.emit(player)
 	_assign_default_activity(player)
 
-func _disconnect_member(player):
+func _disconnect_member(player) -> void:
 	if player.current_activity:
 		activity_manager.interrupt_activity(player, "Déconnexion")
 	player.go_offline()
@@ -145,7 +146,7 @@ func _disconnect_member(player):
 	# Lance l'activité hors ligne
 	activity_manager.start_activity(player, ActivityScript.ActivityType.OFFLINE)
 
-func _assign_default_activity(player):
+func _assign_default_activity(player) -> void:
 	if not player.is_online:
 		return
 		
@@ -189,7 +190,7 @@ func add_member(player: SimulatedPlayer) -> bool:
 		return true
 	return false
 
-func remove_member(player, was_voluntary: bool = true):
+func remove_member(player, was_voluntary: bool = true) -> void:
 	if player in guild_members:
 		if player.is_online:
 			_disconnect_member(player)
@@ -220,22 +221,22 @@ func get_available_members_for_activity(activity_type: String) -> Array:
 	return available
 
 # Callbacks des activités
-func _on_activity_started(player, activity):
+func _on_activity_started(player, activity) -> void:
 	member_activity_changed.emit(player, activity)
 
-func _on_activity_completed(player, _activity):
+func _on_activity_completed(player, _activity) -> void:
 	member_activity_changed.emit(player, null)
 	# Assigne une nouvelle activité si toujours en ligne
 	if player.is_online:
 		_assign_default_activity(player)
 
-func _on_activity_interrupted(player, _activity, _reason: String):
+func _on_activity_interrupted(player, _activity, _reason: String) -> void:
 	member_activity_changed.emit(player, null)
 	# Assigne une nouvelle activité si toujours en ligne
 	if player.is_online:
 		_assign_default_activity(player)
 
-func _on_server_version_updated(new_version: float, _update_name: String):
+func _on_server_version_updated(new_version: float, _update_name: String) -> void:
 	print("Guilde : mise à jour vers version %s" % new_version)
 	
 	# Permettre aux membres de progresser en niveau
@@ -253,12 +254,12 @@ func _on_server_version_updated(new_version: float, _update_name: String):
 			# L'équipement ne suit plus automatiquement le niveau avec le nouveau système
 			print("%s a gagné %d niveau(s) (maintenant niveau %d)" % [member.nom, level_gain, member.personnage_niveau])
 
-func _on_guild_level_up(new_level: int):
+func _on_guild_level_up(new_level: int) -> void:
 	guild_level_changed.emit(new_level)
 	print("La guilde a atteint le niveau %d!" % new_level)
 
 
-func _create_player_character():
+func _create_player_character() -> void:
 	# Créer le personnage du joueur avec la nouvelle classe
 	player_character = PlayerCharacterScript.new()
 	player_character.nom = "Joueur"
@@ -287,7 +288,7 @@ func _create_player_character():
 	# Ajouter à la guilde
 	add_member(player_character)
 
-func _on_guild_perk_unlocked(_perk_name: String, _level: int):
+func _on_guild_perk_unlocked(_perk_name: String, _level: int) -> void:
 	guild_perk_unlocked.emit(_perk_name)
 	print("Nouveau perk débloqué: %s (niveau %d)" % [_perk_name, _level])
 
@@ -314,7 +315,7 @@ func _connect_to_ai_guild_manager() -> void:
 	add_child(poaching_handler)
 	print("GuildManager connecté au AIGuildManager")
 
-func _init_behavior_system():
+func _init_behavior_system() -> void:
 	"""Initialise le système de comportement dynamique"""
 	var behavior_system_script = load("res://scripts/systems/behavior_system.gd")
 	behavior_system = Node.new()
@@ -330,7 +331,7 @@ func _init_behavior_system():
 	if behavior_system.has_signal("burnout_level_changed"):
 		behavior_system.burnout_level_changed.connect(_on_burnout_changed)
 
-func _on_behavior_changed(player, change_type: String):
+func _on_behavior_changed(player, change_type: String) -> void:
 	"""Gère les changements de comportement"""
 	match change_type:
 		"urgent_disconnect":
@@ -352,7 +353,7 @@ func _on_behavior_changed(player, change_type: String):
 			print("%s doit se déconnecter de manière imprévue" % player.nom)
 			_disconnect_member(player)
 
-func _on_personal_event(player, event: Dictionary):
+func _on_personal_event(player, event: Dictionary) -> void:
 	"""Gère les événements personnels"""
 	if event.has("message"):
 		var message = event.message.replace("{player}", player.nom)
@@ -376,7 +377,7 @@ func add_loot_entry(item: Item, member_name: String, dungeon_name: String, boss_
 	while loot_history.size() > 200:
 		loot_history.pop_front()
 
-func _on_burnout_changed(player, new_level: int):
+func _on_burnout_changed(player, new_level: int) -> void:
 	"""Gère les changements de niveau de burnout"""
 	match new_level:
 		0:

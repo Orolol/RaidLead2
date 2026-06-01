@@ -27,7 +27,7 @@ var competitor_guilds = [
 	"Les Forgerons de Guerre"
 ]
 
-func _ready():
+func _ready() -> void:
 	game_time = GameTime
 	if game_time:
 		last_refresh_total_day = _get_total_days_elapsed()
@@ -41,7 +41,7 @@ func _ready():
 	# Génère le pool initial
 	_generate_initial_pool()
 
-func _generate_initial_pool():
+func _generate_initial_pool() -> void:
 	available_players.clear()
 	
 	var pool_limits = _get_current_pool_limits()
@@ -135,7 +135,7 @@ func _calculate_recruitment_difficulty(player: SimulatedPlayer) -> float:
 	
 	return clamp(difficulty, 0.1, 0.9)
 
-func _on_day_changed(_day: int, _week: int, _year: int):
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	var pool_limits = _get_current_pool_limits()
 	
 	# Ajoute quelques nouveaux joueurs chaque jour
@@ -148,12 +148,12 @@ func _on_day_changed(_day: int, _week: int, _year: int):
 	if _get_total_days_elapsed() - last_refresh_total_day >= REFRESH_INTERVAL_DAYS:
 		_refresh_pool()
 
-func _on_hour_changed(_hour: int):
+func _on_hour_changed(_hour: int) -> void:
 	# Simule la compétition - des joueurs peuvent être recrutés par d'autres guildes
 	if randf() < 0.05:  # 5% de chance par heure
 		_simulate_competition()
 
-func _refresh_pool():
+func _refresh_pool() -> void:
 	last_refresh_total_day = _get_total_days_elapsed()
 	var pool_limits = _get_current_pool_limits()
 	
@@ -186,7 +186,7 @@ func _get_total_days_elapsed() -> int:
 		+ (game_time.current_day - 1)
 	)
 
-func _simulate_competition():
+func _simulate_competition() -> void:
 	if available_players.is_empty():
 		return
 	
@@ -238,7 +238,7 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 	if player not in available_players:
 		return {"success": false, "reason": "Joueur non disponible"}
 	
-	var base_chance = 0.5
+	var base_chance: float = BalanceManager.tunable_float("recruitment.base_chance", 0.5)
 	var recruitment_difficulty = player.get_meta("recruitment_difficulty", 0.5)
 	
 	# Facteurs positifs
@@ -261,7 +261,7 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 	
 	# Bonus de réputation de guilde
 	if guild_data.has("reputation"):
-		var reputation_bonus = (guild_data.reputation - 50.0) * 0.01  # -50% à +50%
+		var reputation_bonus = (guild_data.reputation - 50.0) * BalanceManager.tunable_float("recruitment.reputation_weight", 0.01)  # -50% à +50%
 		base_chance += reputation_bonus
 		base_chance = clamp(base_chance, 0.0, 1.0)
 	
@@ -308,7 +308,7 @@ func _generate_rejection_reasons(player: SimulatedPlayer, guild_data: Dictionary
 	
 	return reasons
 
-func _on_server_version_updated(new_version: float, _update_name: String):
+func _on_server_version_updated(new_version: float, _update_name: String) -> void:
 	print("Pool de recrutement : mise à jour vers version %s" % new_version)
 	
 	# Augmenter la taille du pool si nécessaire
@@ -394,10 +394,7 @@ func attempt_national_recruitment(player: SimulatedPlayer, offered_salary: int) 
 
 	if ratio >= 1.0:
 		# Offre >= demande : acceptation directe
-		player.set_meta("salary", offered_salary)
-		available_players.erase(player)
-		player_recruited.emit(player)
-		return {"success": true, "player": player, "salary": offered_salary, "step": "accepted"}
+		return _finalize_national_recruit(player, offered_salary)
 	elif ratio >= 0.7:
 		# Contre-proposition
 		var counter: int = int(demand * randf_range(0.85, 1.1))
@@ -409,23 +406,46 @@ func attempt_national_recruitment(player: SimulatedPlayer, offered_salary: int) 
 func accept_counter_offer(player: SimulatedPlayer, salary: int) -> Dictionary:
 	"""Accepte la contre-proposition d'un joueur national."""
 	if player not in available_players:
-		return {"success": false, "reason": "Joueur non disponible"}
+		return {"success": false, "reason": "Joueur non disponible", "step": "error"}
+	return _finalize_national_recruit(player, salary)
+
+func _finalize_national_recruit(player: SimulatedPlayer, salary: int) -> Dictionary:
+	"""Finalise un recrutement national en dépensant la commission d'agent (one-shot).
+
+	Centralise la dépense d'or pour TOUS les chemins d'acceptation (offre directe ET
+	contre-proposition), avec vérification de solvabilité, à l'image de
+	TransferManager._try_finalize(). Le salaire hebdomadaire reste prélevé par
+	GuildManager._pay_salaries().
+	"""
+	var agent_cost: int = 0
+	if player.get_meta("has_agent", false):
+		agent_cost = int(player.get_meta("agent_commission", 0))
+
+	# La commission d'agent est un coût ponctuel à la signature : on vérifie la solvabilité.
+	if agent_cost > 0:
+		if not GuildManager.guild or GuildManager.guild.gold < agent_cost:
+			return {
+				"success": false,
+				"step": "error",
+				"reason": "Commission d'agent inabordable (%d or requis)" % agent_cost,
+			}
+		GuildManager.guild.spend_gold(agent_cost)
 
 	player.set_meta("salary", salary)
 	available_players.erase(player)
 	player_recruited.emit(player)
-
-	# Commission agent
-	var agent_cost: int = 0
-	if player.get_meta("has_agent", false):
-		agent_cost = player.get_meta("agent_commission", 0)
-
-	return {"success": true, "player": player, "salary": salary, "agent_cost": agent_cost}
+	return {
+		"success": true,
+		"player": player,
+		"salary": salary,
+		"agent_cost": agent_cost,
+		"step": "accepted",
+	}
 
 func scout_player(player: SimulatedPlayer) -> Dictionary:
 	"""Scoute un joueur pour reveler ses stats cachees. Coute de la reputation."""
 	if GuildManager.guild:
-		GuildManager.guild.lose_reputation(2.0, "Scouting de %s" % player.nom)
+		GuildManager.guild.lose_reputation(BalanceManager.tunable_float("reputation.scout_cost", 2.0), "Scouting de %s" % player.nom)
 
 	# Reveler quelques tags caches
 	var revealed_tags: Array = []

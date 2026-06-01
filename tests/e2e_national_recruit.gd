@@ -32,7 +32,7 @@ func _process(_delta: float) -> bool:
 				_state = 2; _frames = 0
 		2:
 			if _frames >= 60:
-				_monde = _main.window_manager._get_existing_instance("monde")
+				_monde = _main.window_manager.get_window_instance("monde")
 				if _monde and _monde.advanced_tabs:
 					_monde.advanced_tabs.select_tab(1)
 				_state = 3; _frames = 0

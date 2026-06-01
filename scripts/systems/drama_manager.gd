@@ -19,11 +19,9 @@ func _ready() -> void:
 	if GameTime.has_signal("year_changed"):
 		GameTime.year_changed.connect(_on_year_changed)
 
-	# Connecter aux incidents media
-	if has_node("/root/MediaManager"):
-		var media: Node = get_node("/root/MediaManager")
-		if media.has_signal("media_incident"):
-			media.media_incident.connect(_on_media_incident)
+	# Connecter aux incidents media (MediaManager est un autoload toujours présent)
+	if MediaManager and MediaManager.has_signal("media_incident"):
+		MediaManager.media_incident.connect(_on_media_incident)
 
 func _on_week_changed(_week: int, _year: int) -> void:
 	_tick_dramas()
@@ -95,9 +93,9 @@ func _create_drama(type: Drama.DramaType, severity: Drama.Severity, source: Stri
 		GuildManager.guild.lose_reputation(absf(drama.get_reputation_impact()),
 			"Drama: %s" % drama.get_type_name())
 
-	# Notifier les sponsors
-	if has_node("/root/SponsorshipManager"):
-		get_node("/root/SponsorshipManager").on_scandal()
+	# Notifier les sponsors (SponsorshipManager est un autoload toujours présent)
+	if SponsorshipManager:
+		SponsorshipManager.on_scandal()
 
 	return drama
 

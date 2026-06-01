@@ -22,7 +22,7 @@ var player_control_panel: PlayerControlPanelScript = null
 var player_character = null  # Référence au personnage joueur
 # var fast_forward_manager: Node = null  # Supprimé - système simplifié
 
-func _ready():
+func _ready() -> void:
 	# Applique le thème global cohérent à toute l'UI (fenêtres, popups, notifications)
 	get_tree().root.theme = UITheme.build()
 
@@ -54,7 +54,7 @@ func _ready():
 	
 
 
-func _setup_background():
+func _setup_background() -> void:
 	var bg_texture: Texture2D = AssetLoader.get_background()
 	if bg_texture:
 		var background = TextureRect.new()
@@ -73,7 +73,7 @@ func _setup_background():
 		add_child(background)
 		move_child(background, 0)
 
-func _setup_time_display():
+func _setup_time_display() -> void:
 	var time_display_scene = load("res://scenes/TimeDisplay.tscn")
 	var time_display = time_display_scene.instantiate()
 	add_child(time_display)
@@ -84,7 +84,7 @@ func _setup_time_display():
 	time_display.offset_right = time_display.custom_minimum_size.x / 2
 	time_display.offset_bottom = 10 + time_display.custom_minimum_size.y
 
-func _setup_chat_panel():
+func _setup_chat_panel() -> void:
 	var chat_scene = load("res://scenes/ChatPanel.tscn")
 	chat_panel = chat_scene.instantiate()
 	add_child(chat_panel)
@@ -110,7 +110,7 @@ func _on_phase_changed_for_chat(new_phase: Variant, _old_phase: Variant) -> void
 		phase_name = PhaseManager.get_phase_name(new_phase)
 	chat_panel.add_phase_notification(phase_name)
 
-func _setup_debug_menu():
+func _setup_debug_menu() -> void:
 	# Créer un conteneur pour le menu debug
 	var debug_container = PanelContainer.new()
 	debug_container.custom_minimum_size = Vector2(150, 30)
@@ -163,7 +163,7 @@ func _should_auto_load_save() -> bool:
 	var user_args: PackedStringArray = OS.get_cmdline_user_args()
 	return not args.has(NO_SAVE_AUTOLOAD_ARG) and not user_args.has(NO_SAVE_AUTOLOAD_ARG)
 
-func _connect_menu_signals():
+func _connect_menu_signals() -> void:
 	menu_bar.personnage_button_pressed.connect(_on_personnage_button_pressed)
 	menu_bar.guilde_button_pressed.connect(_on_guilde_button_pressed)
 	menu_bar.monde_button_pressed.connect(_on_monde_button_pressed)
@@ -173,31 +173,31 @@ func _connect_menu_signals():
 	menu_bar.cohesion_button_pressed.connect(_on_cohesion_button_pressed)
 	menu_bar.conseils_button_pressed.connect(_on_conseils_button_pressed)
 
-func _on_personnage_button_pressed():
+func _on_personnage_button_pressed() -> void:
 	window_manager.show_window("personnage")
 
-func _on_guilde_button_pressed():
+func _on_guilde_button_pressed() -> void:
 	window_manager.show_window("guilde")
 
-func _on_monde_button_pressed():
+func _on_monde_button_pressed() -> void:
 	window_manager.show_window("monde")
 
-func _on_organisation_button_pressed():
+func _on_organisation_button_pressed() -> void:
 	window_manager.show_window("organisation")
 
-func _on_national_button_pressed():
+func _on_national_button_pressed() -> void:
 	window_manager.show_window("national")
 
-func _on_esport_button_pressed():
+func _on_esport_button_pressed() -> void:
 	window_manager.show_window("esport")
 
-func _on_cohesion_button_pressed():
+func _on_cohesion_button_pressed() -> void:
 	window_manager.show_window("cohesion")
 
-func _on_conseils_button_pressed():
+func _on_conseils_button_pressed() -> void:
 	window_manager.show_window("conseils")
 
-func _register_windows():
+func _register_windows() -> void:
 	window_manager.register_window("personnage", "res://scenes/Fenetre_Personnage.tscn")
 	window_manager.register_window("guilde", "res://scenes/Fenetre_Guilde.tscn")
 	window_manager.register_window("monde", "res://scenes/Fenetre_Monde.tscn")
@@ -207,7 +207,7 @@ func _register_windows():
 	window_manager.register_window("cohesion", "res://scenes/Fenetre_Social.tscn")
 	window_manager.register_window("conseils", "res://scenes/Fenetre_Conseils.tscn")
 
-func _connect_window_signals():
+func _connect_window_signals() -> void:
 	# Écouter l'ouverture des fenêtres pour connecter leurs signaux
 	window_manager.window_opened.connect(_on_window_opened)
 
@@ -246,7 +246,7 @@ func _on_player_recruited(player: SimulatedPlayer) -> void:
 		if org_inst:
 			org_inst.set_guild_members(guild_manager_node.guild_members)
 
-func _on_debug_menu_pressed(id: int):
+func _on_debug_menu_pressed(id: int) -> void:
 	print("Debug menu pressed - Option ID: %d" % id)
 	var guild_manager = GuildManager
 	if not guild_manager:
@@ -402,7 +402,7 @@ func _input(event: InputEvent) -> void:
 			KEY_F5:  # F5 pour sauvegarder
 				SaveManager.save_game()
 
-func _connect_event_system():
+func _connect_event_system() -> void:
 	print("Main: Connexion du système d'événements")
 	var event_manager = EventManager
 	if event_manager:
@@ -411,11 +411,11 @@ func _connect_event_system():
 	else:
 		print("Main: ERREUR - EventManager non trouvé!")
 
-func _on_event_triggered(event: RandomEventResource):
+func _on_event_triggered(event: RandomEventResource) -> void:
 	print("Main: Signal event_triggered reçu pour: %s" % event.title)
 	show_event_popup(event)
 
-func show_event_popup(event: RandomEventResource):
+func show_event_popup(event: RandomEventResource) -> void:
 	print("Main: show_event_popup appelé pour l'événement: %s" % event.title)
 	
 	# File d'attente : ne pas empiler sur un autre popup modal (loot, drama, ou un événement déjà affiché)
@@ -438,7 +438,7 @@ func show_event_popup(event: RandomEventResource):
 	# Afficher l'événement
 	event_popup.show_event(event)
 
-func _on_event_choice_selected(choice: EventChoiceResource):
+func _on_event_choice_selected(choice: EventChoiceResource) -> void:
 	var event_manager = EventManager
 	if event_manager and event_manager.pending_event:
 		event_manager.resolve_event(event_manager.pending_event, choice)
@@ -446,7 +446,7 @@ func _on_event_choice_selected(choice: EventChoiceResource):
 	event_popup = null
 	_show_next_pending_event.call_deferred()
 
-func _on_event_popup_closed():
+func _on_event_popup_closed() -> void:
 	event_popup = null
 	_show_next_pending_event.call_deferred()
 
@@ -458,12 +458,12 @@ func _show_next_pending_event() -> void:
 		return
 	show_event_popup(_pending_event_queue.pop_front())
 
-func _connect_loot_conflict_system():
+func _connect_loot_conflict_system() -> void:
 	var gm: Node = GuildManager
 	if gm:
 		gm.loot_conflict_occurred.connect(_on_loot_conflict)
 
-func _on_loot_conflict(conflict: Dictionary):
+func _on_loot_conflict(conflict: Dictionary) -> void:
 	"""Affiche un popup pour résoudre un conflit de loot"""
 	var item: Item = conflict.get("item", null)
 	var candidates: Array = conflict.get("candidates", [])
@@ -539,7 +539,7 @@ func _on_loot_conflict(conflict: Dictionary):
 	add_child(dialog)
 	dialog.popup_centered(Vector2(500, 300))
 
-func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Array, dungeon_name: String, boss_name: String):
+func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Array, dungeon_name: String, boss_name: String) -> void:
 	"""Résout un conflit de loot en attribuant l'item au gagnant"""
 	# Équiper l'item au gagnant
 	winner.try_auto_equip(item)
@@ -769,7 +769,7 @@ func _on_tradition_established(tradition_name: String) -> void:
 	if chat_panel:
 		chat_panel.add_message("[Cohésion] Nouvelle tradition établie : %s" % tradition_name, "loot")
 
-func _setup_player_systems():
+func _setup_player_systems() -> void:
 	"""Configure les systèmes spécifiques au joueur"""
 	# Attendre que le GuildManager soit prêt
 	await get_tree().process_frame
@@ -789,7 +789,7 @@ func _setup_player_systems():
 	# Configurer les connexions
 	_connect_player_systems()
 
-func _setup_player_control_panel():
+func _setup_player_control_panel() -> void:
 	"""Configure le panneau de contrôle du joueur"""
 	var control_panel_scene = load("res://scenes/PlayerControlPanel.tscn")
 	player_control_panel = control_panel_scene.instantiate()
@@ -809,7 +809,7 @@ func _setup_player_control_panel():
 
 # func _setup_fast_forward_manager():  # Supprimé - système simplifié
 
-func _connect_player_systems():
+func _connect_player_systems() -> void:
 	"""Connecte les signaux des systèmes joueur"""
 	if player_control_panel:
 		player_control_panel.disconnect_requested.connect(_on_player_disconnect_requested)
@@ -823,18 +823,18 @@ func _connect_player_systems():
 	
 	print("Systèmes joueur configurés")
 
-func _on_player_disconnect_requested(return_hour: int, return_minute: int):
+func _on_player_disconnect_requested(return_hour: int, return_minute: int) -> void:
 	"""Gère la demande de déconnexion manuelle du joueur"""
 	print("Joueur demande déconnexion manuelle")
 	# TODO: Implémenter déconnexion manuelle simple si nécessaire
 	print("Déconnexion manuelle temporairement désactivée")
 
-func _on_player_forced_disconnect(recovery_hours: int):
+func _on_player_forced_disconnect(recovery_hours: int) -> void:
 	"""Gère la déconnexion forcée du joueur (épuisement)"""
 	print("Joueur déconnecté automatiquement - repos forcé de %d heures" % recovery_hours)
 	execute_forced_rest()
 
-func execute_forced_rest():
+func execute_forced_rest() -> void:
 	"""Execute le repos forcé de 12h avec système robuste"""
 	print("Démarrage du repos forcé - BLOCAGE TOTAL")
 	
@@ -900,7 +900,7 @@ func execute_forced_rest():
 	
 	print("Repos forcé terminé - retour à la normale")
 
-func _on_player_activity_changed(activity_type: String):
+func _on_player_activity_changed(activity_type: String) -> void:
 	"""Gère le changement d'activité du joueur"""
 	print("Joueur a changé d'activité: %s" % activity_type)
 	

@@ -22,6 +22,14 @@ Le code de sortie vaut `0` si tous les tests passent, `1` sinon — pratique pou
 > `-s` (SceneTree) est compilé avant l'enregistrement des autoloads, qui deviennent alors
 > introuvables. En passant par une scène normale, les singletons globaux sont disponibles.
 
+**Validation de syntaxe (alternative à `--check-only`)** — `--check-only` peut rester suspendu
+sous Windows. `CheckScripts.tscn` charge tous les scripts `.gd` via `load()` (autoloads
+disponibles car c'est une scène) et sort `0` si tout compile, `1` sinon :
+
+```powershell
+& "C:\chemin\vers\Godot_v4.6.2-stable_win64_console.exe" --rendering-driver opengl3 --headless --path . res://tests/CheckScripts.tscn
+```
+
 **Vérification courte de la scène principale sans charger la save locale** :
 
 ```powershell
@@ -48,6 +56,12 @@ Le code de sortie vaut `0` si tous les tests passent, `1` sinon — pratique pou
 | PvE Progression | clears joueur, historique de run, meilleur clear, pourcentage de contenu clear, lecture par PhaseManager, score groupe vide, rankings national/mondial, score d'activité guilde vide, score de rapport PvE partagé |
 | ActivityManager | activité Donjon automatique sans fallback farming |
 | PhaseManager | valeurs d'enum, objectifs de phase, sémantique du rang (plus petit = meilleur) |
+| SaveManager Migration | migration v1→v2 (blocs systèmes normalisés), tolérance d'une save plus récente |
+| PvE Loop | composition valide/invalide, run reproductible (graine fixe), loot, phase 0→1 après héroïque |
+| GameRandom | déterminisme `seed_rng` (même graine = même séquence), `randomize_rng` |
+| Recrutement (économie) | commission d'agent prélevée sur tous les chemins, contrôle de solvabilité |
+| Calendrier | salaires hebdomadaires (payés / impayés → moral & réputation), refresh sur jour absolu |
+| UI Smoke | instanciation de `Fenetre_Conseils` + onglet « Cette semaine » au runtime |
 
 ## Ajouter un test
 

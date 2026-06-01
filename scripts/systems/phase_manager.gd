@@ -87,7 +87,7 @@ const PHASE_CONFIG = {
 	}
 }
 
-func _ready():
+func _ready() -> void:
 	# Se connecter aux signaux nécessaires
 	if GuildManager:
 		GuildManager.connect("guild_level_changed", _on_guild_level_changed)
@@ -103,7 +103,7 @@ func _ready():
 	
 	print("PhaseManager initialisé - Phase actuelle: %s" % get_phase_name(current_phase))
 
-func _initialize_phase_progress():
+func _initialize_phase_progress() -> void:
 	"""Initialise le tracking de progression pour chaque phase"""
 	for phase in GamePhase.values():
 		phase_progress[phase] = {
@@ -243,7 +243,7 @@ func try_advance_phase() -> bool:
 	"""Tente de faire progresser vers la phase suivante"""
 	return unlock_next_phase()
 
-func complete_heroic_dungeon(dungeon_name: String = ""):
+func complete_heroic_dungeon(dungeon_name: String = "") -> void:
 	"""Marque un donjon héroïque comme complété"""
 	heroic_dungeons_completed += 1
 	
@@ -265,7 +265,7 @@ func complete_heroic_dungeon(dungeon_name: String = ""):
 	if current_phase == GamePhase.LEVELING:
 		try_advance_phase()
 
-func add_achievement(achievement_name: String, description: String = ""):
+func add_achievement(achievement_name: String, description: String = "") -> void:
 	"""Ajoute un achievement à la phase actuelle"""
 	var achievement = {
 		"name": achievement_name,
@@ -291,7 +291,7 @@ func get_all_achievements() -> Array:
 
 # Méthodes internes pour calculer les requirements
 
-func _get_requirement_current_value(req_name: String):
+func _get_requirement_current_value(req_name: String) -> Variant:
 	"""Retourne la valeur actuelle d'un requirement"""
 	match req_name:
 		"heroic_dungeons_completed":
@@ -412,7 +412,7 @@ func _get_current_date() -> Dictionary:
 
 # Callbacks des signaux
 
-func _on_day_changed(day: int, week: int, year: int):
+func _on_day_changed(day: int, week: int, year: int) -> void:
 	"""Appelé chaque jour pour mettre à jour la progression"""
 	# Incrémenter les jours dans la phase actuelle
 	phase_progress[current_phase]["days_in_phase"] += 1
@@ -424,7 +424,7 @@ func _on_day_changed(day: int, week: int, year: int):
 	if day % 7 == 0:
 		check_phase_progression()
 
-func _update_rank_duration():
+func _update_rank_duration() -> void:
 	"""Compte les jours consécutifs à la 1ère place du classement."""
 	if not GuildRanking:
 		return
@@ -475,21 +475,21 @@ func _compute_team_stability() -> float:
 	var staff_bonus: float = StaffManager.get_total_stability_bonus() if StaffManager else 0.0
 	return clampf(total / float(members.size()) + staff_bonus, 0.0, 100.0)
 
-func _on_week_changed(week: int, year: int):
+func _on_week_changed(week: int, year: int) -> void:
 	"""Appelé chaque semaine"""
 	# Check automatique de progression chaque semaine
 	check_phase_progression()
 
-func _on_guild_level_changed(new_level: int):
+func _on_guild_level_changed(new_level: int) -> void:
 	"""Réagit aux changements de niveau de guilde"""
 	add_achievement("Niveau de guilde %d" % new_level, "La guilde a atteint le niveau %d" % new_level)
 
-func _on_member_recruited(player):
+func _on_member_recruited(player) -> void:
 	"""Réagit au recrutement de nouveaux membres"""
 	if GuildManager.guild_members.size() >= 15:
 		add_achievement("Guilde établie", "La guilde compte maintenant 15 membres actifs")
 
-func _on_member_disconnected(player):
+func _on_member_disconnected(player) -> void:
 	"""Réagit à la déconnexion de membres"""
 	# Vérifier si on maintient le minimum requis
 	pass
@@ -537,7 +537,7 @@ func save_phase_data() -> Dictionary:
 		"days_at_rank_1": days_at_rank_1
 	}
 
-func load_phase_data(data: Dictionary):
+func load_phase_data(data: Dictionary) -> void:
 	"""Charge les données de progression des phases"""
 	current_phase = data.get("current_phase", GamePhase.LEVELING)
 	phase_progress = data.get("phase_progress", {})

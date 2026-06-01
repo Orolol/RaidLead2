@@ -224,3 +224,102 @@ func get_advice_counts() -> Dictionary:
 		var s: int = a.get("severity", Severity.TIP)
 		counts[s] = counts.get(s, 0) + 1
 	return counts
+
+# --- Vue "Cette semaine" (audit Priorité 9) ---
+
+func get_weekly_summary() -> Dictionary:
+	"""Synthèse actionnable de la semaine : membres à risque, objectifs accessibles,
+	opportunités de recrutement, contenu conseillé et activités en cours. Toute la
+	logique est ici (testable) ; l'UI (Fenetre_Conseils) ne fait que l'afficher."""
+	var summary: Dictionary = {
+		"members_at_risk": [],
+		"objectives": [],
+		"recommended_content": [],
+		"recruitment": {},
+		"activities": {},
+	}
+	if not GuildManager or not GuildManager.guild:
+		return summary
+
+	var members: Array = GuildManager.guild_members
+
+	# Membres à risque : burnout, stress, moral bas, intégration faible, débauchage probable.
+	for m in members:
+		if m.get_meta("is_player", false):
+			continue
+		var reasons: Array[String] = []
+		if m.burnout_level >= 2:
+			reasons.append("burnout")
+		if m.stress_level >= 65.0:
+			reasons.append("stress %d" % int(m.stress_level))
+		if m.mood < 35.0:
+			reasons.append("moral %d" % int(m.mood))
+		if m.integration < 30.0 and m.days_in_guild > 7:
+			reasons.append("intégration %d%%" % int(m.integration))
+		if not reasons.is_empty():
+			summary.members_at_risk.append({"name": m.nom, "reasons": reasons})
+
+	# Objectifs accessibles : exigences non remplies de la phase, triées par progression décroissante.
+	if PhaseManager and PhaseManager.has_method("get_requirements_progress"):
+		var prog: Dictionary = PhaseManager.get_requirements_progress(PhaseManager.get_current_phase())
+		var unmet: Array = []
+		for req in prog:
+			if not prog[req].get("met", false):
+				unmet.append({
+					"label": _requirement_label(req),
+					"percent": float(prog[req].get("progress_percent", 0.0)),
+				})
+		unmet.sort_custom(func(a, b): return a.percent > b.percent)
+		summary.objectives = unmet
+
+	# Contenu conseillé : instances adaptées au niveau moyen, marquées clear ou non.
+	var avg_level: int = _average_level(members)
+	var suitable: Array = DungeonData.get_instances_for_level(avg_level)
+	var cleared_ids: Array = []
+	if GuildRanking and GuildRanking.has_method("get_player_cleared_content"):
+		cleared_ids = GuildRanking.get_player_cleared_content()
+	for inst in suitable.slice(0, mini(3, suitable.size())):
+		summary.recommended_content.append({
+			"id": inst.id,
+			"name": inst.data.get("name", inst.id),
+			"level": int(inst.data.get("level_recommended", 0)),
+			"cleared": cleared_ids.has(inst.id),
+		})
+
+	# Recrutement : places libres + taille du pool disponible.
+	var guild = GuildManager.guild
+	summary.recruitment = {
+		"free_slots": maxi(0, guild.get_max_members() - members.size()),
+		"pool_size": RecruitmentPool.available_players.size() if RecruitmentPool else 0,
+		"can_recruit": guild.can_recruit(),
+	}
+
+	# Activités en cours des membres en ligne.
+	var by_type: Dictionary = {}
+	var online: Array = GuildManager.get_online_members()
+	for m in online:
+		var label: String = _activity_label(m.current_activity)
+		by_type[label] = int(by_type.get(label, 0)) + 1
+	summary.activities = {"online": online.size(), "by_type": by_type}
+
+	return summary
+
+func _average_level(members: Array) -> int:
+	if members.is_empty():
+		return 1
+	var total: int = 0
+	for m in members:
+		total += m.personnage_niveau
+	return int(round(float(total) / float(members.size())))
+
+func _activity_label(activity) -> String:
+	if activity == null:
+		return "En attente"
+	match activity.type:
+		Activity.ActivityType.LEVELING: return "Leveling"
+		Activity.ActivityType.FARMING: return "Farm"
+		Activity.ActivityType.FUN: return "Détente"
+		Activity.ActivityType.DUNGEON: return "Donjon"
+		Activity.ActivityType.RAID: return "Raid"
+		Activity.ActivityType.OFFLINE: return "Hors-ligne"
+		_: return "En attente"

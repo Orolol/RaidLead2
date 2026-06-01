@@ -44,7 +44,7 @@ var player_cleared_content: Dictionary = {}
 var player_recent_clears: Array = []
 var player_run_history: Array = []
 
-func _ready():
+func _ready() -> void:
 	# Se connecter aux signaux nécessaires
 	if GuildManager:
 		GuildManager.connect("member_recruited", _on_member_recruited)
@@ -70,7 +70,7 @@ func _ready():
 	
 	print("GuildRanking initialisé")
 
-func _initialize_rankings():
+func _initialize_rankings() -> void:
 	"""Initialise les systèmes de classement"""
 	# Les guildes IA seront ajoutées par le système IA
 	ranking_history = {}
@@ -80,7 +80,7 @@ func _initialize_rankings():
 	if GuildManager and GuildManager.guild:
 		ranking_history[GuildManager.guild.name] = []
 
-func register_guild(guild_name: String, is_player_guild: bool = false):
+func register_guild(guild_name: String, is_player_guild: bool = false) -> void:
 	"""Enregistre une guilde dans le système de classement"""
 	if not ranking_history.has(guild_name):
 		ranking_history[guild_name] = []
@@ -174,7 +174,7 @@ func _calculate_stability_score(guild_data: Dictionary) -> float:
 	
 	return stability * 150.0
 
-func update_rankings():
+func update_rankings() -> void:
 	"""Met à jour les classements de toutes les guildes"""
 	var current_phase = PhaseManager.get_current_phase() if PhaseManager else PhaseManager.GamePhase.SERVEUR
 	
@@ -188,7 +188,7 @@ func update_rankings():
 		PhaseManager.GamePhase.ESPORT:
 			_update_world_rankings()
 
-func _update_server_rankings():
+func _update_server_rankings() -> void:
 	"""Met à jour le classement serveur"""
 	var guilds_data = []
 	
@@ -233,13 +233,13 @@ func _update_server_rankings():
 	last_ranking_update = _get_current_date()
 	print("Classement serveur mis à jour - %d guildes" % server_rankings.size())
 
-func _update_national_rankings():
+func _update_national_rankings() -> void:
 	"""Met a jour le classement national (Phase 2)."""
 	var old_national_rankings = national_rankings.duplicate()
 	national_rankings = _build_rankings_for_phase(PhaseManager.GamePhase.NATIONAL)
 	_publish_rankings("national", old_national_rankings, national_rankings)
 
-func _update_world_rankings():
+func _update_world_rankings() -> void:
 	"""Met a jour le classement mondial (Phase 3)."""
 	var old_world_rankings = world_rankings.duplicate()
 	world_rankings = _build_rankings_for_phase(PhaseManager.GamePhase.ESPORT)
@@ -364,7 +364,7 @@ func _calculate_rank_change(guild_name: String, new_position: int) -> int:
 	
 	return old_position - new_position  # Positif si montée, négatif si descente
 
-func _update_ranking_history(guilds_data: Array):
+func _update_ranking_history(guilds_data: Array) -> void:
 	"""Met à jour l'historique des classements"""
 	var current_date = _get_current_date()
 	
@@ -383,7 +383,7 @@ func _update_ranking_history(guilds_data: Array):
 		if ranking_history[guild_name].size() > 50:
 			ranking_history[guild_name] = ranking_history[guild_name].slice(-50)
 
-func _check_position_changes(old_rankings: Array, new_rankings: Array):
+func _check_position_changes(old_rankings: Array, new_rankings: Array) -> void:
 	"""Vérifie les changements de position et émet les signaux appropriés"""
 	# Créer un mapping des anciennes positions
 	var old_positions = {}
@@ -405,7 +405,7 @@ func _check_position_changes(old_rankings: Array, new_rankings: Array):
 				else:
 					print("📉 Notre guilde descend au classement. Position %d -> %d" % [old_position, new_position])
 
-func register_server_first(guild_name: String, content_id: String):
+func register_server_first(guild_name: String, content_id: String) -> void:
 	"""Enregistre un server first pour une guilde"""
 	server_firsts[content_id] = guild_name
 	
@@ -563,38 +563,38 @@ func _trim_player_run_history(max_runs: int = 100) -> void:
 
 # Callbacks des signaux
 
-func _on_week_changed(week: int, year: int):
+func _on_week_changed(week: int, year: int) -> void:
 	"""Met à jour les rankings chaque semaine"""
 	update_rankings()
 
-func _on_member_recruited(player):
+func _on_member_recruited(player) -> void:
 	"""Réagit au recrutement de nouveaux membres"""
 	# Attendre un peu avant de mettre à jour (laisser le temps à l'intégration)
 	get_tree().create_timer(1.0).timeout.connect(update_rankings)
 
-func _on_guild_level_changed(new_level: int):
+func _on_guild_level_changed(new_level: int) -> void:
 	"""Réagit aux changements de niveau de guilde"""
 	# Mettre à jour immédiatement car c'est important pour le score
 	update_rankings()
 
-func _on_activity_completed(player, activity):
+func _on_activity_completed(player, activity) -> void:
 	"""Réagit aux activités terminées"""
 	# Si c'est une activité de donjon/raid, ça peut affecter le ranking
 	if activity and activity.type in [activity.ActivityType.DUNGEON, activity.ActivityType.RAID]:
 		get_tree().create_timer(2.0).timeout.connect(update_rankings)
 
-func _on_phase_changed(new_phase, old_phase):
+func _on_phase_changed(new_phase, old_phase) -> void:
 	"""Réagit aux changements de phase"""
 	print("Changement de phase détecté : mise à jour du système de classement")
 	update_rankings()
 
-func _on_ai_simulation_completed(guilds_data: Array):
+func _on_ai_simulation_completed(guilds_data: Array) -> void:
 	"""Appelé quand la simulation mensuelle des guildes IA est terminée"""
 	# Les données sont déjà intégrées dans les guildes IA
 	# On met juste à jour les rankings
 	update_rankings()
 
-func _on_ai_guild_created(ai_guild: AIGuild):
+func _on_ai_guild_created(ai_guild: AIGuild) -> void:
 	"""Appelé quand une nouvelle guilde IA est créée"""
 	register_guild(ai_guild.name, false)
 
@@ -636,7 +636,7 @@ func save_ranking_data() -> Dictionary:
 		"last_ranking_update": last_ranking_update
 	}
 
-func load_ranking_data(data: Dictionary):
+func load_ranking_data(data: Dictionary) -> void:
 	"""Charge les données de classement"""
 	server_rankings = data.get("server_rankings", [])
 	national_rankings = data.get("national_rankings", [])

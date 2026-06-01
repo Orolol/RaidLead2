@@ -25,23 +25,23 @@ var leveling_zones = {
 	"50-60": ["Cratère d'Un'Goro", "Gangrebois", "Steppes Ardentes", "Maleterres"]
 }
 
-func _ready():
+func _ready() -> void:
 	game_time = GameTime
 	if game_time:
 		# Se connecter au signal minute_changed pour une mise à jour plus granulaire
 		game_time.minute_changed.connect(_on_minute_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 
-func _on_minute_changed(_minute: int, _hour: int):
+func _on_minute_changed(_minute: int, _hour: int) -> void:
 	# Mettre à jour les activités toutes les 5 minutes pour un bon équilibre performance/réalisme
 	if _minute % 5 == 0:
 		_update_all_activities()
 
-func _on_hour_changed(_hour: int):
+func _on_hour_changed(_hour: int) -> void:
 	# Garder une mise à jour horaire pour la rétrocompatibilité
 	pass
 
-func start_activity(player, activity_type, params: Dictionary = {}):
+func start_activity(player, activity_type, params: Dictionary = {}) -> void:
 	if active_activities.has(player):
 		interrupt_activity(player, "Nouvelle activité démarrée")
 	
@@ -91,7 +91,7 @@ func start_activity(player, activity_type, params: Dictionary = {}):
 	
 	activity_started.emit(player, activity)
 
-func interrupt_activity(player, reason: String = "Interruption"):
+func interrupt_activity(player, reason: String = "Interruption") -> void:
 	if not active_activities.has(player):
 		return
 		
@@ -101,7 +101,7 @@ func interrupt_activity(player, reason: String = "Interruption"):
 	
 	activity_interrupted.emit(player, activity, reason)
 
-func _update_all_activities():
+func _update_all_activities() -> void:
 	# Mise à jour par batch pour optimiser les performances
 	var players_to_update = active_activities.keys()
 	var batch_size = 10  # Traiter 10 joueurs à la fois
@@ -111,7 +111,7 @@ func _update_all_activities():
 		for j in range(i, batch_end):
 			_update_player_activity(players_to_update[j])
 
-func _update_player_activity(player):
+func _update_player_activity(player) -> void:
 	if not active_activities.has(player):
 		return
 		
@@ -443,7 +443,7 @@ func update_dungeons(delta: float) -> void:
 		if dungeon.is_active:
 			dungeon.update(delta, game_time)
 
-func _update_player_controlled_activity(player):
+func _update_player_controlled_activity(player) -> void:
 	"""Met à jour l'activité d'un joueur contrôlé manuellement"""
 	if not active_activities.has(player):
 		return
