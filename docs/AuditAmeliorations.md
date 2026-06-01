@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 51 total | 51 réussis | 0 échoués
+TESTS : 52 total | 52 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -68,6 +68,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - UI Progression: le meilleur clear du dernier contenu PvE joue est maintenant affiche depuis `GuildRanking.get_player_best_clear(content_id)`.
 - DungeonInstance: le signal `boss_defeated` respecte maintenant son arite declaree pendant les conflits de loot.
 - Organisation de groupe: la composition PvE affiche maintenant un apercu de run avec score estime, roles manquants et moyennes niveau/equipement/skill.
+- DungeonData: `calculate_difficulty_score()` retourne maintenant `0.0` pour un groupe vide au lieu de risquer une division par zero.
 
 ### Toujours ouvert
 
@@ -437,7 +438,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 51 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 52 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -695,6 +696,7 @@ Ces tâches sont petites mais utiles:
 - [x] afficher le meilleur clear connu du dernier contenu PvE dans `Fenetre_Personnage`;
 - [x] corriger l'emission de `boss_defeated` pendant les conflits de loot;
 - [x] ajouter un apercu de preparation dans `Fenetre_OrganisationGroupe`;
+- [x] proteger `DungeonData.calculate_difficulty_score()` contre les groupes vides;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;

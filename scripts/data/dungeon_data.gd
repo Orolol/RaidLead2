@@ -327,7 +327,7 @@ static func get_group_composition(instance_id: String) -> Dictionary:
 
 static func calculate_difficulty_score(instance_id: String, group: Array) -> float:
 	var instance = get_instance_data(instance_id)
-	if instance.is_empty():
+	if instance.is_empty() or group.is_empty():
 		return 0.0
 		
 	var score = 1.0

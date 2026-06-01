@@ -195,6 +195,7 @@ func _suite_pve_progression(tf) -> void:
 	tf.eq(GuildRanking.get_player_recent_clears().size(), 1, "clear récent exposé au ranking")
 	tf.eq(GuildRanking.get_player_run_history().size(), 1, "historique de run exposé")
 	tf.eq(GuildRanking.get_player_best_clear("deadmines").get("wipes", 0), 1, "meilleur clear conserve les détails")
+	tf.eq(DungeonData.calculate_difficulty_score("deadmines", []), 0.0, "score PvE groupe vide = 0")
 	
 	GuildRanking.player_cleared_content = saved_cleared
 	GuildRanking.player_recent_clears = saved_recent
