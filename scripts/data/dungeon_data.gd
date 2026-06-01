@@ -310,17 +310,20 @@ static func get_group_composition(instance_id: String) -> Dictionary:
 				"DPS": 3
 			}
 		InstanceType.RAID:
+			# Noyau de raid jouable avec un roster de guilde (≤ 20 membres), et non
+			# l'effectif "lore" de 20/40. Le malus de sous-effectif est géré en combat
+			# via _check_group_composition + la difficulté du contenu.
 			if instance.group_size == 20:
+				return {
+					"Tank": 1,
+					"Healer": 3,
+					"DPS": 6
+				}
+			else:  # raids 40 → noyau jouable de 15
 				return {
 					"Tank": 2,
 					"Healer": 4,
-					"DPS": 14
-				}
-			else:  # 40 joueurs
-				return {
-					"Tank": 3,
-					"Healer": 8,
-					"DPS": 29
+					"DPS": 9
 				}
 	
 	return {}

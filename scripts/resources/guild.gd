@@ -79,9 +79,23 @@ func get_recruitment_quality_bonus() -> float:
 func add_gold(amount: int) -> void:
 	var max_gold = get_guild_effects()["gold_storage"]
 	if max_gold > 0:
-		gold = min(gold + amount, max_gold)
+		var new_gold: int = gold + amount
+		if new_gold > max_gold:
+			_notify_gold_overflow(new_gold - max_gold, max_gold)
+			gold = max_gold
+		else:
+			gold = new_gold
 	else:
+		# Avant le palier de stockage (bas niveau), trésorerie non plafonnée.
 		gold += amount
+
+func _notify_gold_overflow(lost: int, cap: int) -> void:
+	"""Signale (best-effort) l'or perdu par débordement de la trésorerie."""
+	if lost <= 0:
+		return
+	var nm = Singletons.get_autoload("NotificationManager")
+	if nm and nm.has_method("show_warning"):
+		nm.show_warning("Trésorerie pleine (%d or) : %d or perdus. Montez le niveau de guilde pour agrandir le stockage." % [cap, lost], "Stockage d'or")
 
 func spend_gold(amount: int) -> bool:
 	if gold >= amount:

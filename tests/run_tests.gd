@@ -30,6 +30,7 @@ func _run_all() -> void:
 	_suite_random(tf)
 	_suite_recruitment_economy(tf)
 	_suite_calendar(tf)
+	_suite_economy(tf)
 	_suite_ui_smoke(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
@@ -279,42 +280,54 @@ func _suite_save_migration(tf) -> void:
 
 func _suite_pve_loop(tf) -> void:
 	tf.suite("PvE Loop")
-	var DungeonRunScript = load("res://scripts/systems/dungeon_run.gd")
+	var DI = load("res://scripts/systems/dungeon_instance.gd")
 	# Composition : Mortemines = 1 Tank / 1 Healer / 3 DPS.
 	var comp_required: Dictionary = DungeonData.get_group_composition("deadmines")
 	tf.eq(int(comp_required.get("Tank", 0)), 1, "compo donjon requiert 1 tank")
 	tf.eq(int(comp_required.get("DPS", 0)), 3, "compo donjon requiert 3 DPS")
+	# Raids jouables : la compo d'un raid 40 tient dans un roster ≤ 20.
+	var raid_comp: Dictionary = DungeonData.get_group_composition("molten_core")
+	var raid_total: int = int(raid_comp.get("Tank", 0)) + int(raid_comp.get("Healer", 0)) + int(raid_comp.get("DPS", 0))
+	tf.ok(raid_total > 0 and raid_total <= 20, "compo de raid 40 tient dans un roster de 20")
 
-	var valid_group: Array = _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 25, 60)
-	var run_valid = DungeonRunScript.new()
-	run_valid.instance_id = "deadmines"
-	run_valid.instance_data = DungeonData.get_instance_data("deadmines")
-	run_valid.group_members = valid_group
-	tf.ok(run_valid._check_group_composition().valid, "composition complète = valide")
+	# DungeonInstance (moteur vivant) : pénalité de composition (1.0 = complète, < 1.0 = rôle manquant).
+	var inst_valid = DI.new()
+	inst_valid.initialize("deadmines", _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 25, 60))
+	tf.approx(inst_valid._check_group_composition(comp_required), 1.0, "composition complète = pas de pénalité")
 
-	var bad_group: Array = _make_group(["Healer", "DPS", "DPS", "DPS"], 25, 60)  # pas de tank
-	var run_bad = DungeonRunScript.new()
-	run_bad.instance_id = "deadmines"
-	run_bad.instance_data = DungeonData.get_instance_data("deadmines")
-	run_bad.group_members = bad_group
-	var bad_comp: Dictionary = run_bad._check_group_composition()
-	tf.ok(not bad_comp.valid, "composition sans tank = invalide")
-	tf.ok(str(bad_comp.missing).find("Tank") != -1, "rôle manquant signalé (Tank)")
+	var inst_bad = DI.new()
+	inst_bad.initialize("deadmines", _make_group(["Healer", "DPS", "DPS", "DPS"], 25, 60))
+	tf.ok(inst_bad._check_group_composition(comp_required) < 1.0, "composition sans tank = pénalité")
 
-	# Déterminisme : même graine + mêmes membres => même résultat de combat de boss.
+	# Chance de réussite : bornée [0.1, 0.95], et un groupe fort > un groupe faible.
+	var strong = DI.new()
+	strong.initialize("deadmines", _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 40, 90))
+	var weak = DI.new()
+	weak.initialize("deadmines", _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 15, 20))
+	var sc_strong: float = strong._calculate_boss_success_chance(1.0)
+	var sc_weak: float = weak._calculate_boss_success_chance(1.0)
+	tf.between(sc_strong, 0.1, 0.95, "chance de réussite bornée")
+	tf.ok(sc_strong > sc_weak, "groupe fort a une meilleure chance que groupe faible")
+
+	# Connaissance de donjon : un clear l'incrémente (familiarité progressive).
+	var grp = _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 30, 70)
+	var inst_k = DI.new()
+	inst_k.initialize("deadmines", grp)
 	var saved_loot: Array = GuildManager.loot_history.duplicate()
-	GameRandom.seed_rng(4242)
-	var g1: Array = _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 30, 70)
-	var r1 = DungeonRunScript.new(); r1.start_run("deadmines", g1)
-	var res1: Dictionary = r1.simulate_boss_fight(0)
-	GameRandom.seed_rng(4242)
-	var g2: Array = _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 30, 70)
-	var r2 = DungeonRunScript.new(); r2.start_run("deadmines", g2)
-	var res2: Dictionary = r2.simulate_boss_fight(0)
-	tf.eq(res1.success, res2.success, "combat de boss reproductible avec graine fixe")
-	tf.approx(float(res1.success_chance), float(res2.success_chance), "chance de succès reproductible", 0.0001)
+	var saved_gold_k: int = GuildManager.guild.gold if GuildManager.guild else 0
+	var saved_cl: Dictionary = GuildRanking.player_cleared_content.duplicate(true)
+	var saved_rc: Array = GuildRanking.player_recent_clears.duplicate(true)
+	var saved_rh: Array = GuildRanking.player_run_history.duplicate(true)
+	var saved_sf: Dictionary = GuildRanking.server_firsts.duplicate(true)
+	inst_k._complete_dungeon()
+	tf.ok(float(grp[0].connaissance_donjons.get("deadmines", 0.0)) >= 10.0, "clear augmente la connaissance du donjon")
 	GuildManager.loot_history = saved_loot
-	GameRandom.randomize_rng()
+	if GuildManager.guild:
+		GuildManager.guild.gold = saved_gold_k
+	GuildRanking.player_cleared_content = saved_cl
+	GuildRanking.player_recent_clears = saved_rc
+	GuildRanking.player_run_history = saved_rh
+	GuildRanking.server_firsts = saved_sf
 
 	# Loot : la table produit un objet d'iLvl cohérent.
 	var LootTablesScript = load("res://scripts/data/loot_tables.gd")
@@ -453,6 +466,42 @@ func _suite_ui_smoke(tf) -> void:
 	tf.ok(win.get("_weekly_box") != null and win._weekly_box.get_child_count() > 0,
 		"onglet 'Cette semaine' peuplé au runtime")
 	win.queue_free()
+
+func _suite_economy(tf) -> void:
+	tf.suite("Économie")
+	var GuildPerks = load("res://scripts/data/guild_perks_data.gd")
+	tf.eq(int(GuildPerks.get_combined_effects(3).get("gold_storage", 0)), 1000, "stockage d'or niv 3 = 1000")
+	tf.ok(int(GuildPerks.get_combined_effects(10).get("gold_storage", 0)) >= 100000, "stockage d'or croît fortement au niv 10")
+	if not (GuildManager and GuildManager.guild):
+		return
+	var g = GuildManager.guild
+	var saved_xp: int = g.xp
+	var saved_gold: int = g.gold
+
+	# Le cap de trésorerie est respecté au niveau 3 (stockage 1000).
+	g.xp = GuildPerks.get_xp_for_level(3)
+	g.gold = 500
+	g.add_gold(5000)
+	tf.eq(g.gold, 1000, "add_gold plafonne au stockage (niv 3)")
+
+	# Un clear de donjon crédite la trésorerie de guilde (revenu PvE).
+	g.xp = 0  # niveau 1 -> stockage 0 -> non plafonné
+	g.gold = 0
+	var saved_cleared: Dictionary = GuildRanking.player_cleared_content.duplicate(true)
+	var saved_recent: Array = GuildRanking.player_recent_clears.duplicate(true)
+	var saved_history: Array = GuildRanking.player_run_history.duplicate(true)
+	var saved_firsts: Dictionary = GuildRanking.server_firsts.duplicate(true)
+	var DI = load("res://scripts/systems/dungeon_instance.gd")
+	var inst = DI.new()
+	inst.initialize("deadmines", _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 25, 60))
+	inst._complete_dungeon()
+	tf.ok(g.gold >= 1, "clear de donjon crédite la trésorerie de guilde")
+	GuildRanking.player_cleared_content = saved_cleared
+	GuildRanking.player_recent_clears = saved_recent
+	GuildRanking.player_run_history = saved_history
+	GuildRanking.server_firsts = saved_firsts
+	g.xp = saved_xp
+	g.gold = saved_gold
 
 func _make_group(roles: Array, level: int, skill: int) -> Array:
 	"""Construit un groupe de SimulatedPlayer avec rôles/niveau/skill fixés (tests PvE)."""

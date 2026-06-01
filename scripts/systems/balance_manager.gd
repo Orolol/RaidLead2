@@ -49,7 +49,8 @@ const BALANCE := {
 	"salary.unpaid_reputation_loss": 3.0,    # réputation perdue si salaires impayés
 	# Réputation
 	"reputation.scout_cost": 2.0,            # coût en réputation d'un scouting
-	# PvE — malus appliqués en combat / aperçu de run
+	# PvE — récompenses & malus appliqués en combat / aperçu de run
+	"pve.gold_reward_mult": 1.0,        # multiplicateur d'or versé à la guilde par clear
 	"pve.low_energy_threshold": 30.0,
 	"pve.low_energy_penalty": 0.7,
 	"pve.low_morale_threshold": 40.0,

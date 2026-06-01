@@ -1,7 +1,6 @@
 extends PanelContainer
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
-const DungeonRunScript = preload("res://scripts/systems/dungeon_run.gd")
 const ActivityScript = preload("res://scripts/resources/activity.gd")
 const ItemScript = preload("res://scripts/resources/item.gd")
 const DraggableItem = preload("res://scripts/ui/components/draggable_item.gd")
@@ -433,13 +432,19 @@ func _check_launch_button():
 		_update_run_preview()
 		return
 	
-	var all_filled = true
+	var total: int = group_slots.size()
+	var filled: int = 0
 	for slot_id in group_slots:
-		if group_slots[slot_id].member == null:
-			all_filled = false
-			break
-	
-	launch_button.disabled = not all_filled or selected_instance == ""
+		if group_slots[slot_id].member != null:
+			filled += 1
+
+	# Donjon : tous les rôles requis. Raid : lancement possible à effectif partiel
+	# (≥ 60 % du noyau), le sous-effectif se paie en combat (malus de composition).
+	var min_required: int = total
+	if selected_activity == "raid":
+		min_required = maxi(5, int(ceil(float(total) * 0.6)))
+
+	launch_button.disabled = filled < min_required or selected_instance == ""
 	_update_run_preview()
 
 func _setup_run_preview() -> void:
@@ -496,7 +501,7 @@ func _update_run_preview() -> void:
 
 	var difficulty_score: float = DungeonDataScript.calculate_difficulty_score(selected_instance, group)
 	var composition_factor: float = 1.0 if missing_roles.is_empty() else 0.65
-	# Reflète les malus appliqués en combat (DungeonRun.simulate_boss_fight) : fatigue et moral.
+	# Reflète les malus appliqués en combat (DungeonInstance) : fatigue et moral.
 	var fatigue_factor: float = 0.7 if avg_energy < 30.0 else 1.0
 	var estimated_score: int = int(clamp(difficulty_score * composition_factor * fatigue_factor * 100.0, 5.0, 95.0))
 	var missing_text: String = "Composition complete"
@@ -625,18 +630,19 @@ func _launch_fun_activity():
 	hide()
 
 func _launch_dungeon_or_raid():
-	# Vérifie que tous les slots sont remplis
+	# Construit le groupe à partir des slots assignés (effectif partiel autorisé pour les raids).
 	var group = []
 	for slot_id in group_slots:
 		var slot = group_slots[slot_id]
-		if slot.member == null:
-			var dialog = AcceptDialog.new()
-			dialog.dialog_text = "Tous les rôles doivent être assignés!"
-			get_tree().root.add_child(dialog)
-			dialog.popup_centered()
-			return
-		group.append(slot.member)
-	
+		if slot.member != null:
+			group.append(slot.member)
+	if group.is_empty():
+		var dialog = AcceptDialog.new()
+		dialog.dialog_text = "Assignez au moins quelques membres avant de lancer."
+		get_tree().root.add_child(dialog)
+		dialog.popup_centered()
+		return
+
 	# Utiliser le nouveau système de donjons via l'ActivityManager
 	var activity_manager = ActivityManager
 	if activity_manager:
