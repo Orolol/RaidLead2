@@ -79,7 +79,7 @@ func _tick_active_sponsors() -> void:
 			if sponsor.satisfaction <= 0.0:
 				# Perte reputation si sponsor mecontent
 				if GuildManager.guild:
-					GuildManager.guild.lose_reputation(10.0, "Sponsor %s mecontent" % sponsor.sponsor_name)
+					GuildManager.guild.lose_reputation(5.0, "Sponsor %s mecontent" % sponsor.sponsor_name)
 
 	for s in expired:
 		active_sponsors.erase(s)

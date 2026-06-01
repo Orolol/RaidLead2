@@ -199,12 +199,17 @@ func get_world_championship_wins() -> int:
 # --- Sauvegarde ---
 
 func serialize() -> Dictionary:
+	var offers: Array = []
+	for t in available_tournaments:
+		offers.append(t.serialize())
 	return {
 		"world_championship_wins": world_championship_wins,
 		"total_tournaments_won": total_tournaments_won,
 		"international_reputation": international_reputation,
 		"bootcamp_bonus": bootcamp_bonus,
 		"weeks_since_offer": weeks_since_offer,
+		"available_tournaments": offers,
+		"last_results": last_results,
 	}
 
 func deserialize(data: Dictionary) -> void:
@@ -213,5 +218,9 @@ func deserialize(data: Dictionary) -> void:
 	international_reputation = data.get("international_reputation", 50.0)
 	bootcamp_bonus = data.get("bootcamp_bonus", 0.0)
 	weeks_since_offer = data.get("weeks_since_offer", 0)
+	last_results = data.get("last_results", {})
+	available_tournaments.clear()
+	for td in data.get("available_tournaments", []):
+		available_tournaments.append(Tournament.deserialize(td))
 	if available_tournaments.is_empty():
 		_seed_offers()

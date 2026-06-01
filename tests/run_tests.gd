@@ -583,6 +583,25 @@ func _suite_facades(tf) -> void:
 		var tres: Dictionary = TournamentManager.participate(null)
 		tf.eq(tres.get("reason", ""), "phase", "tournoi bloqué hors phase Esport")
 		PhaseManager.current_phase = saved_p2
+	# Sponsors : pénalité adoucie (-6) + récupération plus rapide (+4).
+	var sp = load("res://scripts/resources/sponsor.gd").new("Test", "marque_gaming", 100, 12)
+	sp.satisfaction = 50.0
+	sp.tick_week(true)
+	tf.approx(sp.satisfaction, 54.0, "sponsor satisfait récupère +4")
+	sp.satisfaction = 50.0
+	sp.tick_week(false)
+	tf.approx(sp.satisfaction, 44.0, "sponsor non satisfait perd seulement -6")
+	# Tournois : les offres sont désormais sérialisées (survivent au reload).
+	tf.ok(TournamentManager.serialize().has("available_tournaments"), "offres de tournoi sérialisées")
+	# Tag DB : impatient (référencé par le recrutement) est désormais attribuable.
+	tf.ok(PlayerTags.TAG_DATABASE.has("impatient"), "tag impatient présent dans la base")
+	# Circadien branché : un type matin performe mieux le matin, moins tard le soir.
+	var bs2 = GuildManager.behavior_system if GuildManager else null
+	if bs2 and bs2.has_method("apply_circadian_modifier"):
+		var morning := SimulatedPlayer.new()
+		morning.circadian_type = "morning"
+		tf.ok(bs2.apply_circadian_modifier(morning, 8) > 1.0, "circadien matin : bonus le matin")
+		tf.ok(bs2.apply_circadian_modifier(morning, 23) < 1.0, "circadien matin : malus tard le soir")
 
 func _make_group(roles: Array, level: int, skill: int) -> Array:
 	"""Construit un groupe de SimulatedPlayer avec rôles/niveau/skill fixés (tests PvE)."""

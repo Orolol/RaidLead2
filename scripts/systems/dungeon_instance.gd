@@ -257,6 +257,15 @@ func _calculate_boss_success_chance(boss_difficulty: float) -> float:
 	if StaffManager:
 		base_score *= (1.0 + minf(StaffManager.get_total_performance_bonus(), 0.3))
 
+	# Modificateur circadien moyen : les types matin/soir performent mieux/moins selon l'heure.
+	if GuildManager and GuildManager.behavior_system and game_time_node:
+		var bs = GuildManager.behavior_system
+		if bs.has_method("apply_circadian_modifier"):
+			var circ_sum: float = 0.0
+			for member in group_members:
+				circ_sum += bs.apply_circadian_modifier(member, game_time_node.current_hour)
+			base_score *= circ_sum / float(total_members)
+
 	# Appliquer la difficulté
 	var success_chance = base_score / boss_difficulty
 

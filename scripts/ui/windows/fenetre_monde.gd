@@ -1129,12 +1129,20 @@ func _populate_recent_events(list: ItemList, guild_data: Dictionary):
 	var is_player = guild_data.get("is_player", false)
 	
 	if is_player:
-		# Événements pour notre guilde
-		list.add_item("• Recrutement de 2 nouveaux membres")
-		list.add_item("• Clear de Scholomance avec succès")
-		list.add_item("• Organisation d'un événement de guilde")
+		# Événements RÉELS de notre guilde : derniers runs PvE (fini les faits inventés).
+		var added: bool = false
+		if GuildRanking and GuildRanking.has_method("get_player_run_history"):
+			var runs: Array = GuildRanking.get_player_run_history(4)
+			for i in range(runs.size() - 1, -1, -1):
+				var r: Dictionary = runs[i]
+				var wipes: int = int(r.get("wipes", 0))
+				var suffix: String = " (%d wipe(s))" % wipes if wipes > 0 else ""
+				list.add_item("• Clear : %s%s" % [str(r.get("name", r.get("content_id", "?"))), suffix])
+				added = true
+		if not added:
+			list.add_item("• Aucun run PvE récent — composez un groupe dans Organisation")
 	else:
-		# Événements simulés pour les autres guildes
+		# Estimations pour les guildes adverses (information partielle, normal pour un concurrent).
 		var events = [
 			"• Clear d'un nouveau donjon",
 			"• Recrutement d'un joueur expérimenté",
@@ -1155,7 +1163,16 @@ func _get_guild_strengths(guild_data: Dictionary) -> String:
 	var score = guild_data.get("score", 0.0)
 	
 	if is_player:
-		return "Forte cohésion d'équipe, progression équilibrée, gestion active des membres"
+		# Points forts dérivés de l'état RÉEL de la guilde.
+		var parts: Array[String] = []
+		if GuildManager and GuildManager.guild:
+			parts.append("Réputation %d" % int(GuildManager.guild.reputation))
+		var gcm: Node = get_node_or_null("/root/GuildCultureManager")
+		if gcm and gcm.has_method("get_morale_tier"):
+			parts.append("Ambiance %s" % gcm.get_morale_tier())
+		if GuildManager:
+			parts.append("%d membres" % GuildManager.guild_members.size())
+		return ", ".join(parts) if not parts.is_empty() else "Guilde en développement"
 	
 	# Générer des points forts basés sur le score et le nom
 	var strengths = []
