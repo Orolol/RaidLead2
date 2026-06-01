@@ -3,6 +3,7 @@ class_name DungeonInstance
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
 const LootTables = preload("res://scripts/data/loot_tables.gd")
+const PveRunReportScript = preload("res://scripts/systems/pve_run_report.gd")
 
 signal boss_reached(boss_index: int, boss_name: String)
 signal boss_defeated(boss_index: int, boss_name: String, loot_winner: SimulatedPlayer)
@@ -403,19 +404,24 @@ func _complete_dungeon() -> void:
 		var participant_names: Array = []
 		for member in group_members:
 			participant_names.append(member.nom)
+		var total_bosses: int = dungeon_data.get("bosses", []).size()
+		var expected_duration_seconds: float = float(dungeon_data.get("duration_minutes", 60)) * 60.0
+		var run_details: Dictionary = {
+			"duration_seconds": total_time,
+			"gold_reward": gold_reward,
+			"wipes": total_wipes,
+			"bosses_defeated": total_bosses,
+			"total_bosses": total_bosses,
+			"expected_duration_seconds": expected_duration_seconds
+		}
+		run_details["performance_score"] = PveRunReportScript.calculate_performance_score(true, total_time, gold_reward, 0, run_details)
 		GuildRanking.register_player_content_clear(
 			dungeon_id,
 			dungeon_data.get("name", ""),
 			dungeon_data.get("type", -1),
 			DungeonDataScript.is_heroic_dungeon(dungeon_id),
 			participant_names,
-			{
-				"duration_seconds": total_time,
-				"gold_reward": gold_reward,
-				"wipes": total_wipes,
-				"bosses_defeated": dungeon_data.get("bosses", []).size(),
-				"total_bosses": dungeon_data.get("bosses", []).size()
-			}
+			run_details
 		)
 
 	# Progression de phase : compléter un donjon héroïque fait avancer la Phase 0 -> Serveur

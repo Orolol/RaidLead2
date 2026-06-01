@@ -693,6 +693,7 @@ func _format_pve_run_history_item(run_data: Dictionary) -> String:
 	var duration_text: String = _format_duration_seconds(float(run_data.get("duration_seconds", 0.0)))
 	var wipes: int = int(run_data.get("wipes", 0))
 	var gold_reward: int = int(run_data.get("gold_reward", 0))
+	var performance_score: int = int(run_data.get("performance_score", -1))
 	var date_text: String = _format_date(run_data.get("date", {}))
 	var item_text: String = "%s" % content_name
 	
@@ -700,6 +701,9 @@ func _format_pve_run_history_item(run_data: Dictionary) -> String:
 		item_text += "\n   Durée: %s | Wipes: %d | Or: %d" % [duration_text, wipes, gold_reward]
 	else:
 		item_text += "\n   Wipes: %d | Or: %d" % [wipes, gold_reward]
+	
+	if performance_score >= 0:
+		item_text += " | Score: %d" % performance_score
 	
 	if date_text != "":
 		item_text += "\n   %s" % date_text

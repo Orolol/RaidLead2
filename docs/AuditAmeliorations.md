@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 56 total | 56 réussis | 0 échoués
+TESTS : 57 total | 57 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -72,6 +72,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - GuildRanking: les classements National et Mondial ne sont plus des `pass`; ils produisent un ranking base sur les donnees existantes avec un multiplicateur de phase.
 - GuildRanking: le score d'activite retourne maintenant `0.0` pour une guilde vide au lieu de diviser par zero.
 - Rapport PvE: `Fenetre_Loot` devient un rapport de run avec duree, boss, wipes, participants, butin et score de performance.
+- Rapport PvE: le calcul de score est partage via `pve_run_report.gd`, persiste dans l'historique `GuildRanking` et s'affiche dans `Fenetre_Personnage`.
 
 ### Toujours ouvert
 
@@ -441,7 +442,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 56 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 57 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -703,6 +704,7 @@ Ces tâches sont petites mais utiles:
 - [x] brancher un classement National/Mondial minimal dans `GuildRanking`;
 - [x] proteger le score d'activite de `GuildRanking` contre les guildes vides;
 - [x] transformer la fenetre de butin en rapport PvE dedie avec score de performance;
+- [x] persister et afficher le score de performance dans l'historique PvE;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
