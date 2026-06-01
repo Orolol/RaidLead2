@@ -635,8 +635,8 @@ func _load_layouts():
 		var json = JSON.new()
 		var result = json.parse(json_text)
 		
-		if result == OK:
-			var save_data = json.data
+		if result == OK and json.data is Dictionary:
+			var save_data: Dictionary = json.data
 			layouts = save_data.get("layouts", {})
 			window_positions = save_data.get("window_positions", {})
 			current_layout = save_data.get("current_layout", "default")

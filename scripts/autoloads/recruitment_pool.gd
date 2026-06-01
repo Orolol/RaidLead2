@@ -260,9 +260,9 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 	
 	# Vérifie les attentes du joueur
 	var expectations = player.get_meta("expected_activity", {})
-	if expectations.hardcore and guild_data.get("hardcore", false):
+	if expectations.get("hardcore", false) and guild_data.get("hardcore", false):
 		base_chance += 0.15
-	elif not expectations.hardcore and not guild_data.get("hardcore", false):
+	elif not expectations.get("hardcore", false) and not guild_data.get("hardcore", false):
 		base_chance += 0.15
 	
 	# Bonus de réputation de guilde
@@ -296,9 +296,9 @@ func _generate_rejection_reasons(player: SimulatedPlayer, guild_data: Dictionary
 	
 	var expectations = player.get_meta("expected_activity", {})
 	
-	if expectations.hardcore and not guild_data.get("hardcore", false):
+	if expectations.get("hardcore", false) and not guild_data.get("hardcore", false):
 		reasons.append("Cherche une guilde plus compétitive")
-	elif not expectations.hardcore and guild_data.get("hardcore", false):
+	elif not expectations.get("hardcore", false) and guild_data.get("hardcore", false):
 		reasons.append("Préfère une guilde plus casual")
 	
 	if guild_data.guild_size < 10:
