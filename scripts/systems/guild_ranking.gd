@@ -148,6 +148,8 @@ func _calculate_activity_score(guild_data: Dictionary) -> float:
 	"""Calcule le score d'activité des membres"""
 	var active_members = guild_data.get("active_members_count", 0)
 	var total_members = guild_data.get("total_members_count", 1)
+	if total_members <= 0:
+		return 0.0
 	var activity_ratio = float(active_members) / float(total_members)
 	
 	return activity_ratio * 300.0 + active_members * 10.0

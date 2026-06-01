@@ -204,6 +204,7 @@ func _suite_pve_progression(tf) -> void:
 	GuildRanking._update_world_rankings()
 	tf.ok(GuildRanking.national_rankings.size() > 0, "classement national produit des rangs")
 	tf.ok(GuildRanking.world_rankings.size() > 0, "classement mondial produit des rangs")
+	tf.eq(GuildRanking._calculate_activity_score({"active_members_count": 0, "total_members_count": 0}), 0.0, "score activite guilde vide = 0")
 	
 	GuildRanking.player_cleared_content = saved_cleared
 	GuildRanking.player_recent_clears = saved_recent

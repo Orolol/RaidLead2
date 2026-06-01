@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 54 total | 54 réussis | 0 échoués
+TESTS : 55 total | 55 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -70,6 +70,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - Organisation de groupe: la composition PvE affiche maintenant un apercu de run avec score estime, roles manquants et moyennes niveau/equipement/skill.
 - DungeonData: `calculate_difficulty_score()` retourne maintenant `0.0` pour un groupe vide au lieu de risquer une division par zero.
 - GuildRanking: les classements National et Mondial ne sont plus des `pass`; ils produisent un ranking base sur les donnees existantes avec un multiplicateur de phase.
+- GuildRanking: le score d'activite retourne maintenant `0.0` pour une guilde vide au lieu de diviser par zero.
 
 ### Toujours ouvert
 
@@ -439,7 +440,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 54 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 55 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -699,6 +700,7 @@ Ces tâches sont petites mais utiles:
 - [x] ajouter un apercu de preparation dans `Fenetre_OrganisationGroupe`;
 - [x] proteger `DungeonData.calculate_difficulty_score()` contre les groupes vides;
 - [x] brancher un classement National/Mondial minimal dans `GuildRanking`;
+- [x] proteger le score d'activite de `GuildRanking` contre les guildes vides;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
