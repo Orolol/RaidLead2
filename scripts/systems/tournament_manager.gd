@@ -119,6 +119,15 @@ func _member_power(member) -> float:
 
 func participate(tournament) -> Dictionary:
 	"""Simule la participation a un tournoi en bracket et applique les recompenses."""
+	# Garde-fous : réservé à la phase Esport, avec un roster minimum (sinon victoire
+	# par chance sur un effectif vide, et tournois spammables sans enjeu).
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.ESPORT:
+		_notify_tournament_blocked("Les tournois ne sont disponibles qu'en phase Esport.")
+		return {"success": false, "reason": "phase"}
+	if not GuildManager or GuildManager.guild_members.size() < 5:
+		_notify_tournament_blocked("Roster insuffisant : 5 membres minimum pour participer.")
+		return {"success": false, "reason": "roster"}
+
 	var strength: float = get_roster_strength()
 	var strategy: float = StaffManager.get_total_strategy_bonus() if StaffManager else 0.0
 	var stage_reached: int = 0
@@ -141,6 +150,9 @@ func participate(tournament) -> Dictionary:
 	if GuildManager.guild and gold > 0:
 		GuildManager.guild.add_gold(gold)
 	international_reputation = clampf(international_reputation + prestige, 0.0, 100.0)
+	# Échec précoce (éliminé au 1er tour) : vraie pénalité, pour créer un enjeu de préparation.
+	if stage_reached == 0:
+		international_reputation = clampf(international_reputation - 3.0, 0.0, 100.0)
 
 	if is_champion:
 		total_tournaments_won += 1
@@ -172,6 +184,11 @@ func participate(tournament) -> Dictionary:
 	return results
 
 # --- Accesseurs ---
+
+func _notify_tournament_blocked(msg: String) -> void:
+	var nm = get_node_or_null("/root/NotificationManager")
+	if nm and nm.has_method("show_warning"):
+		nm.show_warning(msg, "Tournoi")
 
 func get_international_reputation() -> float:
 	return international_reputation

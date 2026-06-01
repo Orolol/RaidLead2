@@ -576,6 +576,13 @@ func _suite_facades(tf) -> void:
 	dq.tags_comportement = []
 	dq.tags_caches = ["drama_queen"]
 	tf.ok(not DramaManager._has_revealed_tag(dq, "drama_queen"), "tag caché non considéré comme révélé")
+	# Tournoi : garde-fou de phase (pas de participation hors Esport).
+	if TournamentManager and PhaseManager:
+		var saved_p2 = PhaseManager.current_phase
+		PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+		var tres: Dictionary = TournamentManager.participate(null)
+		tf.eq(tres.get("reason", ""), "phase", "tournoi bloqué hors phase Esport")
+		PhaseManager.current_phase = saved_p2
 
 func _make_group(roles: Array, level: int, skill: int) -> Array:
 	"""Construit un groupe de SimulatedPlayer avec rôles/niveau/skill fixés (tests PvE)."""
