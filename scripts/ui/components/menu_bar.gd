@@ -68,12 +68,24 @@ func _update_phase_locks() -> void:
 		if locked:
 			btn.tooltip_text = "Débloqué en %s" % PhaseManager.get_phase_name(PHASE_LOCKS[wname])
 		else:
-			btn.tooltip_text = ""
+			btn.tooltip_text = _shortcut_tooltip(wname, btn.text)
+
+## Raccourcis clavier d'ouverture (gérés dans main.gd) — exposés en tooltip pour la découvrabilité.
+const SHORTCUTS := {
+	"personnage": "P", "guilde": "G", "monde": "M", "organisation": "O",
+	"national": "N", "esport": "E", "cohesion": "K", "social": "K", "conseils": "A",
+}
+
+func _shortcut_tooltip(window_name: String, text: String) -> String:
+	if SHORTCUTS.has(window_name):
+		return "%s (Ctrl+%s)" % [text, SHORTCUTS[window_name]]
+	return text
 
 func _create_menu_button(text: String, window_name: String, callback: Callable) -> Button:
 	var button = Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(150, 50)
+	button.tooltip_text = _shortcut_tooltip(window_name, text)
 	var icon_tex: Texture2D = AssetLoader.get_menu_icon(text)
 	if icon_tex:
 		button.icon = icon_tex

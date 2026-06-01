@@ -121,12 +121,15 @@ func show_member_equipment(member):
 	var total_ilvl = member.get_total_ilvl()
 	total_ilvl_label.text = "iLvl Total: %d" % total_ilvl
 	
-	# Mettre à jour les couleurs selon le niveau d'équipement
-	if total_ilvl >= 200:
+	# Couleur basée sur l'iLvl MOYEN par pièce (5 slots) et non le total, pour
+	# discriminer sur toute la courbe (l'ancien seuil sur le total restait blanc
+	# jusqu'au niveau 60 puis sautait direct en violet).
+	var avg_ilvl: int = total_ilvl / 5
+	if avg_ilvl >= 50:
 		total_ilvl_label.modulate = Color.PURPLE  # Épique
-	elif total_ilvl >= 150:
+	elif avg_ilvl >= 35:
 		total_ilvl_label.modulate = Color.BLUE    # Rare
-	elif total_ilvl >= 100:
+	elif avg_ilvl >= 15:
 		total_ilvl_label.modulate = Color.GREEN   # Peu commun
 	else:
 		total_ilvl_label.modulate = Color.WHITE   # Commun

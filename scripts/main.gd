@@ -93,9 +93,10 @@ func _setup_chat_panel() -> void:
 	chat_panel.custom_minimum_size = Vector2(400, 230)
 	chat_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	chat_panel.offset_left = -420
-	chat_panel.offset_top = -250
+	# Remonté de 70px pour dégager la barre de menu (80px de haut) qui le chevauchait.
+	chat_panel.offset_top = -320
 	chat_panel.offset_right = -20
-	chat_panel.offset_bottom = -20
+	chat_panel.offset_bottom = -90
 	chat_panel.z_index = 10  # Au-dessus du background mais sous les fenêtres
 
 func _connect_phase_notifications() -> void:
