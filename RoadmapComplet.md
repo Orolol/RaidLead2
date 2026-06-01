@@ -651,6 +651,7 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 - **PvE minimal** : clears joueur enregistrés depuis `DungeonInstance`, sauvegardés dans `GuildRanking`, utilisés par le ranking et `PhaseManager.content_cleared_percent`.
 - **ActivityManager** : préférences automatiques Donjon/Raid converties en activités PvE dédiées plutôt qu'en farming.
 - **Historique PvE** : `GuildRanking` expose l'historique des runs joueur et le meilleur clear connu par contenu.
+- **Fenetre_Personnage** : derniers runs PvE affichés dans l'onglet Progression.
 - **Tests** : suite automatisée étendue à 51 assertions, validée avec Godot 4.6.2.
 
 ### Infrastructure UI Phases 1 & 2 (9 jours)

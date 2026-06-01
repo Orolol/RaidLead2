@@ -15,6 +15,7 @@ var current_phase_label: Label
 var phase_progress_list: ItemList
 var requirements_container: VBoxContainer
 var achievements_list: ItemList
+var pve_run_history_list: ItemList
 
 # Éléments de réputation
 var reputation_value_label: Label
@@ -337,6 +338,19 @@ func _setup_achievements_section(parent: HSplitContainer):
 	achievements_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	achievements_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	achievements_panel.add_child(achievements_list)
+	
+	achievements_panel.add_child(HSeparator.new())
+	
+	var runs_title = Label.new()
+	runs_title.text = "⚔️ Derniers runs PvE"
+	runs_title.add_theme_font_size_override("font_size", 16)
+	achievements_panel.add_child(runs_title)
+	
+	pve_run_history_list = ItemList.new()
+	pve_run_history_list.custom_minimum_size = Vector2(260, 160)
+	pve_run_history_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pve_run_history_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	achievements_panel.add_child(pve_run_history_list)
 
 func _on_close_pressed():
 	hide()
@@ -430,6 +444,9 @@ func _refresh_phase_progression():
 	
 	# Mettre à jour les achievements
 	_update_achievements_display()
+	
+	# Mettre à jour l'historique PvE
+	_update_pve_run_history_display()
 
 func _update_requirements_display():
 	"""Met à jour l'affichage des requirements"""
@@ -604,6 +621,65 @@ func _update_achievements_display():
 				achievements_list.set_item_custom_bg_color(item_index, Color(0.5, 0.3, 0.2, 0.3))
 			PhaseManager.GamePhase.ESPORT:
 				achievements_list.set_item_custom_bg_color(item_index, Color(0.5, 0.5, 0.2, 0.3))
+
+func _update_pve_run_history_display() -> void:
+	"""Met à jour l'affichage des derniers runs PvE de la guilde."""
+	pve_run_history_list.clear()
+	
+	if not GuildRanking or not GuildRanking.has_method("get_player_run_history"):
+		pve_run_history_list.add_item("Historique PvE indisponible.")
+		return
+	
+	var runs: Array = GuildRanking.get_player_run_history(5)
+	if runs.is_empty():
+		pve_run_history_list.add_item("Aucun run enregistré pour le moment.")
+		return
+	
+	runs.reverse()
+	for run_data in runs:
+		var item_text: String = _format_pve_run_history_item(run_data)
+		pve_run_history_list.add_item(item_text)
+		
+		var item_index: int = pve_run_history_list.get_item_count() - 1
+		if bool(run_data.get("is_heroic", false)):
+			pve_run_history_list.set_item_custom_bg_color(item_index, Color(0.45, 0.25, 0.08, 0.35))
+		elif int(run_data.get("type", -1)) == DungeonData.InstanceType.RAID:
+			pve_run_history_list.set_item_custom_bg_color(item_index, Color(0.35, 0.18, 0.45, 0.35))
+
+func _format_pve_run_history_item(run_data: Dictionary) -> String:
+	var content_name: String = run_data.get("name", run_data.get("content_id", "Contenu inconnu"))
+	var duration_text: String = _format_duration_seconds(float(run_data.get("duration_seconds", 0.0)))
+	var wipes: int = int(run_data.get("wipes", 0))
+	var gold_reward: int = int(run_data.get("gold_reward", 0))
+	var date_text: String = _format_date(run_data.get("date", {}))
+	var item_text: String = "%s" % content_name
+	
+	if duration_text != "":
+		item_text += "\n   Durée: %s | Wipes: %d | Or: %d" % [duration_text, wipes, gold_reward]
+	else:
+		item_text += "\n   Wipes: %d | Or: %d" % [wipes, gold_reward]
+	
+	if date_text != "":
+		item_text += "\n   %s" % date_text
+	
+	return item_text
+
+func _format_duration_seconds(seconds: float) -> String:
+	if seconds <= 0.0:
+		return ""
+	var total_seconds: int = int(seconds)
+	var minutes: int = int(total_seconds / 60)
+	var remaining_seconds: int = total_seconds % 60
+	return "%02d:%02d" % [minutes, remaining_seconds]
+
+func _format_date(date: Dictionary) -> String:
+	if date.is_empty():
+		return ""
+	return "Année %d, Semaine %d, Jour %d" % [
+		int(date.get("year", 1)),
+		int(date.get("week", 1)),
+		int(date.get("day", 1))
+	]
 
 func _compare_dates(date_a: Dictionary, date_b: Dictionary) -> int:
 	"""Compare deux dates (retourne > 0 si date_a > date_b)"""

@@ -63,10 +63,11 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - PvE minimal: les clears réels de la guilde joueur sont maintenant enregistrés par `DungeonInstance`, sauvegardés dans `GuildRanking`, exposés au ranking et lus par `PhaseManager.content_cleared_percent`.
 - ActivityManager: les préférences automatiques `DUNGEON`/`RAID` créent maintenant des activités PvE dédiées au lieu de retomber sur du farming.
 - Historique PvE: `GuildRanking` conserve aussi un historique des runs joueur avec durée, wipes, récompense et accès au meilleur clear connu.
+- UI Progression: `Fenetre_Personnage` affiche maintenant les derniers runs PvE dans l'onglet Progression.
 
 ### Toujours ouvert
 
-- Le chantier PvE reste le prochain gros morceau: le tracking et l'historique existent maintenant, mais il manque encore un vrai rapport de run affiché au joueur et une résolution PvE plus centrale.
+- Le chantier PvE reste le prochain gros morceau: le tracking et l'historique sont visibles, mais il manque encore un vrai rapport de run dédié et une résolution PvE plus centrale.
 - Les chemins UI directs hors `main.gd` restent à auditer plus largement, même si le cas `PhaseManager -> ChatPanel` est bouclé.
 - L'UX des fenêtres principales reste à reprendre, mais l'onglet Progression de `Fenetre_Personnage` a reçu une première stabilisation de lisibilité.
 
@@ -104,7 +105,7 @@ Points vus:
 Étendre la source de vérité PvE maintenant amorcée dans `GuildRanking`:
 
 - enrichir encore le run: loot obtenu, difficulté, score de performance, incidents sociaux;
-- brancher `get_player_run_history()` et `get_player_best_clear(content_id)` dans une UI;
+- brancher `get_player_best_clear(content_id)` dans une UI de détail ou de rapport de run;
 - décider si ce tracking reste dans `GuildRanking` ou devient un autoload `PveProgression` quand l'historique devient plus riche;
 - brancher une UI de rapport de run et d'historique.
 
@@ -685,6 +686,7 @@ Ces tâches sont petites mais utiles:
 - [x] brancher un tracking minimal des clears PvE joueur dans `GuildRanking` et `PhaseManager`;
 - [x] empêcher les préférences automatiques Donjon/Raid de retomber sur du farming;
 - [x] enregistrer un historique minimal des runs PvE joueur;
+- [x] afficher les derniers runs PvE joueur dans `Fenetre_Personnage`;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
