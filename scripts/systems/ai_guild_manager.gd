@@ -8,8 +8,6 @@ signal monthly_simulation_completed(guilds_data: Array)
 signal poaching_attempt(target_member, source_guild: AIGuild, success: bool)
 
 var ai_guilds: Array[AIGuild] = []
-var simulation_timer: Timer
-var daily_check_timer: Timer
 
 # Configuration par phase
 const GUILD_COUNT_BY_PHASE = {
@@ -62,29 +60,18 @@ func _ready():
 		GameTime.connect("day_changed", _on_day_changed)
 		GameTime.connect("week_changed", _on_week_changed)
 	
-	# Créer les timers de simulation
-	_setup_simulation_timers()
-	
+	# La simulation IA est pilotée par GameTime (_on_day_changed / _on_week_changed),
+	# synchronisée avec la vitesse de jeu (plus de timers temps-réel désynchronisés).
+
 	# Initialiser les guildes pour la phase actuelle
 	_initialize_guilds_for_current_phase()
 	
 	print("AIGuildManager initialisé avec %d guildes" % ai_guilds.size())
 
-func _setup_simulation_timers():
-	"""Configure les timers de simulation"""
-	# Timer pour simulation mensuelle
-	simulation_timer = Timer.new()
-	simulation_timer.wait_time = 300.0  # 5 minutes = 1 mois de jeu
-	simulation_timer.timeout.connect(_run_monthly_simulation)
-	simulation_timer.autostart = true
-	add_child(simulation_timer)
-	
-	# Timer pour vérifications quotidiennes
-	daily_check_timer = Timer.new()
-	daily_check_timer.wait_time = 10.0  # 10 secondes = 1 jour de jeu
-	daily_check_timer.timeout.connect(_run_daily_checks)
-	daily_check_timer.autostart = true
-	add_child(daily_check_timer)
+func _setup_simulation_timers() -> void:
+	# Obsolète : la simulation IA est désormais pilotée par GameTime
+	# (_on_day_changed / _on_week_changed). Conservée vide pour compat d'appel éventuel.
+	pass
 
 func _initialize_guilds_for_current_phase():
 	"""Initialise les guildes pour la phase actuelle"""
@@ -299,16 +286,13 @@ func _on_phase_changed(new_phase, old_phase):
 	call_deferred("_initialize_guilds_for_current_phase")
 
 func _on_day_changed(day: int, week: int, year: int):
-	"""Réagit aux changements de jour"""
-	# Les vérifications quotidiennes sont gérées par le timer
-	pass
+	"""Vérifications quotidiennes (pilotées par GameTime, synchronisées à la vitesse de jeu)."""
+	_run_daily_checks()
 
 func _on_week_changed(week: int, year: int):
-	"""Réagit aux changements de semaine"""
-	# Simulation plus légère chaque semaine
-	if week % 4 == 0:  # Tous les mois
-		# Le timer mensuel s'en charge déjà
-		pass
+	"""Simulation mensuelle toutes les 4 semaines de jeu."""
+	if week % 4 == 0:
+		_run_monthly_simulation()
 
 # API publique pour interactions
 
@@ -392,7 +376,7 @@ func get_debug_info() -> Dictionary:
 	return {
 		"simulation_stats": get_simulation_stats(),
 		"top_guilds": top_guilds_info,
-		"timers_active": simulation_timer.is_stopped() == false
+		"driven_by": "GameTime"
 	}
 
 # Méthodes de sauvegarde/chargement
@@ -420,8 +404,7 @@ func save_ai_guilds_data() -> Dictionary:
 		guilds_data.append(guild_data)
 	
 	return {
-		"ai_guilds": guilds_data,
-		"simulation_timer_time_left": simulation_timer.time_left if simulation_timer else 0.0
+		"ai_guilds": guilds_data
 	}
 
 func load_ai_guilds_data(data: Dictionary):

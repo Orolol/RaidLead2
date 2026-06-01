@@ -7,6 +7,11 @@ const EquipmentScript = preload("res://scripts/resources/equipment.gd")
 const LootTablesScript = preload("res://scripts/data/loot_tables.gd")
 const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.gd")
 
+## Identifiant stable inter-session (get_instance_id() ne survit pas au reload) —
+## utilisé pour persister le graphe social. Généré une fois à la création.
+static var _id_counter: int = 0
+@export var player_id: String = ""
+
 @export var nom: String = ""
 @export var tags_comportement: Array = []  # Tags visibles
 @export var tags_caches: Array = []  # Tags cachés
@@ -74,6 +79,8 @@ const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.
 # Propriétés pour la compatibilité
 
 func _init():
+	_id_counter += 1
+	player_id = "p%d" % _id_counter
 	nom = _generate_random_name()
 	_generate_random_stats()
 	_initialize_behavior_profile()

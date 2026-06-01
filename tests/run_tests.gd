@@ -172,8 +172,34 @@ func _suite_save(tf) -> void:
 	tf.eq(p2.personnage_niveau, 42, "round-trip niveau")
 	tf.approx(p2.stress_level, 55.0, "round-trip stress")
 	tf.eq(p2.skill, 77, "round-trip skill")
+	tf.ok(p.player_id != "", "player_id généré à la création")
+	tf.eq(p2.player_id, p.player_id, "round-trip player_id stable")
+	if p.behavior_profile and p2.behavior_profile:
+		tf.approx(p2.behavior_profile.stress_tolerance, p.behavior_profile.stress_tolerance, "round-trip profil comportemental via SaveManager")
 	var cdata = GuildCultureManager.serialize()
 	tf.ok(cdata.has("guild_morale"), "culture sérialise guild_morale")
+
+	# Round-trip du graphe social (clés player_id stables, traduites au save).
+	var sd = GuildManager.behavior_system.social_dynamics if (GuildManager and GuildManager.behavior_system) else null
+	if sd and GuildManager.guild_members.size() >= 3:
+		var m1 = GuildManager.guild_members[1]
+		var m2 = GuildManager.guild_members[2]
+		if m1.player_id != "" and m2.player_id != "":
+			var saved_rels = sd.relationships.duplicate()
+			var saved_cliques = sd.cliques.duplicate()
+			sd.relationships.clear()
+			sd.cliques.clear()
+			sd.form_relationship(m1, m2, SocialDynamics.RelationType.FRIEND, 0.5)
+			var social_data = sd.serialize()
+			sd.relationships.clear()
+			sd.deserialize(social_data)
+			tf.ok(sd.are_friends(m1, m2), "round-trip social : amitié restaurée après reload")
+			sd.relationships = saved_rels
+			sd.cliques = saved_cliques
+
+	# Round-trip EventManager (cooldowns / one-time).
+	var ev_data = EventManager.serialize()
+	tf.ok(ev_data.has("event_history") and ev_data.has("active_chains"), "EventManager sérialise historique + chaînes")
 
 func _suite_ai_guild(tf) -> void:
 	tf.suite("AIGuild")
@@ -181,6 +207,18 @@ func _suite_ai_guild(tf) -> void:
 	tf.eq(restored.name, "Guilde Restaurée", "restauration conserve le nom sans génération")
 	tf.eq(restored.ai_strategy, AIGuild.Strategy.HARDCORE, "restauration conserve la stratégie")
 	tf.eq(restored.members.size(), 0, "restauration ne génère pas de membres temporaires")
+	# Dédup du contenu cleared (pas de double comptage face au joueur).
+	var ai2: AIGuild = AIGuild.new("Dedup Test", AIGuild.Strategy.BALANCED, false)
+	ai2.recent_achievements = [
+		{"type": "pve_clear", "content": {"id": "deadmines", "name": "x"}},
+		{"type": "pve_clear", "content": {"id": "deadmines", "name": "x"}},
+		{"type": "pve_clear", "content": {"id": "uldaman", "name": "y"}},
+	]
+	tf.eq(ai2._get_cleared_content_ids().size(), 2, "contenu cleared dédupliqué (2 uniques sur 3)")
+	# Progression de niveau : la simulation mensuelle fait monter l'XP.
+	var xp_before: int = ai2.xp
+	ai2.simulate_monthly_progress()
+	tf.ok(ai2.xp > xp_before, "simulation mensuelle fait progresser l'XP de la guilde IA")
 
 func _suite_pve_progression(tf) -> void:
 	tf.suite("PvE Progression")
@@ -273,6 +311,13 @@ func _suite_save_migration(tf) -> void:
 	tf.ok(migrated.has("balance") and migrated["balance"] is Dictionary, "bloc balance matérialisé par la migration")
 	tf.ok(migrated.has("staff") and migrated["staff"] is Dictionary, "bloc staff matérialisé par la migration")
 	tf.eq(migrated["guild"].get("name", ""), "Old Guild", "migration non destructive (guild conservé)")
+	# v2 -> v3 : matérialise les blocs events + social.
+	var legacy_v2: Dictionary = {"save_version": 2, "guild": {"name": "G"}, "members": []}
+	var migrated_v2: Dictionary = SaveManager._migrate_save_data(legacy_v2)
+	tf.eq(int(migrated_v2.get("save_version", 0)), SaveManager.CURRENT_SAVE_VERSION, "migration v2 -> version courante")
+	tf.ok(migrated_v2.has("events") and migrated_v2["events"] is Dictionary, "bloc events matérialisé par la migration")
+	tf.ok(migrated_v2.has("social") and migrated_v2["social"] is Dictionary, "bloc social matérialisé par la migration")
+
 	# Une sauvegarde plus récente que le build est tolérée (best-effort, pas de crash).
 	var future: Dictionary = {"save_version": 9999, "guild": {}}
 	var future_out: Dictionary = SaveManager._migrate_save_data(future)

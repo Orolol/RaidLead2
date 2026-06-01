@@ -28,6 +28,35 @@ class_name BehaviorProfile
 func _init():
 	_randomize_profile()
 
+func serialize() -> Dictionary:
+	"""Sérialise les traits du profil (pour que la personnalité survive au reload)."""
+	return {
+		"stress_tolerance": stress_tolerance,
+		"flexibility": flexibility,
+		"social_needs": social_needs,
+		"achievement_drive": achievement_drive,
+		"routine_preference": routine_preference,
+		"conflict_avoidance": conflict_avoidance,
+		"circadian_type": circadian_type,
+		"burnout_threshold": burnout_threshold,
+		"mood_recovery_rate": mood_recovery_rate,
+		"fatigue_accumulation_rate": fatigue_accumulation_rate,
+		"preferred_session_length": preferred_session_length,
+	}
+
+func deserialize(data: Dictionary) -> void:
+	stress_tolerance = data.get("stress_tolerance", stress_tolerance)
+	flexibility = data.get("flexibility", flexibility)
+	social_needs = data.get("social_needs", social_needs)
+	achievement_drive = data.get("achievement_drive", achievement_drive)
+	routine_preference = data.get("routine_preference", routine_preference)
+	conflict_avoidance = data.get("conflict_avoidance", conflict_avoidance)
+	circadian_type = data.get("circadian_type", circadian_type)
+	burnout_threshold = data.get("burnout_threshold", burnout_threshold)
+	mood_recovery_rate = data.get("mood_recovery_rate", mood_recovery_rate)
+	fatigue_accumulation_rate = data.get("fatigue_accumulation_rate", fatigue_accumulation_rate)
+	preferred_session_length = data.get("preferred_session_length", preferred_session_length)
+
 func _randomize_profile():
 	"""Génère un profil aléatoire mais cohérent"""
 	

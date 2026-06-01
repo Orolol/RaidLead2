@@ -422,6 +422,12 @@ func _complete_dungeon() -> void:
 	# Récompense d'or → trésorerie de guilde : c'est le revenu principal de la boucle PvE.
 	if GuildManager and GuildManager.guild:
 		GuildManager.guild.add_gold(gold_reward)
+		# XP de guilde (fait progresser le niveau, 20% du score de classement).
+		var is_raid_clear: bool = int(dungeon_data.get("type", -1)) == DungeonDataScript.InstanceType.RAID
+		var guild_xp: int = 250 if is_raid_clear else 100
+		if DungeonDataScript.is_heroic_dungeon(dungeon_id):
+			guild_xp += 100
+		GuildManager.guild.gain_xp(guild_xp, "Contenu complété : " + str(dungeon_data.get("name", "")))
 
 	# Part personnelle (flavor) + bonus de moral pour les participants.
 	var member_count: int = max(1, group_members.size())

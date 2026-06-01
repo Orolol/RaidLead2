@@ -493,3 +493,81 @@ func _generate_clique_name() -> String:
 func _invalidate_cache():
 	"""Invalide le cache du graphe social"""
 	social_graph_cache.clear()
+
+# --- Sauvegarde ---
+# On traduit les clés instance_id (volatiles) en player_id stables UNIQUEMENT à la
+# frontière save/load ; le runtime continue d'utiliser get_instance_id() sans changement.
+
+func serialize() -> Dictionary:
+	var rels: Dictionary = {}
+	for key in relationships:
+		var ids: PackedStringArray = key.split(":")
+		if ids.size() != 2:
+			continue
+		var p1 = _get_player_by_id(int(ids[0]))
+		var p2 = _get_player_by_id(int(ids[1]))
+		if not p1 or not p2:
+			continue
+		var rel = relationships[key]
+		rels["%s:%s" % [p1.player_id, p2.player_id]] = {
+			"type": rel.type,
+			"strength": rel.strength,
+			"formed_day": rel.formed_day,
+			"last_interaction_day": rel.last_interaction_day,
+		}
+	var cliques_data: Array = []
+	for c in cliques:
+		var member_ids: Array = []
+		for m in c.members:
+			member_ids.append(m.player_id)
+		cliques_data.append({
+			"name": c.name,
+			"member_ids": member_ids,
+			"leader_id": c.leader.player_id if c.leader else "",
+			"formation_day": c.formation_day,
+			"cohesion": c.cohesion,
+		})
+	return {"relationships": rels, "cliques": cliques_data}
+
+func deserialize(data: Dictionary) -> void:
+	relationships.clear()
+	cliques.clear()
+	var by_pid: Dictionary = _members_by_player_id()
+	var saved_rels: Dictionary = data.get("relationships", {})
+	for key in saved_rels:
+		var ids: PackedStringArray = key.split(":")
+		if ids.size() != 2:
+			continue
+		var p1 = by_pid.get(ids[0])
+		var p2 = by_pid.get(ids[1])
+		if not p1 or not p2:
+			continue
+		var rd: Dictionary = saved_rels[key]
+		var rel = RelationshipData.new(int(rd.get("type", RelationType.NEUTRAL)))
+		rel.strength = float(rd.get("strength", 0.3))
+		rel.formed_day = int(rd.get("formed_day", 0))
+		rel.last_interaction_day = int(rd.get("last_interaction_day", 0))
+		relationships[_get_relationship_key(p1, p2)] = rel
+	for cd in data.get("cliques", []):
+		var members: Array = []
+		for pid in cd.get("member_ids", []):
+			var m = by_pid.get(pid)
+			if m:
+				members.append(m)
+		if members.size() < 2:
+			continue
+		var c = Clique.new()
+		c.name = cd.get("name", "")
+		c.members = members
+		c.leader = by_pid.get(cd.get("leader_id", ""))
+		c.formation_day = int(cd.get("formation_day", 0))
+		c.cohesion = float(cd.get("cohesion", 0.5))
+		cliques.append(c)
+	_invalidate_cache()
+
+func _members_by_player_id() -> Dictionary:
+	var out: Dictionary = {}
+	if GuildManager:
+		for m in GuildManager.guild_members:
+			out[m.player_id] = m
+	return out

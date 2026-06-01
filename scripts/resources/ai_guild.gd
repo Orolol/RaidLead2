@@ -220,7 +220,12 @@ func simulate_monthly_progress():
 	
 	# Mise à jour du focus
 	_update_current_focus()
-	
+
+	# Progression de niveau crédible : XP mensuel adossé à la réputation/stratégie, pour que
+	# le score de niveau (20% du classement) reste disputé face au joueur.
+	var monthly_xp: int = int(120 + reputation * 4.0 + config.raid_focus * 200.0)
+	gain_xp(monthly_xp, "Progression mensuelle")
+
 	print("Progression mensuelle simulée pour %s - Membres: %d, Réputation: %.1f" % [name, members.size(), reputation])
 
 func _simulate_pve_progression():
@@ -537,25 +542,21 @@ func get_guild_data_for_ranking() -> Dictionary:
 	}
 
 func _get_cleared_content_ids() -> Array:
-	"""Retourne les IDs du contenu cleared"""
-	var cleared = []
+	"""Retourne les IDs UNIQUES du contenu cleared (dédupliqués, comme côté joueur)."""
+	var cleared: Dictionary = {}
 	for achievement in recent_achievements:
 		if achievement.type == "pve_clear":
-			cleared.append(achievement.content.id)
-	return cleared
+			cleared[achievement.content.id] = true
+	return cleared.keys()
 
 func _get_recent_clears() -> Array:
-	"""Retourne les clears des 7 derniers jours"""
-	var recent = []
-	var current_date = _get_current_date()
-	
-	for achievement in recent_achievements:
+	"""Retourne les IDs uniques des clears récents (5 derniers achievements, dédupliqués)."""
+	var recent: Dictionary = {}
+	for i in range(maxi(0, recent_achievements.size() - 5), recent_achievements.size()):
+		var achievement = recent_achievements[i]
 		if achievement.type == "pve_clear":
-			# Simplification : considérer les 5 derniers achievements comme récents
-			if recent_achievements.find(achievement) >= recent_achievements.size() - 5:
-				recent.append(achievement.content.id)
-	
-	return recent
+			recent[achievement.content.id] = true
+	return recent.keys()
 
 # Méthodes utilitaires
 

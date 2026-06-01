@@ -7,7 +7,7 @@ const SAVE_PATH := "user://savegame.json"
 const BACKUP_PATH := "user://savegame_backup.json"
 ## Version du format de sauvegarde écrite par ce build. À incrémenter à chaque
 ## changement de format, en ajoutant la migration correspondante dans _build_migrations().
-const CURRENT_SAVE_VERSION := 2
+const CURRENT_SAVE_VERSION := 3
 const AUTOSAVE_WEEK_INTERVAL := 4  # auto-sauvegarde périodique (toutes les 4 semaines de jeu)
 
 ## Blocs systèmes (clés de save) — utilisés par les migrations pour normaliser
@@ -15,7 +15,7 @@ const AUTOSAVE_WEEK_INTERVAL := 4  # auto-sauvegarde périodique (toutes les 4 s
 const _DICT_SYSTEM_BLOCKS := [
 	"game_time", "server_version", "phase", "ranking", "ai_guilds", "guild",
 	"media", "sponsors", "dramas", "staff", "tournaments", "transfers",
-	"legacy", "culture", "balance",
+	"legacy", "culture", "balance", "events", "social",
 ]
 const _ARRAY_SYSTEM_BLOCKS := ["members", "loot_history"]
 
@@ -73,6 +73,8 @@ func save_game() -> bool:
 		"legacy": LegacyManager.serialize(),
 		"culture": GuildCultureManager.serialize(),
 		"balance": BalanceManager.serialize(),
+		"events": EventManager.serialize(),
+		"social": _serialize_social(),
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
@@ -155,6 +157,7 @@ func _build_migrations() -> Dictionary:
 	une migration `version_courante: _migrate_vX_to_vY`."""
 	return {
 		1: _migrate_v1_to_v2,
+		2: _migrate_v2_to_v3,
 	}
 
 func _migrate_save_data(data: Dictionary) -> Dictionary:
@@ -189,6 +192,13 @@ func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 	for key in _ARRAY_SYSTEM_BLOCKS:
 		if not data.has(key) or not (data[key] is Array):
 			data[key] = []
+	return data
+
+func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
+	"""v2 -> v3 : ajoute la persistance des événements (cooldowns/one-time) et du graphe social."""
+	for key in ["events", "social"]:
+		if not data.has(key) or not (data[key] is Dictionary):
+			data[key] = {}
 	return data
 
 func _apply_save_data(data: Dictionary) -> void:
@@ -229,6 +239,11 @@ func _apply_save_data(data: Dictionary) -> void:
 		GuildCultureManager.deserialize(data.culture)
 	if data.has("balance"):
 		BalanceManager.deserialize(data.balance)
+	# Événements et graphe social (après les membres, dont ils dépendent).
+	if data.has("events"):
+		EventManager.deserialize(data.events)
+	if data.has("social"):
+		_deserialize_social(data.social)
 
 func has_save() -> bool:
 	"""Vérifie si une sauvegarde existe."""
@@ -239,6 +254,22 @@ func delete_save() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH)
 		print("SaveManager: sauvegarde supprimée")
+
+# --- Sérialisation du graphe social (via behavior_system.social_dynamics) ---
+
+func _get_social_dynamics():
+	if GuildManager and GuildManager.behavior_system:
+		return GuildManager.behavior_system.social_dynamics
+	return null
+
+func _serialize_social() -> Dictionary:
+	var sd = _get_social_dynamics()
+	return sd.serialize() if sd and sd.has_method("serialize") else {}
+
+func _deserialize_social(data: Dictionary) -> void:
+	var sd = _get_social_dynamics()
+	if sd and sd.has_method("deserialize"):
+		sd.deserialize(data)
 
 # --- Sérialisation Guild ---
 
@@ -291,9 +322,18 @@ func _deserialize_members(data: Array) -> void:
 		_deserialize_player(member, member_data)
 		GuildManager.guild_members.append(member)
 
+	# Avancer le compteur d'id stable au-delà des id chargés (anti-collision avec les futures recrues).
+	var max_id: int = SimulatedPlayer._id_counter
+	for m in GuildManager.guild_members:
+		if m.player_id.begins_with("p"):
+			max_id = maxi(max_id, m.player_id.substr(1).to_int())
+	SimulatedPlayer._id_counter = max_id
+
 func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 	var data: Dictionary = {
 		"nom": player.nom,
+		"player_id": player.player_id,
+		"behavior_profile": player.behavior_profile.serialize() if player.behavior_profile else {},
 		"is_player": player.get_meta("is_player", false),
 		"personnage_classe": player.personnage_classe,
 		"personnage_role": player.personnage_role,
@@ -345,6 +385,9 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 
 func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 	player.nom = data.get("nom", "")
+	player.player_id = data.get("player_id", player.player_id)
+	if data.has("behavior_profile") and player.behavior_profile and player.behavior_profile.has_method("deserialize"):
+		player.behavior_profile.deserialize(data.get("behavior_profile", {}))
 	player.personnage_classe = data.get("personnage_classe", "")
 	player.personnage_role = data.get("personnage_role", "")
 	player.personnage_niveau = data.get("personnage_niveau", 1)

@@ -356,4 +356,21 @@ func get_event_stats() -> Dictionary:
 		"total_events": event_pool.size()
 	}
 
+# --- Sauvegarde ---
+
+func serialize() -> Dictionary:
+	"""Persiste les cooldowns et le gating one-time (sinon des événements uniques se redéclenchent)."""
+	return {
+		"event_history": event_history.duplicate(true),
+		"active_chains": active_chains.duplicate(true),
+		"events_today": events_today,
+		"last_day_count": last_day_count,
+	}
+
+func deserialize(data: Dictionary) -> void:
+	event_history = data.get("event_history", {})
+	active_chains = data.get("active_chains", {})
+	events_today = int(data.get("events_today", 0))
+	last_day_count = int(data.get("last_day_count", 0))
+
 # Méthodes de contrôle supprimées - utilise process_mode PAUSABLE
