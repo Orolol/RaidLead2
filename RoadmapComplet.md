@@ -653,6 +653,7 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 - **Historique PvE** : `GuildRanking` expose l'historique des runs joueur et le meilleur clear connu par contenu.
 - **Fenetre_Personnage** : derniers runs PvE affichés dans l'onglet Progression.
 - **ChatPanel** : fin de donjon enrichie en mini rapport avec durée, boss, wipes et or.
+- **Fenetre_Personnage** : meilleur clear du dernier contenu PvE affiché depuis `GuildRanking.get_player_best_clear(content_id)`.
 - **Tests** : suite automatisée étendue à 51 assertions, validée avec Godot 4.6.2.
 
 ### Infrastructure UI Phases 1 & 2 (9 jours)

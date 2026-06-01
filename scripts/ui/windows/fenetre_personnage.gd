@@ -15,6 +15,7 @@ var current_phase_label: Label
 var phase_progress_list: ItemList
 var requirements_container: VBoxContainer
 var achievements_list: ItemList
+var pve_best_clear_label: Label
 var pve_run_history_list: ItemList
 
 # Éléments de réputation
@@ -346,6 +347,13 @@ func _setup_achievements_section(parent: HSplitContainer):
 	runs_title.add_theme_font_size_override("font_size", 16)
 	achievements_panel.add_child(runs_title)
 	
+	pve_best_clear_label = Label.new()
+	pve_best_clear_label.text = "Meilleur clear: aucun run enregistre."
+	pve_best_clear_label.add_theme_font_size_override("font_size", 12)
+	pve_best_clear_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pve_best_clear_label.modulate = Color(0.78, 0.82, 0.92)
+	achievements_panel.add_child(pve_best_clear_label)
+	
 	pve_run_history_list = ItemList.new()
 	pve_run_history_list.custom_minimum_size = Vector2(260, 160)
 	pve_run_history_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -627,13 +635,17 @@ func _update_pve_run_history_display() -> void:
 	pve_run_history_list.clear()
 	
 	if not GuildRanking or not GuildRanking.has_method("get_player_run_history"):
+		pve_best_clear_label.text = "Meilleur clear: indisponible."
 		pve_run_history_list.add_item("Historique PvE indisponible.")
 		return
 	
 	var runs: Array = GuildRanking.get_player_run_history(5)
 	if runs.is_empty():
+		pve_best_clear_label.text = "Meilleur clear: aucun run enregistre."
 		pve_run_history_list.add_item("Aucun run enregistré pour le moment.")
 		return
+	
+	_update_pve_best_clear_display(runs[runs.size() - 1])
 	
 	runs.reverse()
 	for run_data in runs:
@@ -645,6 +657,36 @@ func _update_pve_run_history_display() -> void:
 			pve_run_history_list.set_item_custom_bg_color(item_index, Color(0.45, 0.25, 0.08, 0.35))
 		elif int(run_data.get("type", -1)) == DungeonData.InstanceType.RAID:
 			pve_run_history_list.set_item_custom_bg_color(item_index, Color(0.35, 0.18, 0.45, 0.35))
+
+func _update_pve_best_clear_display(latest_run: Dictionary) -> void:
+	"""Affiche le meilleur clear connu pour le dernier contenu joue."""
+	if not GuildRanking or not GuildRanking.has_method("get_player_best_clear"):
+		pve_best_clear_label.text = "Meilleur clear: indisponible."
+		return
+	
+	var content_id: String = str(latest_run.get("content_id", ""))
+	if content_id == "":
+		pve_best_clear_label.text = "Meilleur clear: contenu inconnu."
+		return
+	
+	var best_clear: Dictionary = GuildRanking.get_player_best_clear(content_id)
+	if best_clear.is_empty():
+		pve_best_clear_label.text = "Meilleur clear: aucun detail."
+		return
+	
+	var content_name: String = best_clear.get("name", content_id)
+	var duration_text: String = _format_duration_seconds(float(best_clear.get("duration_seconds", 0.0)))
+	var wipes: int = int(best_clear.get("wipes", 0))
+	var gold_reward: int = int(best_clear.get("gold_reward", 0))
+	var date_text: String = _format_date(best_clear.get("date", {}))
+	
+	if duration_text == "":
+		pve_best_clear_label.text = "Meilleur clear %s : %d wipe(s), %d or" % [content_name, wipes, gold_reward]
+	else:
+		pve_best_clear_label.text = "Meilleur clear %s : %s, %d wipe(s), %d or" % [content_name, duration_text, wipes, gold_reward]
+	
+	if date_text != "":
+		pve_best_clear_label.text += " - %s" % date_text
 
 func _format_pve_run_history_item(run_data: Dictionary) -> String:
 	var content_name: String = run_data.get("name", run_data.get("content_id", "Contenu inconnu"))
