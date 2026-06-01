@@ -298,7 +298,7 @@ func _on_boss_defeated() -> void:
 					}
 					GuildManager.loot_conflict_occurred.emit(conflict)
 					# Ne pas distribuer maintenant, le signal gère la suite
-					boss_defeated.emit(current_boss_index, boss_name, null, looted_item)
+					boss_defeated.emit(current_boss_index, boss_name, null)
 
 					# Continuer la progression normalement
 					wipe_count = 0
