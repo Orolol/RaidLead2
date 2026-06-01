@@ -851,3 +851,22 @@ Ces problèmes ont été **confirmés indépendamment par plusieurs agents** et 
 4. **Boucler la persistance** : social + events + runs/tournois, avec `id` membre stable (synthèse #4).
 5. **Brancher les façades** : célébrité→recrut/débauchage, staff→PvE, gating de phase (synthèse #5/#6).
 6. **Aligner l'UI cœur** sur le standard récent + corriger le multi-fenêtres mort et le chevauchement chat (E).
+
+## Suivi d'implémentation — passe 2 (1er juin 2026)
+
+Implémenté et validé (suite de tests passée de 57 → **123 assertions**, 100 % vertes ; `Main.tscn` démarre sans erreur ; 96 scripts compilent) :
+
+- ✅ **Économie** : l'or PvE est versé à la guilde à chaque clear (tunable `pve.gold_reward_mult`) ; `gold_storage` croît avec le niveau (1k→250k) au lieu du cap dur à 1000 ; débordement notifié.
+- ✅ **Moteur PvE unifié** : `DungeonRun` (mort) supprimé ; perks de guilde (réussite raid, réduction conflits DKP), connaissance de donjon et équité de loot branchés dans `DungeonInstance` ; XP de guilde au clear restaurée.
+- ✅ **Raids jouables** : compos réduites à un noyau (40→15, 20→10) ; lancement à effectif partiel pour les raids.
+- ✅ **Robustesse PvE** : résolution de boss en temps de jeu (plus d'`await` temps-réel) ; progression monotone ; plancher de réussite ; division par zéro corrigée.
+- ✅ **Guildes IA** : pilotées par `GameTime` (plus de timers muraux) ; score de contenu dédupliqué ; progression de niveau crédible.
+- ✅ **Persistance** : `player_id` stable ; graphe social (relations/cliques), profils comportementaux et état d'`EventManager` (cooldowns/one-time) sauvegardés ; `save_version` 2→3 + migrations.
+- ✅ **Façades branchées** : staff→PvE, célébrité→débauchage/recrutement, stabilité→réputation ; `tick_celebrity_weekly` mort supprimé.
+- ✅ **Gating de phase** : médias/sponsors/dramas gatés à la phase Nationale ; `drama_queen` caché ne déclenche plus de drama avant révélation.
+- ✅ **Comportements** : `_get_current_day` en jour absolu ; mémoire émotionnelle (évolution des profils) ; influence `STUDENT` ; purge des caches au départ d'un membre.
+- ✅ **National/Esport** : audience plafonnée (anti-runaway) ; tournois gardés (phase Esport + roster ≥ 5) ; pénalité d'élimination précoce.
+- ✅ **Nettoyage** : `EventBus` (mort, non autoloadé) et `Main_old.tscn` supprimés ; crash latent `expectations.hardcore` corrigé ; garde de type sur le chargement de layout.
+- ✅ **UI** : chat ne chevauche plus la barre de menu ; couleur d'iLvl sur la moyenne par pièce ; tooltips de raccourcis sur les boutons de menu.
+
+Reportés (notés dans les commits, valeur/risque moindre) : migration des ~37 `get_node("/root/..")`, `print()`→logger, enrichissement de la base de tags ; refonte complète de la connexion dynamique, circadien→perf, refonte `PersonalEvents` ; soft-lock sponsors, persistance des offres de tournoi ; multi-fenêtres mort, drag&drop d'équipement, unification `UIConstants`/`UITheme`, données factices de la fenêtre Monde.
