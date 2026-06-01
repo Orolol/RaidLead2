@@ -200,6 +200,7 @@ func _suite_pve_progression(tf) -> void:
 	tf.eq(GuildRanking.get_player_run_history().size(), 1, "historique de run exposé")
 	tf.eq(GuildRanking.get_player_best_clear("deadmines").get("wipes", 0), 1, "meilleur clear conserve les détails")
 	tf.eq(DungeonData.calculate_difficulty_score("deadmines", []), 0.0, "score PvE groupe vide = 0")
+	tf.ok(FenetreLoot.calculate_performance_score(true, 900.0, 75, 2, {"bosses_defeated": 3, "total_bosses": 3, "wipes": 0, "expected_duration_seconds": 1200.0}) >= 85, "rapport PvE score un run propre haut")
 	GuildRanking._update_national_rankings()
 	GuildRanking._update_world_rankings()
 	tf.ok(GuildRanking.national_rankings.size() > 0, "classement national produit des rangs")

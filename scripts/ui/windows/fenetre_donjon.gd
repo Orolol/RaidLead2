@@ -317,8 +317,28 @@ func _show_loot_window(success: bool, total_time: float, gold_reward: int, reaso
 	var dungeon_name = "Donjon"
 	if current_instance and current_instance.dungeon_data.has("name"):
 		dungeon_name = str(current_instance.dungeon_data.get("name"))
+	var run_details: Dictionary = _build_run_report_details()
 
 	if loot_window.has_method("show_loot_summary"):
-		loot_window.show_loot_summary(dungeon_name, success, total_time, gold_reward, loot_data, reason)
+		loot_window.show_loot_summary(dungeon_name, success, total_time, gold_reward, loot_data, reason, run_details)
 	else:
 		loot_window.popup_centered()
+
+func _build_run_report_details() -> Dictionary:
+	if not current_instance:
+		return {}
+	
+	var participants: Array[String] = []
+	for member in current_instance.group_members:
+		if member:
+			participants.append(member.nom)
+	
+	var bosses: Array = current_instance.dungeon_data.get("bosses", [])
+	return {
+		"content_id": current_instance.dungeon_id,
+		"participants": participants,
+		"bosses_defeated": min(current_instance.current_boss_index, bosses.size()),
+		"total_bosses": bosses.size(),
+		"wipes": current_instance.total_wipes,
+		"expected_duration_seconds": float(current_instance.dungeon_data.get("duration_minutes", 60)) * 60.0
+	}

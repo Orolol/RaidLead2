@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 55 total | 55 réussis | 0 échoués
+TESTS : 56 total | 56 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -71,10 +71,11 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - DungeonData: `calculate_difficulty_score()` retourne maintenant `0.0` pour un groupe vide au lieu de risquer une division par zero.
 - GuildRanking: les classements National et Mondial ne sont plus des `pass`; ils produisent un ranking base sur les donnees existantes avec un multiplicateur de phase.
 - GuildRanking: le score d'activite retourne maintenant `0.0` pour une guilde vide au lieu de diviser par zero.
+- Rapport PvE: `Fenetre_Loot` devient un rapport de run avec duree, boss, wipes, participants, butin et score de performance.
 
 ### Toujours ouvert
 
-- Le chantier PvE reste le prochain gros morceau: le tracking, l'historique, le meilleur clear et le résumé chat sont visibles, mais il manque encore un vrai rapport de run dédié et une résolution PvE plus centrale.
+- Le chantier PvE reste le prochain gros morceau: le tracking, l'historique, le meilleur clear, le résumé chat et un rapport de run dédié sont visibles; il manque encore une résolution PvE plus centrale.
 - Les chemins UI directs hors `main.gd` restent à auditer plus largement, même si le cas `PhaseManager -> ChatPanel` est bouclé.
 - L'UX des fenêtres principales reste à reprendre, mais l'onglet Progression de `Fenetre_Personnage` a reçu une première stabilisation de lisibilité.
 
@@ -440,7 +441,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 55 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 56 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -701,6 +702,7 @@ Ces tâches sont petites mais utiles:
 - [x] proteger `DungeonData.calculate_difficulty_score()` contre les groupes vides;
 - [x] brancher un classement National/Mondial minimal dans `GuildRanking`;
 - [x] proteger le score d'activite de `GuildRanking` contre les guildes vides;
+- [x] transformer la fenetre de butin en rapport PvE dedie avec score de performance;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
