@@ -211,6 +211,8 @@ func remove_member(player, was_voluntary: bool = true) -> void:
 		if guild:
 			guild.on_member_departure(player.nom, was_voluntary)
 		guild_members.erase(player)
+		if behavior_system and behavior_system.has_method("forget_player"):
+			behavior_system.forget_player(player)
 
 func get_online_members() -> Array:
 	var online = []

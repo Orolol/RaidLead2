@@ -183,6 +183,8 @@ func get_influence_on_player(player) -> float:
 					influence += base_influence * 1.2
 				RelationType.MENTOR:
 					influence += base_influence * 1.5
+				RelationType.STUDENT:
+					influence += base_influence * 1.3
 				RelationType.RIVAL:
 					influence += base_influence * 0.8
 				RelationType.ENEMY:

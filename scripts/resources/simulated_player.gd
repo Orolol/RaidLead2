@@ -251,6 +251,8 @@ func _check_tag_reveals():
 
 func trigger_loot_conflict():
 	loot_conflicts += 1
+	if behavior_profile:
+		behavior_profile.adjust_from_experience("social_conflict", "negative")
 	_check_tag_reveals()
 
 func trigger_wipe():
@@ -259,12 +261,13 @@ func trigger_wipe():
 	add_stress(4.0)  # La pression des wipes alimente le stress competitif
 	last_wipe_day = _get_current_day()
 	
-	# Réaction selon le profil comportemental
+	# Réaction selon le profil comportemental + mémoire émotionnelle (le profil évolue).
 	if behavior_profile:
 		var stress_response = behavior_profile.get_stress_response(fatigue_accumulated)
 		mood += stress_response.get("mood_impact", 0)
 		energy += stress_response.get("energy_impact", 0)
-	
+		behavior_profile.adjust_from_experience("raid_wipe", "repeated")
+
 	_check_tag_reveals()
 
 func trigger_raid_success():
@@ -275,6 +278,8 @@ func trigger_raid_success():
 	# Réduction de fatigue et de stress après succès
 	fatigue_accumulated = max(0, fatigue_accumulated - 10)
 	reduce_stress(5.0)
+	if behavior_profile:
+		behavior_profile.adjust_from_experience("raid_success", "positive")
 	
 	_check_tag_reveals()
 
@@ -707,15 +712,11 @@ func _initialize_activity_preferences():
 			activity_preferences["FARMING"] *= 1.2
 
 func _get_current_day() -> int:
-	"""Obtient le jour actuel du jeu"""
+	"""Jour ABSOLU écoulé (et non current_day 1-7 qui se réinitialise chaque semaine,
+	ce qui faussait les calculs "jours depuis le dernier wipe/succès/loot")."""
 	var game_time = Singletons.get_autoload("GameTime")
-	if game_time:
-		# GameTime pourrait être un autoload, essayer de le récupérer depuis l'arbre
-		var tree = Engine.get_main_loop()
-		if tree and tree.root:
-			var gt = tree.root.get_node_or_null("/root/GameTime")
-			if gt:
-				return gt.current_day
+	if game_time and game_time.has_method("get_total_days_elapsed"):
+		return game_time.get_total_days_elapsed()
 	return 0
 
 func equip_epic_item(item):

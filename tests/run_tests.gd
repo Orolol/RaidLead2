@@ -101,6 +101,12 @@ func _suite_player(tf) -> void:
 	p.stress_level = 20.0
 	tf.approx(p.get_esport_performance_factor(), 1.0, "perf esport au stress bas", 0.01)
 	tf.ok(typeof(p.get_role()) == TYPE_STRING, "get_role renvoie une String")
+	# Behavior wiring : jour absolu + mémoire émotionnelle (profil qui évolue).
+	tf.eq(p._get_current_day(), GameTime.get_total_days_elapsed(), "_get_current_day utilise le jour absolu")
+	if p.behavior_profile:
+		p.behavior_profile.achievement_drive = 0.5
+		p.trigger_raid_success()
+		tf.ok(p.behavior_profile.achievement_drive > 0.5, "un succès de raid fait évoluer le profil comportemental")
 
 func _suite_balance(tf) -> void:
 	tf.suite("BalanceManager")

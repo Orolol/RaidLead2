@@ -20,6 +20,12 @@ var last_cache_update: int = -1
 # Horaires personnalisés par joueur (minute précise de connexion/déconnexion prévue)
 var player_scheduled_times: Dictionary = {}  # player -> {next_connection: int, next_disconnection: int}
 
+func forget_player(player) -> void:
+	"""Purge les caches d'un membre qui quitte la guilde (évite une fuite de références :
+	player_scheduled_times n'était jamais nettoyé au départ d'un membre)."""
+	player_scheduled_times.erase(player)
+	connection_probability_cache.erase(player)
+
 func _ready():
 	game_time = GameTime
 	guild_manager = GuildManager
