@@ -198,8 +198,9 @@ func _on_dungeon_started(dungeon_instance):
 		dungeon_instance.boss_defeated.connect(_on_boss_defeated)
 	if not dungeon_instance.boss_failed.is_connected(_on_boss_failed):
 		dungeon_instance.boss_failed.connect(_on_boss_failed)
-	if not dungeon_instance.dungeon_completed.is_connected(_on_dungeon_completed):
-		dungeon_instance.dungeon_completed.connect(_on_dungeon_completed)
+	var completion_callback = _on_dungeon_completed.bind(dungeon_instance)
+	if not dungeon_instance.dungeon_completed.is_connected(completion_callback):
+		dungeon_instance.dungeon_completed.connect(completion_callback)
 	if not dungeon_instance.loot_distributed.is_connected(_on_loot_distributed):
 		dungeon_instance.loot_distributed.connect(_on_loot_distributed)
 
@@ -217,10 +218,25 @@ func _on_boss_failed(boss_index: int, boss_name: String, wipe_count: int):
 	var msg = "Wipe sur %s (tentative #%d)" % [boss_name, wipe_count]
 	add_message(msg, "error")
 
-func _on_dungeon_completed(total_time: float, gold_reward: int):
-	var minutes = int(total_time) / 60
+func _on_dungeon_completed(total_time: float, gold_reward: int, dungeon_instance = null):
+	var minutes = int(int(total_time) / 60)
 	var seconds = int(total_time) % 60
-	var msg = "Donjon terminé en %02d:%02d ! Récompense : %d or" % [minutes, seconds, gold_reward]
+	var dungeon_name = "Donjon"
+	var boss_count = 0
+	var wipe_count = 0
+	if dungeon_instance:
+		dungeon_name = dungeon_instance.dungeon_data.get("name", dungeon_name)
+		boss_count = dungeon_instance.dungeon_data.get("bosses", []).size()
+		wipe_count = dungeon_instance.total_wipes
+	
+	var msg = "Rapport %s : terminé en %02d:%02d, %d boss, %d wipe(s), %d or" % [
+		dungeon_name,
+		minutes,
+		seconds,
+		boss_count,
+		wipe_count,
+		gold_reward
+	]
 	add_message(msg, "dungeon")
 	
 	# Notification toast pour succès de donjon
