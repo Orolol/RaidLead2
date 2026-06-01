@@ -655,6 +655,7 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 - **ChatPanel** : fin de donjon enrichie en mini rapport avec durée, boss, wipes et or.
 - **Fenetre_Personnage** : meilleur clear du dernier contenu PvE affiché depuis `GuildRanking.get_player_best_clear(content_id)`.
 - **DungeonInstance** : émission de `boss_defeated` corrigée pendant les conflits de loot pour respecter la signature du signal.
+- **Fenetre_OrganisationGroupe** : aperçu de run ajouté avec score estimé, rôles manquants et moyennes niveau/équipement/skill.
 - **Tests** : suite automatisée étendue à 51 assertions, validée avec Godot 4.6.2.
 
 ### Infrastructure UI Phases 1 & 2 (9 jours)

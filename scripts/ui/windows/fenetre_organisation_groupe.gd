@@ -19,6 +19,7 @@ var available_members_scroll: ScrollContainer
 var group_composition: VBoxContainer
 var group_slots: Dictionary = {}
 var draggable_members: Array = []
+var run_preview_label: Label
 
 var guild_members: Array = []
 var selected_activity: String = ""
@@ -256,6 +257,7 @@ func _update_group_composition():
 		child.queue_free()
 	
 	group_slots.clear()
+	run_preview_label = null
 	
 	if selected_activity == "" or selected_instance == "":
 		return
@@ -283,6 +285,7 @@ func _update_group_composition():
 					_add_role_slot("Healer", 1)
 					_add_role_slot("DPS", 3)
 	
+		_setup_run_preview()
 	_check_launch_button()
 
 func _add_role_slot(role: String, count: int):
@@ -427,6 +430,7 @@ func _unassign_member_from_slot(slot_id: String):
 func _check_launch_button():
 	if selected_activity == "fun":
 		launch_button.disabled = false
+		_update_run_preview()
 		return
 	
 	var all_filled = true
@@ -436,6 +440,98 @@ func _check_launch_button():
 			break
 	
 	launch_button.disabled = not all_filled or selected_instance == ""
+	_update_run_preview()
+
+func _setup_run_preview() -> void:
+	group_composition.add_child(HSeparator.new())
+	
+	run_preview_label = Label.new()
+	run_preview_label.text = "Apercu: assignez un groupe pour estimer le run."
+	run_preview_label.add_theme_font_size_override("font_size", 12)
+	run_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	run_preview_label.modulate = Color(0.78, 0.82, 0.92)
+	group_composition.add_child(run_preview_label)
+
+func _update_run_preview() -> void:
+	if not is_instance_valid(run_preview_label) or selected_instance == "" or selected_activity == "fun":
+		return
+	
+	var instance_data: Dictionary = DungeonDataScript.get_instance_data(selected_instance)
+	if instance_data.is_empty():
+		run_preview_label.text = "Apercu: instance inconnue."
+		return
+	
+	var group: Array[SimulatedPlayer] = _get_assigned_group()
+	var required: Dictionary = DungeonDataScript.get_group_composition(selected_instance)
+	var required_count: int = int(instance_data.get("group_size", _count_required_members(required)))
+	var group_count: int = group.size()
+	var missing_roles: Array[String] = _get_missing_roles(required, group)
+	
+	if group.is_empty():
+		run_preview_label.text = "Apercu %s : 0/%d membres. Assignez les roles pour voir le score." % [
+			instance_data.get("name", selected_instance),
+			required_count
+		]
+		return
+	
+	var avg_level: float = 0.0
+	var avg_equipment: float = 0.0
+	var avg_skill: float = 0.0
+	for member in group:
+		avg_level += float(member.personnage_niveau)
+		avg_equipment += float(member.get_total_ilvl())
+		avg_skill += float(member.skill)
+	avg_level /= float(group_count)
+	avg_equipment /= float(group_count)
+	avg_skill /= float(group_count)
+	
+	var difficulty_score: float = DungeonDataScript.calculate_difficulty_score(selected_instance, group)
+	var composition_factor: float = 1.0 if missing_roles.is_empty() else 0.65
+	var estimated_score: int = int(clamp(difficulty_score * composition_factor * 100.0, 5.0, 95.0))
+	var missing_text: String = "Composition complete"
+	if not missing_roles.is_empty():
+		missing_text = "Manque: %s" % ", ".join(missing_roles)
+	
+	run_preview_label.text = "Apercu %s : %d/%d membres | Score estime %d%%\nNiv. %.1f / iLvl %.1f / Skill %.1f | %s" % [
+		instance_data.get("name", selected_instance),
+		group_count,
+		required_count,
+		estimated_score,
+		avg_level,
+		avg_equipment,
+		avg_skill,
+		missing_text
+	]
+
+func _get_assigned_group() -> Array[SimulatedPlayer]:
+	var group: Array[SimulatedPlayer] = []
+	for slot_id in group_slots:
+		var slot = group_slots[slot_id]
+		if slot.member != null:
+			group.append(slot.member)
+	return group
+
+func _get_missing_roles(required: Dictionary, group: Array[SimulatedPlayer]) -> Array[String]:
+	var actual: Dictionary = {}
+	for role in required:
+		actual[role] = 0
+	for member in group:
+		var role: String = member.get_role()
+		if actual.has(role):
+			actual[role] = int(actual[role]) + 1
+	
+	var missing: Array[String] = []
+	for role in required:
+		var deficit: int = int(required[role]) - int(actual.get(role, 0))
+		if deficit > 0:
+			missing.append("%d %s" % [deficit, role])
+	return missing
+
+func _count_required_members(required: Dictionary) -> int:
+	var total: int = 0
+	for role in required:
+		total += int(required[role])
+	return total
 
 func _refresh_available_members():
 	# Nettoyer les anciens DraggableItems

@@ -67,6 +67,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - Chat: la fin d'un donjon affiche maintenant un mini rapport avec nom du contenu, durée, boss, wipes et or.
 - UI Progression: le meilleur clear du dernier contenu PvE joue est maintenant affiche depuis `GuildRanking.get_player_best_clear(content_id)`.
 - DungeonInstance: le signal `boss_defeated` respecte maintenant son arite declaree pendant les conflits de loot.
+- Organisation de groupe: la composition PvE affiche maintenant un apercu de run avec score estime, roles manquants et moyennes niveau/equipement/skill.
 
 ### Toujours ouvert
 
@@ -693,6 +694,7 @@ Ces tâches sont petites mais utiles:
 - [x] enrichir le message de fin de donjon dans le chat;
 - [x] afficher le meilleur clear connu du dernier contenu PvE dans `Fenetre_Personnage`;
 - [x] corriger l'emission de `boss_defeated` pendant les conflits de loot;
+- [x] ajouter un apercu de preparation dans `Fenetre_OrganisationGroupe`;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;
