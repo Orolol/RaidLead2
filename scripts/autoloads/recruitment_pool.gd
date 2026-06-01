@@ -240,6 +240,12 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 	
 	var base_chance: float = BalanceManager.tunable_float("recruitment.base_chance", 0.5)
 	var recruitment_difficulty = player.get_meta("recruitment_difficulty", 0.5)
+
+	# Bonus de célébrité : des membres connus rendent la guilde plus attractive (max +0.2).
+	var celeb_bonus: float = 0.0
+	for m in GuildManager.guild_members:
+		celeb_bonus += m.get_celebrity_bonus_recruitment()
+	base_chance += minf(celeb_bonus, 0.2)
 	
 	# Facteurs positifs
 	if guild_data.has("recent_raid_success") and guild_data.recent_raid_success:

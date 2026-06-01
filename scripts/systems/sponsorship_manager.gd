@@ -37,6 +37,9 @@ func _ready() -> void:
 	_refresh_pool()
 
 func _on_week_changed(_week: int, _year: int) -> void:
+	# Les sponsors n'existent qu'à partir de la phase Nationale.
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.NATIONAL:
+		return
 	weeks_since_last_scandal += 1
 	weeks_since_refresh += 1
 

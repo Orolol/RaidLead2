@@ -253,6 +253,10 @@ func _calculate_boss_success_chance(boss_difficulty: float) -> float:
 	avg_knowledge /= float(total_members)
 	base_score *= (1.0 + avg_knowledge / 200.0)
 
+	# Bonus du staff professionnel (coach/analyste) — rend l'investissement staff visible en PvE.
+	if StaffManager:
+		base_score *= (1.0 + minf(StaffManager.get_total_performance_bonus(), 0.3))
+
 	# Appliquer la difficulté
 	var success_chance = base_score / boss_difficulty
 

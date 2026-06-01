@@ -31,6 +31,7 @@ func _run_all() -> void:
 	_suite_recruitment_economy(tf)
 	_suite_calendar(tf)
 	_suite_economy(tf)
+	_suite_facades(tf)
 	_suite_ui_smoke(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
@@ -547,6 +548,28 @@ func _suite_economy(tf) -> void:
 	GuildRanking.server_firsts = saved_firsts
 	g.xp = saved_xp
 	g.gold = saved_gold
+
+func _suite_facades(tf) -> void:
+	tf.suite("Façades branchées")
+	# Gating de phase : à la phase Leveling, le tick drama ne crée pas de drama national.
+	if PhaseManager and DramaManager:
+		var saved_phase = PhaseManager.current_phase
+		PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+		var before: int = DramaManager.active_dramas.size()
+		DramaManager._on_week_changed(1, 1)
+		tf.eq(DramaManager.active_dramas.size(), before, "aucun drama national déclenché en phase Leveling")
+		PhaseManager.current_phase = saved_phase
+	# Célébrité → risque de débauchage (façade désormais branchée).
+	var celeb := SimulatedPlayer.new()
+	celeb.celebrity_level = 90.0
+	tf.ok(celeb.get_celebrity_poaching_risk() > 0.0, "membre célèbre = risque de débauchage")
+	celeb.celebrity_level = 10.0
+	tf.eq(celeb.get_celebrity_poaching_risk(), 0.0, "membre peu connu = pas de risque")
+	# drama_queen caché ne doit pas être considéré comme révélé.
+	var dq := SimulatedPlayer.new()
+	dq.tags_comportement = []
+	dq.tags_caches = ["drama_queen"]
+	tf.ok(not DramaManager._has_revealed_tag(dq, "drama_queen"), "tag caché non considéré comme révélé")
 
 func _make_group(roles: Array, level: int, skill: int) -> Array:
 	"""Construit un groupe de SimulatedPlayer avec rôles/niveau/skill fixés (tests PvE)."""

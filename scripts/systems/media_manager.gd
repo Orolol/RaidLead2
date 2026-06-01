@@ -21,6 +21,9 @@ func _ready() -> void:
 		GameTime.week_changed.connect(_on_week_changed)
 
 func _on_week_changed(_week: int, _year: int) -> void:
+	# Les médias/célébrité ne s'activent qu'à partir de la phase Nationale.
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.NATIONAL:
+		return
 	_update_celebrity()
 	_update_streamers()
 	_check_media_events()

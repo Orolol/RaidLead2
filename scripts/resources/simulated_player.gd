@@ -433,13 +433,8 @@ func get_celebrity_poaching_risk() -> float:
 		return 0.2
 	return 0.0
 
-func tick_celebrity_weekly() -> void:
-	"""Mise a jour hebdomadaire de la celebrite."""
-	# Decroissance naturelle
-	update_celebrity(-1.0)
-	# Bonus si haut skill
-	if skill > 80:
-		update_celebrity(0.5)
+# (tick_celebrity_weekly supprimé : la célébrité est gérée par MediaManager._update_celebrity,
+#  cette version était du code mort qui doublonnait la logique.)
 
 # --- Stress competitif & Burnout (Phase Esport) ---
 

@@ -74,9 +74,22 @@ func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	for member in guild_members:
 		member.increment_days_in_guild()
 
-func _on_week_changed(_week: int, _year: int) -> void:
+func _on_week_changed(week: int, _year: int) -> void:
 	# Verse les salaires des recrues semi-pro (Phase Nationale)
 	_pay_salaries()
+	# Bonus mensuel de stabilité d'équipe : une équipe intégrée gagne en réputation.
+	if week % 4 == 0:
+		_apply_stability_bonus()
+
+func _apply_stability_bonus() -> void:
+	"""Récompense la stabilité : forte intégration moyenne → gain de réputation (US 5.x)."""
+	if not guild or guild_members.is_empty():
+		return
+	var total_integration: float = 0.0
+	for m in guild_members:
+		total_integration += m.integration
+	if total_integration / float(guild_members.size()) >= 60.0:
+		guild.on_team_stability_bonus()
 
 func get_total_weekly_salaries() -> int:
 	"""Masse salariale hebdomadaire totale (recrues nationales)."""

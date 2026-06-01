@@ -226,8 +226,15 @@ func _calculate_member_leave_probability(member, offer: Dictionary) -> float:
 		base_probability += 0.15
 	if offer.get("leadership_role", false):
 		base_probability += 0.1
-	
-	return clamp(base_probability, 0.05, 0.8)
+
+	# La célébrité rend un membre plus convoité : risque de départ accru.
+	if target_member_has_celebrity_risk(member):
+		base_probability += member.get_celebrity_poaching_risk()
+
+	return clamp(base_probability, 0.05, 0.85)
+
+func target_member_has_celebrity_risk(member) -> bool:
+	return member != null and member.has_method("get_celebrity_poaching_risk")
 
 func _add_recruited_member_to_ai_guild(guild: AIGuild, recruited_member):
 	"""Ajoute un membre recruté à une guilde IA"""
