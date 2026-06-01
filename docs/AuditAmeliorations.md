@@ -870,3 +870,16 @@ Implémenté et validé (suite de tests passée de 57 → **123 assertions**, 10
 - ✅ **UI** : chat ne chevauche plus la barre de menu ; couleur d'iLvl sur la moyenne par pièce ; tooltips de raccourcis sur les boutons de menu.
 
 Reportés (notés dans les commits, valeur/risque moindre) : migration des ~37 `get_node("/root/..")`, `print()`→logger, enrichissement de la base de tags ; refonte complète de la connexion dynamique, circadien→perf, refonte `PersonalEvents` ; soft-lock sponsors, persistance des offres de tournoi ; multi-fenêtres mort, drag&drop d'équipement, unification `UIConstants`/`UITheme`, données factices de la fenêtre Monde.
+
+### Lot reporté — traité ensuite (1er juin 2026, suite)
+
+La majorité des reportés ci-dessus a été reprise dans une seconde passe (suite de tests **123 → 131 assertions**, vertes) :
+
+- ✅ **Sponsors** : soft-lock assoupli (pénalité -10→-6, récup +2→+4, `no_scandal_weeks` 4→2) ; **offres de tournoi persistées** (+ `last_results`).
+- ✅ **Données factices** : la fenêtre Monde affiche désormais les vrais derniers runs/réputation/moral pour la guilde du joueur (les IA gardent des estimations, normal pour un concurrent).
+- ✅ **Tags** : `impatient` ajouté à la base (sa branche de recrutement était morte).
+- ✅ **Circadien → PvE** : le modificateur matin/soir s'applique à la réussite de combat.
+- ✅ **Absences planifiées** : consommées par le système de connexion (un membre en « absence » ne se connecte plus) ; `start_day` en jour absolu.
+- ✅ **Santé du code** : chemin enfant fragile `"/root/GuildManager/BehaviorSystem"` remplacé par `GuildManager.behavior_system` ; prints horaires d'`EventManager` gardés en build debug.
+
+Restent volontairement reportés (à faire avec validation **visuelle** via l'éditeur/MCP, ou design à trancher) : refonte complète de la connexion dynamique (`should_connect_dynamic`) et routage de la pool `PersonalEvents` ; **drag&drop d'équipement**, unification `UIConstants`/`UITheme`, décision sur le code multi-fenêtres mort ; migration de masse des `get_node("/root/..")` restants et `print()`→logger complet.
