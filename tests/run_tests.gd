@@ -171,6 +171,10 @@ func _suite_pve_progression(tf) -> void:
 	var saved_recent: Array = GuildRanking.player_recent_clears.duplicate(true)
 	var saved_history: Array = GuildRanking.player_run_history.duplicate(true)
 	var saved_firsts: Dictionary = GuildRanking.server_firsts.duplicate(true)
+	var saved_national_rankings: Array = GuildRanking.national_rankings.duplicate(true)
+	var saved_world_rankings: Array = GuildRanking.world_rankings.duplicate(true)
+	var saved_ranking_history: Dictionary = GuildRanking.ranking_history.duplicate(true)
+	var saved_last_ranking_update: Dictionary = GuildRanking.last_ranking_update.duplicate(true)
 	
 	GuildRanking.player_cleared_content = {}
 	GuildRanking.player_recent_clears = []
@@ -196,11 +200,19 @@ func _suite_pve_progression(tf) -> void:
 	tf.eq(GuildRanking.get_player_run_history().size(), 1, "historique de run exposé")
 	tf.eq(GuildRanking.get_player_best_clear("deadmines").get("wipes", 0), 1, "meilleur clear conserve les détails")
 	tf.eq(DungeonData.calculate_difficulty_score("deadmines", []), 0.0, "score PvE groupe vide = 0")
+	GuildRanking._update_national_rankings()
+	GuildRanking._update_world_rankings()
+	tf.ok(GuildRanking.national_rankings.size() > 0, "classement national produit des rangs")
+	tf.ok(GuildRanking.world_rankings.size() > 0, "classement mondial produit des rangs")
 	
 	GuildRanking.player_cleared_content = saved_cleared
 	GuildRanking.player_recent_clears = saved_recent
 	GuildRanking.player_run_history = saved_history
 	GuildRanking.server_firsts = saved_firsts
+	GuildRanking.national_rankings = saved_national_rankings
+	GuildRanking.world_rankings = saved_world_rankings
+	GuildRanking.ranking_history = saved_ranking_history
+	GuildRanking.last_ranking_update = saved_last_ranking_update
 
 func _suite_activity_manager(tf) -> void:
 	tf.suite("ActivityManager")

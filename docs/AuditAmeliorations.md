@@ -39,7 +39,7 @@ TESTS : 39 total | 39 réussis | 0 échoués
 Résultat après les chantiers de stabilisation suivants:
 
 ```text
-TESTS : 52 total | 52 réussis | 0 échoués
+TESTS : 54 total | 54 réussis | 0 échoués
 ```
 
 Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de ma première tentative, mais la suite de tests dédiée passe correctement avec la version 4.6.2 indiquée.
@@ -69,6 +69,7 @@ Note: le `--check-only` avec Godot 4.5 avait laissé un process suspendu lors de
 - DungeonInstance: le signal `boss_defeated` respecte maintenant son arite declaree pendant les conflits de loot.
 - Organisation de groupe: la composition PvE affiche maintenant un apercu de run avec score estime, roles manquants et moyennes niveau/equipement/skill.
 - DungeonData: `calculate_difficulty_score()` retourne maintenant `0.0` pour un groupe vide au lieu de risquer une division par zero.
+- GuildRanking: les classements National et Mondial ne sont plus des `pass`; ils produisent un ranking base sur les donnees existantes avec un multiplicateur de phase.
 
 ### Toujours ouvert
 
@@ -300,7 +301,7 @@ Beaucoup de systèmes utilisent `randf()`, `randi()`, `pick_random()`. Pour un j
 
 Exemples:
 
-- Phase 2 et Phase 3 du classement encore TODO dans `GuildRanking`.
+- Phase 2 et Phase 3 du classement avaient encore des `pass` dans `GuildRanking`. Corrige par un ranking de base reutilisant les donnees existantes; l'equilibrage fin reste a faire.
 - `content_cleared_percent` encore placeholder.
 - PvE clear réel pas encore branché au ranking.
 - certains flux de national/esport semblent en place mais probablement pas encore équilibrés ni éprouvés.
@@ -438,7 +439,7 @@ Créer une vue "Cette semaine":
 
 ### Ce qui est bien
 
-Le repo a déjà un mini framework et 52 tests. C'est une excellente base. Les tests couvrent notamment:
+Le repo a déjà un mini framework et 54 tests. C'est une excellente base. Les tests couvrent notamment:
 
 - items/équipement;
 - stress et burnout;
@@ -697,6 +698,7 @@ Ces tâches sont petites mais utiles:
 - [x] corriger l'emission de `boss_defeated` pendant les conflits de loot;
 - [x] ajouter un apercu de preparation dans `Fenetre_OrganisationGroupe`;
 - [x] proteger `DungeonData.calculate_difficulty_score()` contre les groupes vides;
+- [x] brancher un classement National/Mondial minimal dans `GuildRanking`;
 - [x] faire utiliser la vraie réputation dans `GuildRanking`;
 - [x] supprimer le double `register_guild`;
 - [x] mettre la doc à jour sur Godot 4.6.2;

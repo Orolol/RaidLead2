@@ -232,14 +232,71 @@ func _update_server_rankings():
 	print("Classement serveur mis à jour - %d guildes" % server_rankings.size())
 
 func _update_national_rankings():
-	"""Met à jour le classement national (Phase 2)"""
-	# TODO: Implémenter pour Phase 2
-	pass
+	"""Met a jour le classement national (Phase 2)."""
+	var old_national_rankings = national_rankings.duplicate()
+	national_rankings = _build_rankings_for_phase(PhaseManager.GamePhase.NATIONAL)
+	_publish_rankings("national", old_national_rankings, national_rankings)
 
 func _update_world_rankings():
-	"""Met à jour le classement mondial (Phase 3)"""
-	# TODO: Implémenter pour Phase 3
-	pass
+	"""Met a jour le classement mondial (Phase 3)."""
+	var old_world_rankings = world_rankings.duplicate()
+	world_rankings = _build_rankings_for_phase(PhaseManager.GamePhase.ESPORT)
+	_publish_rankings("mondial", old_world_rankings, world_rankings)
+
+func _build_rankings_for_phase(phase: int) -> Array:
+	var guilds_data: Array = _collect_guilds_for_ranking()
+	
+	for guild_data in guilds_data:
+		var base_score: float = calculate_guild_score(guild_data["name"], guild_data)
+		guild_data["score"] = base_score * _get_phase_score_multiplier(guild_data, phase)
+	
+	guilds_data.sort_custom(func(a, b): return a["score"] > b["score"])
+	
+	for i in range(guilds_data.size()):
+		guilds_data[i]["position"] = i + 1
+		guilds_data[i]["rank_change"] = _calculate_rank_change(guilds_data[i]["name"], i + 1)
+	
+	return guilds_data
+
+func _collect_guilds_for_ranking() -> Array:
+	var guilds_data: Array = []
+	
+	if GuildManager and GuildManager.guild:
+		var player_guild_data: Dictionary = _get_player_guild_data()
+		player_guild_data["is_player"] = true
+		guilds_data.append(player_guild_data)
+	
+	if AIGuildManager:
+		var ai_guilds: Array = AIGuildManager.get_all_guilds()
+		for ai_guild in ai_guilds:
+			var ai_guild_data: Dictionary = ai_guild.get_guild_data_for_ranking()
+			ai_guild_data["is_player"] = false
+			guilds_data.append(ai_guild_data)
+	
+	return guilds_data
+
+func _get_phase_score_multiplier(guild_data: Dictionary, phase: int) -> float:
+	var reputation: float = float(guild_data.get("reputation", 50.0))
+	var cleared_content: Array = guild_data.get("cleared_content", [])
+	var raid_clears: int = 0
+	for content_id in cleared_content:
+		if _is_raid_content(str(content_id)):
+			raid_clears += 1
+	
+	match phase:
+		PhaseManager.GamePhase.NATIONAL:
+			return 1.0 + min(cleared_content.size() * 0.02, 0.20) + clamp((reputation - 50.0) / 500.0, -0.05, 0.15)
+		PhaseManager.GamePhase.ESPORT:
+			return 1.0 + min(raid_clears * 0.05, 0.30) + clamp((reputation - 60.0) / 400.0, -0.05, 0.20)
+		_:
+			return 1.0
+
+func _publish_rankings(scope_name: String, old_rankings: Array, new_rankings: Array) -> void:
+	_update_ranking_history(new_rankings)
+	ranking_updated.emit(new_rankings)
+	_check_position_changes(old_rankings, new_rankings)
+	last_ranking_update = _get_current_date()
+	print("Classement %s mis Ã  jour - %d guildes" % [scope_name, new_rankings.size()])
 
 func _get_player_guild_data() -> Dictionary:
 	"""Récupère les données de la guilde du joueur pour le classement"""
