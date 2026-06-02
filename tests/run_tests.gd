@@ -36,6 +36,7 @@ func _run_all() -> void:
 	_suite_economy(tf)
 	_suite_facades(tf)
 	_suite_ui_smoke(tf)
+	_suite_chat_director(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
 	print(tf.summary())
@@ -783,3 +784,57 @@ func _make_group(roles: Array, level: int, skill: int) -> Array:
 		p.mood = 80.0
 		group.append(p)
 	return group
+
+func _suite_chat_director(tf) -> void:
+	tf.suite("ChatDirector (Phase A)")
+
+	# Corpus chargé
+	tf.eq(ChatDirector.get_corpus_size(), 40, "corpus ambient = 40 lignes")
+
+	# Grammaire inline {a|b|c}
+	var expanded: String = ChatDirector._expand("{alpha|beta|gamma}")
+	tf.ok(expanded in ["alpha", "beta", "gamma"], "expand {a|b|c} -> un choix")
+	tf.eq(ChatDirector._expand("texte simple"), "texte simple", "expand sans accolades = identite")
+
+	# Veto de classe : la ligne 'eau' est reservee aux mages
+	var mage := SimulatedPlayer.new()
+	mage.personnage_classe = "Mage"
+	var warrior := SimulatedPlayer.new()
+	warrior.personnage_classe = "Guerrier"
+	var water_line := {"requires_class": "Mage", "text": "free water"}
+	tf.ok(ChatDirector._passes_vetos(water_line, mage), "veto classe : mage passe")
+	tf.ok(not ChatDirector._passes_vetos(water_line, warrior), "veto classe : non-mage bloque")
+
+	# Bavardise : social > solitaire (a humeur egale)
+	var chatty := SimulatedPlayer.new()
+	chatty.mood = 80.0
+	chatty.tags_comportement = ["social"]
+	var quiet := SimulatedPlayer.new()
+	quiet.mood = 80.0
+	quiet.tags_comportement = ["solitaire"]
+	tf.ok(ChatDirector._talkativeness(chatty) > ChatDirector._talkativeness(quiet), "social plus bavard que solitaire")
+
+	# Emission de bout en bout : 2 membres en ligne -> une ligne sort
+	var emitted: Array = []
+	var cb: Callable = func(_speaker_name, text, _channel): emitted.append(text)
+	ChatDirector.line_emitted.connect(cb)
+	var a := SimulatedPlayer.new()
+	a.nom = "TesteurA"
+	a.player_id = "chat_test_a"
+	a.is_online = true
+	a.mood = 80.0
+	a.personnage_classe = "Guerrier"
+	var b := SimulatedPlayer.new()
+	b.nom = "TesteurB"
+	b.player_id = "chat_test_b"
+	b.is_online = true
+	b.mood = 80.0
+	b.personnage_classe = "Guerrier"
+	GuildManager.guild_members.append(a)
+	GuildManager.guild_members.append(b)
+	var ok_emit: bool = ChatDirector.debug_force_ambient()
+	tf.ok(ok_emit, "debug_force_ambient emet une ligne avec des membres en ligne")
+	tf.ok(emitted.size() >= 1 and String(emitted[0]).strip_edges() != "", "ligne emise non vide")
+	GuildManager.guild_members.erase(a)
+	GuildManager.guild_members.erase(b)
+	ChatDirector.line_emitted.disconnect(cb)
