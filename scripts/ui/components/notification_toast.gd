@@ -50,19 +50,19 @@ const TYPE_ICONS = {
 	Type.ACHIEVEMENT: "★"
 }
 
-func _ready():
+func _ready() -> void:
 	_setup_ui()
 	_setup_timer()
 	_apply_notification_data()
 	_animate_entrance()
 
-func _setup_ui():
+func _setup_ui() -> void:
 	"""Configure la structure UI du toast"""
 	custom_minimum_size = Vector2(350, 80)
 	size_flags_horizontal = Control.SIZE_SHRINK_END
-	
+
 	# Container horizontal principal
-	var hbox = HBoxContainer.new()
+	var hbox := HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 10)
 	add_child(hbox)
 	
@@ -76,7 +76,7 @@ func _setup_ui():
 	hbox.add_child(icon_label)
 	
 	# Container vertical pour titre et message
-	var vbox = VBoxContainer.new()
+	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", 2)
 	hbox.add_child(vbox)
@@ -120,18 +120,18 @@ func _setup_ui():
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
 
-func _setup_timer():
+func _setup_timer() -> void:
 	"""Configure le timer de fermeture automatique"""
 	dismiss_timer = Timer.new()
 	dismiss_timer.one_shot = true
 	dismiss_timer.timeout.connect(_on_timer_timeout)
 	add_child(dismiss_timer)
 
-func _apply_notification_data():
+func _apply_notification_data() -> void:
 	"""Applique les données de notification"""
 	if notification_data.is_empty():
 		return
-	
+
 	var type = notification_data.get("type", Type.INFO)
 	var title = notification_data.get("title", "Notification")
 	var message = notification_data.get("text", "")
@@ -146,7 +146,7 @@ func _apply_notification_data():
 	auto_dismiss_time = duration
 	
 	# Style du panel
-	var style = StyleBoxFlat.new()
+	var style := StyleBoxFlat.new()
 	style.bg_color = color
 	style.corner_radius_top_left = 8
 	style.corner_radius_top_right = 8
@@ -173,38 +173,38 @@ func _apply_notification_data():
 		progress_bar.max_value = auto_dismiss_time
 		progress_bar.value = auto_dismiss_time
 
-func _animate_entrance():
+func _animate_entrance() -> void:
 	"""Animation d'apparition"""
 	# Commencer hors écran à droite
-	var original_pos = position
+	var original_pos := position
 	position.x += size.x + 20
 	modulate.a = 0.0
-	
+
 	# Animer vers la position finale
-	var tween = create_tween()
+	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "position:x", original_pos.x, 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	tween.tween_property(self, "modulate:a", 1.0, 0.3)
 
-func _animate_exit():
+func _animate_exit() -> void:
 	"""Animation de sortie"""
 	if is_dismissing:
 		return
-	
+
 	is_dismissing = true
-	
-	var tween = create_tween()
+
+	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "position:x", position.x + size.x + 20, 0.3).set_ease(Tween.EASE_IN)
 	tween.tween_property(self, "modulate:a", 0.0, 0.3)
 	tween.finished.connect(_on_animation_finished)
 
-func _on_animation_finished():
+func _on_animation_finished() -> void:
 	"""Appelé quand l'animation de sortie est terminée"""
 	dismissed.emit()
 	queue_free()
 
-func _on_gui_input(event: InputEvent):
+func _on_gui_input(event: InputEvent) -> void:
 	"""Gère les interactions avec le toast"""
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -212,55 +212,55 @@ func _on_gui_input(event: InputEvent):
 			# Optionnel: fermer après clic
 			# dismiss()
 
-func _on_mouse_entered():
+func _on_mouse_entered() -> void:
 	"""Pause le timer quand la souris survole"""
 	if dismiss_timer and dismiss_timer.time_left > 0:
 		dismiss_timer.paused = true
 		progress_bar.modulate = Color(1, 1, 1, 0.5)
 
-func _on_mouse_exited():
+func _on_mouse_exited() -> void:
 	"""Reprend le timer quand la souris quitte"""
 	if dismiss_timer and dismiss_timer.time_left > 0:
 		dismiss_timer.paused = false
 		progress_bar.modulate = Color(1, 1, 1, 0.3)
 
-func _on_close_pressed():
+func _on_close_pressed() -> void:
 	"""Ferme le toast"""
 	dismiss()
 
-func _on_timer_timeout():
+func _on_timer_timeout() -> void:
 	"""Timer expiré, fermer le toast"""
 	dismiss()
 
-func _process(delta: float):
+func _process(delta: float) -> void:
 	"""Met à jour la barre de progression"""
 	if dismiss_timer and not dismiss_timer.is_stopped() and auto_dismiss_time > 0:
 		progress_bar.value = dismiss_timer.time_left
 
 # ==================== API PUBLIQUE ====================
 
-func setup(data: Dictionary):
+func setup(data: Dictionary) -> void:
 	"""Configure le toast avec des données"""
 	notification_data = data
 	if is_inside_tree():
 		_apply_notification_data()
 
-func dismiss():
+func dismiss() -> void:
 	"""Ferme le toast avec animation"""
 	if not is_dismissing:
 		_animate_exit()
 
-func pause_timer():
+func pause_timer() -> void:
 	"""Met en pause le timer de fermeture"""
 	if dismiss_timer:
 		dismiss_timer.paused = true
 
-func resume_timer():
+func resume_timer() -> void:
 	"""Reprend le timer de fermeture"""
 	if dismiss_timer:
 		dismiss_timer.paused = false
 
-func set_progress(value: float):
+func set_progress(value: float) -> void:
 	"""Définit manuellement la progression"""
 	if progress_bar:
 		progress_bar.value = value

@@ -412,7 +412,7 @@ func _get_current_date() -> Dictionary:
 
 # Callbacks des signaux
 
-func _on_day_changed(day: int, week: int, year: int) -> void:
+func _on_day_changed(day: int, _week: int, _year: int) -> void:
 	"""Appelé chaque jour pour mettre à jour la progression"""
 	# Incrémenter les jours dans la phase actuelle
 	phase_progress[current_phase]["days_in_phase"] += 1
@@ -475,7 +475,7 @@ func _compute_team_stability() -> float:
 	var staff_bonus: float = StaffManager.get_total_stability_bonus() if StaffManager else 0.0
 	return clampf(total / float(members.size()) + staff_bonus, 0.0, 100.0)
 
-func _on_week_changed(week: int, year: int) -> void:
+func _on_week_changed(_week: int, _year: int) -> void:
 	"""Appelé chaque semaine"""
 	# Check automatique de progression chaque semaine
 	check_phase_progression()
@@ -484,12 +484,12 @@ func _on_guild_level_changed(new_level: int) -> void:
 	"""Réagit aux changements de niveau de guilde"""
 	add_achievement("Niveau de guilde %d" % new_level, "La guilde a atteint le niveau %d" % new_level)
 
-func _on_member_recruited(player) -> void:
+func _on_member_recruited(_player) -> void:
 	"""Réagit au recrutement de nouveaux membres"""
 	if GuildManager.guild_members.size() >= 15:
 		add_achievement("Guilde établie", "La guilde compte maintenant 15 membres actifs")
 
-func _on_member_disconnected(player) -> void:
+func _on_member_disconnected(_player) -> void:
 	"""Réagit à la déconnexion de membres"""
 	# Vérifier si on maintient le minimum requis
 	pass

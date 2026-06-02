@@ -23,6 +23,15 @@ var relationships: Dictionary = {}  # "player1_id:player2_id" -> RelationshipDat
 var cliques: Array = []  # Groupes sociaux formés
 var social_graph_cache: Dictionary = {}  # Cache pour optimisation
 
+# Index de performance (évite les scans O(M) par membre toutes les 5 min) :
+# - _member_index : instance_id -> membre (remplace le scan linéaire de _get_player_by_id)
+# - _adjacency   : instance_id -> Array[int] des instance_id reliés (cercle social en O(degré))
+# Maintenus à form_relationship / break_relationship ; _member_index est reconstruit
+# paresseusement depuis GuildManager.guild_members car ce système n'est pas notifié
+# des arrivées/départs de membres.
+var _member_index: Dictionary = {}  # int -> SimulatedPlayer
+var _adjacency: Dictionary = {}  # int -> Array[int]
+
 class RelationshipData:
 	var type: int = RelationType.NEUTRAL
 	var strength: float = 0.0  # 0.0 à 1.0
@@ -42,17 +51,17 @@ class Clique:
 	var cohesion: float = 0.5
 	var preferred_activities: Array = []
 
-func _ready():
+func _ready() -> void:
 	var game_time = GameTime
 	if game_time:
 		game_time.day_changed.connect(_on_day_changed)
 		game_time.week_changed.connect(_on_week_changed)
 
-func _on_day_changed(_day: int, _week: int, _year: int):
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	_decay_relationships()
 	_check_clique_cohesion()
 
-func _on_week_changed(_week: int, _year: int):
+func _on_week_changed(_week: int, _year: int) -> void:
 	_evaluate_clique_formations()
 
 # Gestion des relations
@@ -64,7 +73,7 @@ func get_relationship(player1, player2) -> RelationshipData:
 		return relationships[key]
 	return null
 
-func form_relationship(player1, player2, type: int, initial_strength: float = 0.3):
+func form_relationship(player1, player2, type: int, initial_strength: float = 0.3) -> void:
 	"""Forme une nouvelle relation entre deux joueurs"""
 	
 	if player1 == player2:
@@ -90,12 +99,13 @@ func form_relationship(player1, player2, type: int, initial_strength: float = 0.
 		rel.formed_day = _get_current_day()
 		rel.last_interaction_day = rel.formed_day
 		relationships[key] = rel
+		_add_adjacency(player1.get_instance_id(), player2.get_instance_id())
 		relationship_formed.emit(player1, player2, type)
-	
+
 	# Invalider le cache
 	_invalidate_cache()
 
-func strengthen_relationship(player1, player2, amount: float = 0.1):
+func strengthen_relationship(player1, player2, amount: float = 0.1) -> void:
 	"""Renforce une relation existante"""
 	var rel = get_relationship(player1, player2)
 	if rel:
@@ -103,7 +113,7 @@ func strengthen_relationship(player1, player2, amount: float = 0.1):
 		rel.last_interaction_day = _get_current_day()
 		_add_interaction_history(rel, "strengthen", amount)
 
-func weaken_relationship(player1, player2, amount: float = 0.1):
+func weaken_relationship(player1, player2, amount: float = 0.1) -> void:
 	"""Affaiblit une relation existante"""
 	var rel = get_relationship(player1, player2)
 	if rel:
@@ -115,15 +125,16 @@ func weaken_relationship(player1, player2, amount: float = 0.1):
 		if rel.strength < 0.1:
 			break_relationship(player1, player2)
 
-func break_relationship(player1, player2):
+func break_relationship(player1, player2) -> void:
 	"""Brise une relation entre deux joueurs"""
 	var key = _get_relationship_key(player1, player2)
 	if relationships.has(key):
 		relationships.erase(key)
+		_remove_adjacency(player1.get_instance_id(), player2.get_instance_id())
 		relationship_broken.emit(player1, player2)
 		_invalidate_cache()
 
-func transform_relationship(player1, player2, new_type: int):
+func transform_relationship(player1, player2, new_type: int) -> void:
 	"""Transforme une relation en un autre type"""
 	var rel = get_relationship(player1, player2)
 	if rel:
@@ -154,17 +165,15 @@ func get_online_friends(player) -> Array:
 	return online_friends
 
 func get_social_circle(player) -> Array:
-	"""Retourne le cercle social complet d'un joueur"""
+	"""Retourne le cercle social complet d'un joueur (O(degré) via l'adjacence)."""
 	var circle = []
-	
-	for key in relationships:
-		var players = key.split(":")
-		if player.get_instance_id() == int(players[0]) or player.get_instance_id() == int(players[1]):
-			var other_id = int(players[0]) if player.get_instance_id() == int(players[1]) else int(players[1])
-			var other = _get_player_by_id(other_id)
-			if other and other not in circle:
-				circle.append(other)
-	
+	var neighbors: Array = _adjacency.get(player.get_instance_id(), [])
+
+	for other_id in neighbors:
+		var other = _get_player_by_id(other_id)
+		if other and other not in circle:
+			circle.append(other)
+
 	return circle
 
 func get_influence_on_player(player) -> float:
@@ -204,15 +213,15 @@ func are_rivals(player1, player2) -> bool:
 
 # Gestion des cliques
 
-func form_clique(members: Array, name: String = ""):
+func form_clique(members: Array, player_name: String = "") -> void:
 	"""Forme une nouvelle clique"""
-	
+
 	if members.size() < 3:
 		return  # Besoin d'au moins 3 membres
-	
+
 	var clique = Clique.new()
 	clique.members = members.duplicate()
-	clique.name = name if name != "" else _generate_clique_name()
+	clique.name = player_name if player_name != "" else _generate_clique_name()
 	clique.formation_day = _get_current_day()
 	
 	# Déterminer le leader (plus haute influence sociale)
@@ -251,7 +260,7 @@ func is_in_same_clique(player1, player2) -> bool:
 			return true
 	return false
 
-func update_clique_cohesion(clique: Clique, delta: float):
+func update_clique_cohesion(clique: Clique, delta: float) -> void:
 	"""Met à jour la cohésion d'une clique"""
 	clique.cohesion = clamp(clique.cohesion + delta, 0.0, 1.0)
 	
@@ -259,7 +268,7 @@ func update_clique_cohesion(clique: Clique, delta: float):
 	if clique.cohesion < 0.2:
 		dissolve_clique(clique)
 
-func dissolve_clique(clique: Clique):
+func dissolve_clique(clique: Clique) -> void:
 	"""Dissout une clique"""
 	
 	# Affaiblir les relations entre membres
@@ -271,7 +280,7 @@ func dissolve_clique(clique: Clique):
 
 # Conflits sociaux
 
-func trigger_social_conflict(player1, player2, reason: String):
+func trigger_social_conflict(player1, player2, reason: String) -> void:
 	"""Déclenche un conflit social entre deux joueurs"""
 	
 	social_conflict.emit(player1, player2, reason)
@@ -358,31 +367,75 @@ func _get_relationship_key(player1, player2) -> String:
 		return "%d:%d" % [id2, id1]
 
 func _get_relations_of_type(player, type: int) -> Array:
-	"""Retourne toutes les relations d'un type donné"""
+	"""Retourne toutes les relations d'un type donné (O(degré) via l'adjacence)."""
 	var relations = []
-	
-	for key in relationships:
-		var rel = relationships[key]
-		if rel.type != type:
+	var my_id: int = player.get_instance_id()
+	var neighbors: Array = _adjacency.get(my_id, [])
+
+	for other_id in neighbors:
+		var key: String = "%d:%d" % [my_id, other_id] if my_id < other_id else "%d:%d" % [other_id, my_id]
+		var rel = relationships.get(key)
+		if rel == null or rel.type != type:
 			continue
-		
-		var players = key.split(":")
-		if player.get_instance_id() == int(players[0]) or player.get_instance_id() == int(players[1]):
-			var other_id = int(players[0]) if player.get_instance_id() == int(players[1]) else int(players[1])
-			var other = _get_player_by_id(other_id)
-			if other:
-				relations.append(other)
-	
+		var other = _get_player_by_id(other_id)
+		if other:
+			relations.append(other)
+
 	return relations
 
 func _get_player_by_id(id: int):
-	"""Retrouve un joueur par son ID"""
+	"""Retrouve un joueur par son instance_id via l'index (O(1) amorti).
+	L'index est reconstruit paresseusement si l'id est inconnu (un membre a pu
+	être ajouté depuis la dernière reconstruction)."""
+	var member = _member_index.get(id)
+	if member != null and is_instance_valid(member):
+		return member
+	# Cache miss (ou entrée périmée) : reconstruire depuis la source de vérité.
+	_rebuild_member_index()
+	member = _member_index.get(id)
+	if member != null and is_instance_valid(member):
+		return member
+	return null
+
+func _rebuild_member_index() -> void:
+	"""(Re)construit l'index instance_id -> membre depuis GuildManager."""
+	_member_index.clear()
 	var guild_manager = GuildManager
 	if guild_manager:
 		for member in guild_manager.guild_members:
-			if member.get_instance_id() == id:
-				return member
-	return null
+			_member_index[member.get_instance_id()] = member
+
+func _add_adjacency(id1: int, id2: int) -> void:
+	"""Enregistre l'arête id1<->id2 dans l'adjacence (idempotent)."""
+	var list1: Array = _adjacency.get(id1, [])
+	if not list1.has(id2):
+		list1.append(id2)
+		_adjacency[id1] = list1
+	var list2: Array = _adjacency.get(id2, [])
+	if not list2.has(id1):
+		list2.append(id1)
+		_adjacency[id2] = list2
+
+func _remove_adjacency(id1: int, id2: int) -> void:
+	"""Retire l'arête id1<->id2 de l'adjacence."""
+	if _adjacency.has(id1):
+		_adjacency[id1].erase(id2)
+		if _adjacency[id1].is_empty():
+			_adjacency.erase(id1)
+	if _adjacency.has(id2):
+		_adjacency[id2].erase(id1)
+		if _adjacency[id2].is_empty():
+			_adjacency.erase(id2)
+
+func _rebuild_adjacency() -> void:
+	"""Reconstruit l'adjacence depuis les clés de relations (filet de sécurité
+	après un deserialize, où les relations sont insérées directement)."""
+	_adjacency.clear()
+	for key in relationships:
+		var ids: PackedStringArray = key.split(":")
+		if ids.size() != 2:
+			continue
+		_add_adjacency(int(ids[0]), int(ids[1]))
 
 func _get_current_day() -> int:
 	"""Obtient le jour actuel du jeu"""
@@ -391,7 +444,7 @@ func _get_current_day() -> int:
 		return game_time.current_day
 	return 0
 
-func _add_interaction_history(rel: RelationshipData, interaction_type: String, value):
+func _add_interaction_history(rel: RelationshipData, interaction_type: String, value) -> void:
 	"""Ajoute une interaction à l'historique"""
 	rel.history.append({
 		"type": interaction_type,
@@ -403,7 +456,7 @@ func _add_interaction_history(rel: RelationshipData, interaction_type: String, v
 	if rel.history.size() > 50:
 		rel.history.pop_front()
 
-func _decay_relationships():
+func _decay_relationships() -> void:
 	"""Fait décroître les relations non entretenues"""
 	var current_day = _get_current_day()
 	
@@ -424,7 +477,7 @@ func _decay_relationships():
 				if player1 and player2:
 					break_relationship(player1, player2)
 
-func _check_clique_cohesion():
+func _check_clique_cohesion() -> void:
 	"""Vérifie la cohésion des cliques"""
 	for clique in cliques:
 		var total_strength = 0.0
@@ -443,7 +496,7 @@ func _check_clique_cohesion():
 			var new_cohesion = avg_strength * 0.8 + clique.cohesion * 0.2
 			update_clique_cohesion(clique, new_cohesion - clique.cohesion)
 
-func _evaluate_clique_formations():
+func _evaluate_clique_formations() -> void:
 	"""Évalue si de nouvelles cliques peuvent se former"""
 	var guild_manager = GuildManager
 	if not guild_manager:
@@ -492,7 +545,7 @@ func _generate_clique_name() -> String:
 	
 	return prefixes[randi() % prefixes.size()] + " " + suffixes[randi() % suffixes.size()]
 
-func _invalidate_cache():
+func _invalidate_cache() -> void:
 	"""Invalide le cache du graphe social"""
 	social_graph_cache.clear()
 
@@ -534,6 +587,8 @@ func serialize() -> Dictionary:
 func deserialize(data: Dictionary) -> void:
 	relationships.clear()
 	cliques.clear()
+	_adjacency.clear()
+	_member_index.clear()
 	var by_pid: Dictionary = _members_by_player_id()
 	var saved_rels: Dictionary = data.get("relationships", {})
 	for key in saved_rels:
@@ -565,6 +620,9 @@ func deserialize(data: Dictionary) -> void:
 		c.formation_day = int(cd.get("formation_day", 0))
 		c.cohesion = float(cd.get("cohesion", 0.5))
 		cliques.append(c)
+	# Les relations ont été insérées directement (sans form_relationship) :
+	# reconstruire l'adjacence depuis les clés.
+	_rebuild_adjacency()
 	_invalidate_cache()
 
 func _members_by_player_id() -> Dictionary:

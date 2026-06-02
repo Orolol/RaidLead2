@@ -447,7 +447,10 @@ func _update_player_controlled_activity(player) -> void:
 	"""Met à jour l'activité d'un joueur contrôlé manuellement"""
 	if not active_activities.has(player):
 		return
-	
+	# Pendant un repos / hors ligne, l'activité ne doit plus produire de gains (C10).
+	if not player.is_online:
+		return
+
 	var activity = active_activities[player]
 	var time_factor = 5.0 / 60.0  # 5 minutes
 	

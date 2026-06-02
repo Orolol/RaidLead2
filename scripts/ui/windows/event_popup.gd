@@ -1,8 +1,8 @@
 extends Window
 class_name EventPopupWindow
 
-const RandomEventResource = preload("res://scripts/resources/random_event.gd")
-const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
+# RandomEventResource / EventChoiceResource sont des class_name globaux
+# (random_event.gd / event_choice.gd) — pas de const redondant (SHADOWED_GLOBAL_IDENTIFIER).
 
 var current_event: RandomEventResource = null
 var choice_buttons: Array[Button] = []
@@ -250,12 +250,18 @@ func _on_close_requested():
 	var tween = create_tween()
 	tween.tween_property(self, "size", Vector2i(10, 10), 0.2)
 	await tween.finished
-	
+
 	# Reprendre le jeu
 	var game_time = GameTime
 	if game_time:
 		game_time.resume()
-	
+
+	# Résoudre l'événement sans appliquer d'effet (« Ignorer ») : sinon EventManager
+	# garde pending_event != null et bloque tous les tirages suivants (C13).
+	var event_manager = EventManager
+	if event_manager:
+		event_manager.dismiss_event()
+
 	popup_closed.emit()
 	hide()
 	queue_free()

@@ -83,7 +83,7 @@ func _connect_instance_signals() -> void:
 	current_instance.loot_distributed.connect(_on_loot_distributed)
 
 func _setup_display() -> void:
-	var dungeon_data_dict = current_instance.dungeon_data
+	var dungeon_data_dict: Dictionary = current_instance.dungeon_data
 	var dungeon_name: String = dungeon_data_dict.get("name", "Donjon inconnu")
 	dungeon_name_label.text = dungeon_name
 	title_label.text = "Donjon: " + dungeon_name
@@ -105,10 +105,10 @@ func _setup_display() -> void:
 		banner_rect.texture = banner
 
 	await get_tree().process_frame
-	
+
 	# Configurer la ligne du chemin
-	var path_start = Vector2(50, dungeon_path.size.y / 2)
-	var path_end = Vector2(dungeon_path.size.x - 50, dungeon_path.size.y / 2)
+	var path_start := Vector2(50, dungeon_path.size.y / 2)
+	var path_end := Vector2(dungeon_path.size.x - 50, dungeon_path.size.y / 2)
 	path_line.clear_points()
 	path_line.add_point(path_start)
 	path_line.add_point(path_end)
@@ -124,37 +124,37 @@ func _create_boss_markers() -> void:
 	for marker in boss_marker_nodes:
 		marker.queue_free()
 	boss_marker_nodes.clear()
-	
-	var bosses = current_instance.dungeon_data.get("bosses", [])
-	var positions = current_instance.boss_positions
-	
+
+	var bosses: Array = current_instance.dungeon_data.get("bosses", [])
+	var positions: Array[float] = current_instance.boss_positions
+
 	# S'assurer que les dimensions sont correctes
-	var path_width = max(700, dungeon_path.size.x - 100)
-	var path_height = dungeon_path.size.y
-	var path_center_y = path_height / 2
-	
+	var path_width: float = max(700, dungeon_path.size.x - 100)
+	var path_height: float = dungeon_path.size.y
+	var path_center_y: float = path_height / 2
+
 	for i in range(bosses.size()):
-		var boss_name = bosses[i]
-		var position = positions[i] if i < positions.size() else float(i) / float(max(1, bosses.size() - 1))
-		
+		var boss_name: String = bosses[i]
+		var position: float = positions[i] if i < positions.size() else float(i) / float(max(1, bosses.size() - 1))
+
 		# Créer le marqueur
-		var marker = Panel.new()
+		var marker := Panel.new()
 		marker.custom_minimum_size = Vector2(30, 30)
 		marker.size = Vector2(30, 30)
-		
+
 		# Positionner le marqueur le long du chemin
-		var x_pos = 50 + position * path_width
-		var y_pos = path_center_y - 15  # Centrer verticalement
+		var x_pos: float = 50 + position * path_width
+		var y_pos: float = path_center_y - 15  # Centrer verticalement
 		marker.position = Vector2(x_pos, y_pos)
-		
+
 		# Couleur selon le statut
 		if i == bosses.size() - 1:
 			marker.modulate = COLOR_BOSS_FINAL
 		else:
 			marker.modulate = COLOR_BOSS_PENDING
-			
+
 		# Ajouter un label pour le nom du boss
-		var label = Label.new()
+		var label := Label.new()
 		label.text = boss_name
 		label.add_theme_font_size_override("font_size", 10)
 		label.position = Vector2(-35, 35)  # Décaler en dessous du marqueur
@@ -169,7 +169,7 @@ func _update_members_list() -> void:
 	members_list.clear()
 	
 	for member in current_instance.group_members:
-		var text = "%s - %s Niv.%d" % [
+		var text: String = "%s - %s Niv.%d" % [
 			member.nom,
 			member.personnage_role,
 			member.personnage_niveau
@@ -188,23 +188,23 @@ func _process(delta: float) -> void:
 func _update_display() -> void:
 	# Mettre à jour le temps
 	var game_time = GameTime
-	var elapsed = current_instance.get_elapsed_time(game_time)
-	var minutes = int(elapsed) / 60
-	var seconds = int(elapsed) % 60
+	var elapsed: float = current_instance.get_elapsed_time(game_time)
+	var minutes: int = int(elapsed) / 60
+	var seconds: int = int(elapsed) % 60
 	time_label.text = "Temps: %02d:%02d" % [minutes, seconds]
-	
+
 	# Mettre à jour la position du groupe avec les bonnes dimensions
-	var path_width = max(700, dungeon_path.size.x - 100)
-	var path_center_y = dungeon_path.size.y / 2
-	var group_x = 50 + current_instance.current_position * path_width
-	var group_y = path_center_y - 10
+	var path_width: float = max(700, dungeon_path.size.x - 100)
+	var path_center_y: float = dungeon_path.size.y / 2
+	var group_x: float = 50 + current_instance.current_position * path_width
+	var group_y: float = path_center_y - 10
 	group_marker.position = Vector2(group_x - 10, group_y)
-	
+
 	# Mettre à jour la ligne du chemin
-	var path_start = Vector2(50, path_center_y)
-	var completed_end = Vector2(group_x, path_center_y)
-	var path_end = Vector2(50 + path_width, path_center_y)
-	
+	var path_start := Vector2(50, path_center_y)
+	var completed_end := Vector2(group_x, path_center_y)
+	var path_end := Vector2(50 + path_width, path_center_y)
+
 	path_line.clear_points()
 	path_line.add_point(path_start)
 	path_line.add_point(completed_end)
@@ -244,8 +244,8 @@ func _on_boss_failed(boss_index: int, boss_name: String, wipe_count: int) -> voi
 			boss_marker_nodes[boss_index].modulate = COLOR_BOSS_CURRENT
 
 func _on_dungeon_completed(total_time: float, gold_reward: int) -> void:
-	var minutes = int(total_time) / 60
-	var seconds = int(total_time) % 60
+	var minutes: int = int(total_time) / 60
+	var seconds: int = int(total_time) % 60
 	status_label.text = "Donjon terminé en %02d:%02d! Récompense: %d or" % [minutes, seconds, gold_reward]
 	abandon_button.disabled = true
 	
@@ -259,12 +259,12 @@ func _on_dungeon_abandoned(reason: String) -> void:
 	status_label.text = "Donjon abandonné: %s" % reason
 	abandon_button.disabled = true
 
-	var elapsed = 0.0
+	var elapsed: float = 0.0
 	if current_instance:
 		elapsed = current_instance.get_elapsed_time(current_instance.game_time_node)
 	_show_loot_window(false, elapsed, 0, reason)
 
-func _on_progress_updated(progress_percent: float) -> void:
+func _on_progress_updated(_progress_percent: float) -> void:
 	# Peut être utilisé pour une barre de progression globale
 	pass
 
@@ -272,10 +272,10 @@ func _on_loot_distributed(member: SimulatedPlayer, item: Item) -> void:
 	if not current_instance or not item or not member:
 		return
 
-	var bosses = current_instance.dungeon_data.get("bosses", [])
-	var boss_index = clamp(current_instance.current_boss_index, 0, bosses.size() - 1) if bosses.size() > 0 else 0
+	var bosses: Array = current_instance.dungeon_data.get("bosses", [])
+	var boss_index: int = clamp(current_instance.current_boss_index, 0, bosses.size() - 1) if bosses.size() > 0 else 0
 	var boss_name = bosses[boss_index] if boss_index < bosses.size() else ""
-	var drop_time = current_instance.get_elapsed_time(current_instance.game_time_node)
+	var drop_time: float = current_instance.get_elapsed_time(current_instance.game_time_node)
 
 	loot_history.append({
 		"member_name": member.nom,
@@ -295,9 +295,11 @@ func _on_abandon_button_pressed() -> void:
 		dialog.dialog_type = dialog.DialogType.WARNING
 		dialog.title_text = "Abandonner le donjon"
 		dialog.message_text = "Êtes-vous sûr de vouloir abandonner le donjon?\nTous les membres perdront de l'énergie et le moral baissera."
-		dialog.confirmed.connect(func(): 
+		# Propriétaire unique de l'abandon : on se contente d'émettre le signal.
+		# Le parent (Fenetre_OrganisationGroupe) est l'unique exécutant de
+		# l'abandon réel — éviter d'appliquer les conséquences deux fois (C14).
+		dialog.confirmed.connect(func() -> void:
 			abandon_requested.emit()
-			current_instance._abandon_dungeon("Abandonné par le joueur")
 		)
 		get_tree().root.add_child(dialog)
 		dialog.show_dialog()
@@ -306,7 +308,7 @@ func _show_loot_window(success: bool, total_time: float, gold_reward: int, reaso
 	if not LootWindowScene:
 		return
 
-	var loot_data = loot_history.duplicate(true)
+	var loot_data: Array = loot_history.duplicate(true)
 	loot_history.clear()
 
 	var loot_window = LootWindowScene.instantiate()
@@ -314,7 +316,7 @@ func _show_loot_window(success: bool, total_time: float, gold_reward: int, reaso
 		return
 
 	get_tree().root.add_child(loot_window)
-	var dungeon_name = "Donjon"
+	var dungeon_name: String = "Donjon"
 	if current_instance and current_instance.dungeon_data.has("name"):
 		dungeon_name = str(current_instance.dungeon_data.get("name"))
 	var run_details: Dictionary = _build_run_report_details()

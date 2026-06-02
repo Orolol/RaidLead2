@@ -44,23 +44,23 @@ func _ready() -> void:
 func _generate_initial_pool() -> void:
 	available_players.clear()
 	
-	var pool_limits = _get_current_pool_limits()
-	var pool_size = randi_range(pool_limits.min_size, pool_limits.max_size)
+	var pool_limits: Dictionary = _get_current_pool_limits()
+	var pool_size: int = randi_range(pool_limits.min_size, pool_limits.max_size)
 	for i in pool_size:
-		var player = _spawn_player()
+		var player: SimulatedPlayer = _spawn_player()
 		available_players.append(player)
-	
+
 	pool_refreshed.emit()
 
 func _get_current_pool_limits() -> Dictionary:
 	var base_min = BASE_MIN_POOL_SIZE
 	var base_max = BASE_MAX_POOL_SIZE
-	
+
 	if ServerVersion:
 		var pool_size = ServerVersion.get_recruitment_pool_size()
 		base_min = pool_size
 		base_max = min(pool_size + 10, BASE_MAX_POOL_SIZE)
-	
+
 	# Ajouter le bonus de perks de guilde
 	var guild_manager = GuildManager
 	if guild_manager and guild_manager.guild:
@@ -85,8 +85,8 @@ func _spawn_player() -> SimulatedPlayer:
 	return _create_random_player()
 
 func _create_random_player() -> SimulatedPlayer:
-	var player = SimulatedPlayer.new()
-	
+	var player := SimulatedPlayer.new()
+
 	# Ajoute des infos supplémentaires pour le recrutement
 	player.set_meta("recruitment_motivation", _generate_motivation())
 	player.set_meta("expected_activity", _generate_expected_activity())
@@ -95,7 +95,7 @@ func _create_random_player() -> SimulatedPlayer:
 	return player
 
 func _generate_motivation() -> String:
-	var motivations = [
+	var motivations: Array[String] = [
 		"Cherche une guilde active pour progresser",
 		"Veut participer à des raids réguliers",
 		"Recherche une ambiance familiale",
@@ -117,7 +117,7 @@ func _generate_expected_activity() -> Dictionary:
 	}
 
 func _calculate_recruitment_difficulty(player: SimulatedPlayer) -> float:
-	var difficulty = 0.5  # Base
+	var difficulty: float = 0.5  # Base
 	
 	# Plus difficile si haut niveau/skill
 	if player.personnage_niveau >= 55:
@@ -136,12 +136,12 @@ func _calculate_recruitment_difficulty(player: SimulatedPlayer) -> float:
 	return clamp(difficulty, 0.1, 0.9)
 
 func _on_day_changed(_day: int, _week: int, _year: int) -> void:
-	var pool_limits = _get_current_pool_limits()
-	
+	var pool_limits: Dictionary = _get_current_pool_limits()
+
 	# Ajoute quelques nouveaux joueurs chaque jour
 	for i in randi_range(1, DAILY_NEW_PLAYERS):
 		if available_players.size() < pool_limits.max_size:
-			var new_player = _spawn_player()
+			var new_player: SimulatedPlayer = _spawn_player()
 			available_players.append(new_player)
 	
 	# Refresh complet périodiquement
@@ -155,14 +155,14 @@ func _on_hour_changed(_hour: int) -> void:
 
 func _refresh_pool() -> void:
 	last_refresh_total_day = _get_total_days_elapsed()
-	var pool_limits = _get_current_pool_limits()
-	
+	var pool_limits: Dictionary = _get_current_pool_limits()
+
 	# Retire certains joueurs (recrutés ailleurs, ont arrêté, etc.)
-	var players_to_remove = []
+	var players_to_remove: Array = []
 	for player in available_players:
 		if randf() < 0.3:  # 30% de chance de partir
 			players_to_remove.append(player)
-	
+
 	for player in players_to_remove:
 		available_players.erase(player)
 		if randf() < 0.5:  # 50% de chance que ce soit une autre guilde
@@ -194,7 +194,7 @@ func _simulate_competition() -> void:
 	var player = available_players[randi() % available_players.size()]
 	
 	# Les bons joueurs sont plus susceptibles d'être recrutés
-	var recruit_chance = 0.1
+	var recruit_chance: float = 0.1
 	if player.skill > 70:
 		recruit_chance += 0.2
 	if player.personnage_niveau == 60:
@@ -206,10 +206,10 @@ func _simulate_competition() -> void:
 		player_lost_to_competition.emit(player, guild)
 
 func get_filtered_players(filters: Dictionary) -> Array:
-	var filtered = []
-	
+	var filtered: Array = []
+
 	for player in available_players:
-		var matches = true
+		var matches: bool = true
 		
 		# Filtre par classe
 		if filters.has("class") and filters.class != "":
@@ -272,7 +272,7 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 		base_chance = clamp(base_chance, 0.0, 1.0)
 	
 	# Ajuste selon la difficulté
-	var final_chance = base_chance * (1.0 - recruitment_difficulty)
+	var final_chance: float = base_chance * (1.0 - recruitment_difficulty)
 
 	# Équilibrage adaptatif : bonus de recrutement si le joueur est à la traîne (US 6.4)
 	var balance_manager = BalanceManager
@@ -280,20 +280,20 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 		final_chance *= balance_manager.get_recruit_chance_mult()
 	final_chance = clamp(final_chance, 0.0, 1.0)
 
-	var success = randf() < final_chance
-	
+	var success: bool = randf() < final_chance
+
 	if success:
 		available_players.erase(player)
 		player_recruited.emit(player)
 		return {"success": true, "player": player}
 	else:
 		# Génère une raison de refus
-		var reasons = _generate_rejection_reasons(player, guild_data)
+		var reasons: Array = _generate_rejection_reasons(player, guild_data)
 		return {"success": false, "reason": reasons[randi() % reasons.size()]}
 
 func _generate_rejection_reasons(player: SimulatedPlayer, guild_data: Dictionary) -> Array:
-	var reasons = []
-	
+	var reasons: Array = []
+
 	var expectations = player.get_meta("expected_activity", {})
 	
 	if expectations.get("hardcore", false) and not guild_data.get("hardcore", false):
@@ -318,16 +318,16 @@ func _on_server_version_updated(new_version: float, _update_name: String) -> voi
 	GameLog.d("Pool de recrutement : mise à jour vers version %s" % new_version)
 	
 	# Augmenter la taille du pool si nécessaire
-	var pool_limits = _get_current_pool_limits()
+	var pool_limits: Dictionary = _get_current_pool_limits()
 	while available_players.size() < pool_limits.min_size:
 		available_players.append(_spawn_player())
-	
+
 	# Permettre à certains joueurs existants de progresser en niveau
 	var max_level = ServerVersion.get_max_player_level()
 	for player in available_players:
 		# 30% de chance qu'un joueur gagne quelques niveaux lors d'une mise à jour
 		if randf() < 0.3 and player.personnage_niveau < max_level:
-			var level_gain = randi_range(1, min(5, max_level - player.personnage_niveau))
+			var level_gain: int = randi_range(1, min(5, max_level - player.personnage_niveau))
 			player.personnage_niveau += level_gain
 			# L'équipement ne suit plus automatiquement le niveau avec le nouveau système
 	

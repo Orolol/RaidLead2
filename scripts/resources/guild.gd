@@ -17,7 +17,7 @@ signal level_up(new_level: int)
 signal perk_unlocked(perk_name: String, level: int)
 signal reputation_changed(old_reputation: float, new_reputation: float, reason: String)
 
-func _init():
+func _init() -> void:
 	name = "Ma Guilde"
 	xp = 0
 	gold = 0
@@ -26,11 +26,11 @@ func _init():
 	reputation_history = []
 
 func gain_xp(amount: int, source: String = "") -> void:
-	var old_level = get_level()
+	var old_level: int = get_level()
 	xp += amount
 	xp_gained.emit(amount, source)
-	
-	var new_level = get_level()
+
+	var new_level: int = get_level()
 	if new_level > old_level:
 		level_up.emit(new_level)
 		if new_level in GuildPerksData.PERKS:
@@ -81,8 +81,12 @@ func add_gold(amount: int) -> void:
 	if max_gold > 0:
 		var new_gold: int = gold + amount
 		if new_gold > max_gold:
-			_notify_gold_overflow(new_gold - max_gold, max_gold)
+			# Ne notifie qu'à la transition vers « trésorerie pleine » pour éviter
+			# le spam de toasts (add_gold est appelé très fréquemment via le farming).
+			var was_full: bool = gold >= max_gold
 			gold = max_gold
+			if not was_full:
+				_notify_gold_overflow(new_gold - max_gold, max_gold)
 		else:
 			gold = new_gold
 	else:
@@ -208,7 +212,7 @@ func get_reputation_tier() -> String:
 		return "Désastreuse"
 func gain_reputation(amount: float, reason: String) -> void:
 	"""Augmente la réputation de la guilde"""
-	var old_reputation = reputation
+	var old_reputation: float = reputation
 	reputation = clamp(reputation + amount, 0.0, 100.0)
 	
 	_add_reputation_event(amount, reason)
@@ -218,7 +222,7 @@ func gain_reputation(amount: float, reason: String) -> void:
 
 func lose_reputation(amount: float, reason: String) -> void:
 	"""Diminue la réputation de la guilde"""
-	var old_reputation = reputation
+	var old_reputation: float = reputation
 	reputation = clamp(reputation - amount, 0.0, 100.0)
 	
 	_add_reputation_event(-amount, reason)
@@ -229,7 +233,7 @@ func lose_reputation(amount: float, reason: String) -> void:
 func _add_reputation_event(change: float, reason: String) -> void:
 	"""Ajoute un événement à l'historique de réputation"""
 	var game_time = Singletons.get_autoload("GameTime")
-	var current_date = {}
+	var current_date: Dictionary = {}
 	if game_time:
 		current_date = {
 			"year": game_time.current_year,
@@ -238,8 +242,8 @@ func _add_reputation_event(change: float, reason: String) -> void:
 		}
 	else:
 		current_date = {"year": 1, "week": 1, "day": 1}
-	
-	var event = {
+
+	var event: Dictionary = {
 		"date": current_date,
 		"change": change,
 		"reason": reason,
@@ -258,7 +262,7 @@ func get_reputation_history() -> Array:
 
 func get_recent_reputation_events(count: int = 10) -> Array:
 	"""Retourne les X derniers événements de réputation"""
-	var recent_events = reputation_history.duplicate()
+	var recent_events: Array = reputation_history.duplicate()
 	recent_events.reverse()  # Plus récent en premier
 	return recent_events.slice(0, min(count, recent_events.size()))
 
@@ -284,7 +288,7 @@ func on_world_first(achievement_name: String) -> void:
 
 func on_successful_recruitment(player_name: String, player_skill: float) -> void:
 	"""Appelé lors d'un recrutement réussi"""
-	var reputation_gain = 2.0
+	var reputation_gain: float = 2.0
 	if player_skill > 80:
 		reputation_gain = 5.0  # Recrutement de qualité
 	elif player_skill > 60:
@@ -301,7 +305,7 @@ func on_member_departure(player_name: String, was_voluntary: bool) -> void:
 
 func on_raid_success(raid_name: String, difficulty: String) -> void:
 	"""Appelé lors d'un succès de raid"""
-	var reputation_gain = 2.0
+	var reputation_gain: float = 2.0
 	if difficulty == "Héroïque":
 		reputation_gain = 4.0
 	elif difficulty == "Mythique":
@@ -318,7 +322,7 @@ func on_raid_failure(raid_name: String, wipe_count: int) -> void:
 
 func on_drama_event(drama_type: String, severity: String) -> void:
 	"""Appelé lors d'un événement de drama"""
-	var reputation_loss = 5.0
+	var reputation_loss: float = 5.0
 	if severity == "Majeur":
 		reputation_loss = 10.0
 	elif severity == "Mineur":
@@ -332,5 +336,5 @@ func on_team_stability_bonus() -> void:
 
 func on_high_turnover_penalty(turnover_rate: float) -> void:
 	"""Appelé en cas de turnover élevé"""
-	var penalty = turnover_rate * 5.0  # Plus le turnover est élevé, plus la pénalité est importante
+	var penalty: float = turnover_rate * 5.0  # Plus le turnover est élevé, plus la pénalité est importante
 	lose_reputation(penalty, "Turnover élevé (%.1f%%)" % (turnover_rate * 100))

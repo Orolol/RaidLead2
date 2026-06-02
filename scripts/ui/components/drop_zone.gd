@@ -49,11 +49,11 @@ signal hover_started(item: DraggableItem, zone: DropZone)
 signal hover_ended(item: DraggableItem, zone: DropZone)
 signal validation_failed(item: DraggableItem, zone: DropZone, reason: String)
 
-func _ready():
+func _ready() -> void:
 	_setup_ui()
 	_setup_drop_detection()
 
-func _setup_ui():
+func _setup_ui() -> void:
 	"""Configure l'interface visuelle de la drop zone"""
 	
 	# Panel de fond
@@ -90,23 +90,23 @@ func _setup_ui():
 	
 	_update_placeholder_visibility()
 
-func _setup_drop_detection():
+func _setup_drop_detection() -> void:
 	"""Configure la détection des drops"""
 	mouse_filter = Control.MOUSE_FILTER_PASS
 
 # ==================== SETTERS ====================
 
-func set_accepted_types(types: Array[String]):
+func set_accepted_types(types: Array[String]) -> void:
 	accepted_types = types
 
-func set_max_items(max_count: int):
+func set_max_items(max_count: int) -> void:
 	max_items = max(1, max_count)
 	_validate_current_items()
 
-func set_allow_reorder(allow: bool):
+func set_allow_reorder(allow: bool) -> void:
 	allow_reorder = allow
 
-func set_drop_policy(policy: DropPolicy):
+func set_drop_policy(policy: DropPolicy) -> void:
 	drop_policy = policy
 
 # ==================== API PUBLIQUE - VALIDATION ====================
@@ -155,30 +155,30 @@ func accept_drop(item: DraggableItem, data: Dictionary = {}) -> bool:
 
 # ==================== GESTION DES DROPS ====================
 
-func _handle_replace_drop(item: DraggableItem):
+func _handle_replace_drop(item: DraggableItem) -> void:
 	"""Gère le drop en mode REPLACE"""
 	# Retirer les items existants
 	for existing_item in stored_items.duplicate():
 		remove_item(existing_item)
-	
+
 	# Ajouter le nouvel item
 	add_item(item)
 
-func _handle_stack_drop(item: DraggableItem):
+func _handle_stack_drop(item: DraggableItem) -> void:
 	"""Gère le drop en mode STACK"""
 	if stored_items.size() < max_items:
 		add_item(item)
 
-func _handle_swap_drop(item: DraggableItem):
+func _handle_swap_drop(item: DraggableItem) -> void:
 	"""Gère le drop en mode SWAP"""
 	if stored_items.size() > 0:
-		var existing_item = stored_items[0]
+		var existing_item: DraggableItem = stored_items[0]
 		var source_zone = item.get_parent()
-		
+
 		# Échanger les positions
 		remove_item(existing_item)
 		add_item(item)
-		
+
 		if source_zone and source_zone.has_method("add_item"):
 			source_zone.add_item(existing_item)
 	else:
@@ -222,7 +222,7 @@ func remove_item(item: DraggableItem) -> bool:
 	item_removed.emit(item, self)
 	return true
 
-func clear_items():
+func clear_items() -> void:
 	"""Vide la zone de tous ses items"""
 	for item in stored_items.duplicate():
 		remove_item(item)
@@ -245,53 +245,53 @@ func is_full() -> bool:
 
 # ==================== FEEDBACK VISUEL ====================
 
-func on_drag_hover_enter(item: DraggableItem, data: Dictionary = {}):
+func on_drag_hover_enter(item: DraggableItem, data: Dictionary = {}) -> void:
 	"""Appelé quand un item entre dans la zone"""
 	current_hovering_item = item
-	
+
 	if can_accept_drop(item, data):
 		_show_valid_highlight()
 	else:
 		_show_invalid_highlight()
-	
+
 	hover_started.emit(item, self)
 
-func on_drag_hover_exit(item: DraggableItem, data: Dictionary = {}):
+func on_drag_hover_exit(item: DraggableItem, _data: Dictionary = {}) -> void:
 	"""Appelé quand un item quitte la zone"""
 	current_hovering_item = null
 	_hide_highlight()
 	hover_ended.emit(item, self)
 
-func _show_valid_highlight():
+func _show_valid_highlight() -> void:
 	"""Affiche le highlight pour un drop valide"""
 	if not highlight_animation:
 		_apply_highlight_style(highlight_color)
 		return
-	
-	var style = original_style.duplicate()
+
+	var style: StyleBoxFlat = original_style.duplicate()
 	style.bg_color = highlight_color
 	style.border_color = highlight_color.lightened(0.3)
 	style.border_width_left = border_width
 	style.border_width_right = border_width
 	style.border_width_top = border_width
 	style.border_width_bottom = border_width
-	
+
 	background_panel.add_theme_stylebox_override("panel", style)
-	
+
 	# Animation de pulsation
-	var tween = create_tween()
+	var tween := create_tween()
 	tween.set_loops()
 	tween.tween_property(background_panel, "modulate:a", 0.7, 0.5)
 	tween.tween_property(background_panel, "modulate:a", 1.0, 0.5)
-	
+
 	is_highlighted = true
 
-func _show_invalid_highlight():
+func _show_invalid_highlight() -> void:
 	"""Affiche le highlight pour un drop invalide"""
 	_apply_highlight_style(invalid_color)
 	is_invalid_hover = true
 
-func _hide_highlight():
+func _hide_highlight() -> void:
 	"""Cache le highlight"""
 	background_panel.add_theme_stylebox_override("panel", original_style)
 	background_panel.modulate.a = 1.0
@@ -302,16 +302,16 @@ func _hide_highlight():
 	is_highlighted = false
 	is_invalid_hover = false
 
-func _apply_highlight_style(color: Color):
+func _apply_highlight_style(color: Color) -> void:
 	"""Applique un style de highlight"""
-	var style = original_style.duplicate()
+	var style: StyleBoxFlat = original_style.duplicate()
 	style.bg_color = color
 	style.border_color = color.lightened(0.3)
 	style.border_width_left = border_width
 	style.border_width_right = border_width
 	style.border_width_top = border_width
 	style.border_width_bottom = border_width
-	
+
 	background_panel.add_theme_stylebox_override("panel", style)
 
 # ==================== VALIDATION ====================
@@ -339,23 +339,23 @@ func _check_item_limit(item: DraggableItem) -> bool:
 	
 	return false
 
-func _validate_current_items():
+func _validate_current_items() -> void:
 	"""Valide les items actuels après changement de configuration"""
 	while stored_items.size() > max_items:
-		var item = stored_items.pop_back()
+		var item: DraggableItem = stored_items.pop_back()
 		content_container.remove_child(item)
 
 # ==================== ARRANGEMENT ====================
 
-func _arrange_items():
+func _arrange_items() -> void:
 	"""Arrange les items dans la zone"""
 	if auto_sort:
 		_sort_items()
-	
+
 	# Ajuster la taille si nécessaire
 	_resize_to_fit_items()
 
-func _sort_items():
+func _sort_items() -> void:
 	"""Trie les items selon un critère"""
 	stored_items.sort_custom(func(a: DraggableItem, b: DraggableItem):
 		# Exemple : tri par nom
@@ -363,37 +363,37 @@ func _sort_items():
 		var name_b = b.drag_data.get("name", "")
 		return name_a < name_b
 	)
-	
+
 	# Réorganiser dans l'UI
 	for i in range(stored_items.size()):
 		content_container.move_child(stored_items[i], i)
 
-func _resize_to_fit_items():
+func _resize_to_fit_items() -> void:
 	"""Ajuste la taille pour contenir les items"""
 	# Implémentation basique - peut être étendue
 	pass
 
-func _update_placeholder_visibility():
+func _update_placeholder_visibility() -> void:
 	"""Met à jour la visibilité du placeholder"""
 	placeholder_label.visible = stored_items.is_empty()
 
 # ==================== API UTILITAIRES ====================
 
-func set_placeholder_text(text: String):
+func set_placeholder_text(text: String) -> void:
 	"""Définit le texte du placeholder"""
 	if placeholder_label:
 		placeholder_label.text = text
 
-func set_validation_callback(callback: Callable):
+func set_validation_callback(callback: Callable) -> void:
 	"""Définit une fonction de validation personnalisée"""
 	validation_callback = callback
 
-func add_accepted_type(type: String):
+func add_accepted_type(type: String) -> void:
 	"""Ajoute un type accepté"""
 	if type not in accepted_types:
 		accepted_types.append(type)
 
-func remove_accepted_type(type: String):
+func remove_accepted_type(type: String) -> void:
 	"""Supprime un type accepté"""
 	accepted_types.erase(type)
 
@@ -413,18 +413,18 @@ func get_item_with_data(key: String, value) -> DraggableItem:
 
 # ==================== CONFIGURATIONS PRÉDÉFINIES ====================
 
-func setup_for_equipment_slot(slot_type: String):
+func setup_for_equipment_slot(slot_type: String) -> void:
 	"""Configuration pour un slot d'équipement"""
 	accepted_types = ["equipment", "item"]
 	max_items = 1
 	drop_policy = DropPolicy.REPLACE
 	set_placeholder_text(slot_type.capitalize())
-	
+
 	# Validation spécifique à l'équipement
 	validation_callback = func(item: DraggableItem, data: Dictionary, zone: DropZone) -> bool:
 		return data.get("slot_type", "") == slot_type
 
-func setup_for_group_member_slot(max_members: int = 5):
+func setup_for_group_member_slot(max_members: int = 5) -> void:
 	"""Configuration pour les slots de membres de groupe"""
 	accepted_types = ["member", "player"]
 	max_items = max_members
@@ -432,14 +432,14 @@ func setup_for_group_member_slot(max_members: int = 5):
 	allow_reorder = true
 	set_placeholder_text("Drop members here")
 
-func setup_for_inventory_slot():
+func setup_for_inventory_slot() -> void:
 	"""Configuration pour un slot d'inventaire"""
 	accepted_types = ["item", "equipment", "consumable"]
 	max_items = 1
 	drop_policy = DropPolicy.SWAP
 	set_placeholder_text("Empty")
 
-func setup_for_tab_container():
+func setup_for_tab_container() -> void:
 	"""Configuration pour réorganiser les onglets"""
 	accepted_types = ["tab"]
 	max_items = -1  # Illimité
@@ -451,7 +451,7 @@ func setup_for_tab_container():
 
 static func create_equipment_slot(slot_type: String, parent: Node) -> DropZone:
 	"""Crée un slot d'équipement"""
-	var drop_zone = DropZone.new()
+	var drop_zone := DropZone.new()
 	drop_zone.setup_for_equipment_slot(slot_type)
 	drop_zone.custom_minimum_size = Vector2(64, 64)
 	parent.add_child(drop_zone)
@@ -459,7 +459,7 @@ static func create_equipment_slot(slot_type: String, parent: Node) -> DropZone:
 
 static func create_group_slot(max_members: int, parent: Node) -> DropZone:
 	"""Crée un slot de groupe"""
-	var drop_zone = DropZone.new()
+	var drop_zone := DropZone.new()
 	drop_zone.setup_for_group_member_slot(max_members)
 	drop_zone.custom_minimum_size = Vector2(200, 100)
 	parent.add_child(drop_zone)

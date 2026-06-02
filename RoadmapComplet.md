@@ -660,6 +660,42 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Passe de typage statique (2 juin 2026)
+*3 lots, ~60 fichiers. Validé : TestRunner 172/172 + **CheckScripts 104 scripts compilés sans erreur** + boot live.*
+- 🟠 **Typage statique conservateur** appliqué à tout le code (mandat CLAUDE.md) : types de retour (`-> void`/concret), paramètres, variables locales et collections homogènes (`Array[T]`).
+  - **Lot 1** : resources + data (modèle de données).
+  - **Lot 2** : systèmes + autoloads + utils (`save_manager` laissé intact — blobs JSON).
+  - **Lot 3** : UI (fenêtres, composants, dialogs, managers).
+- **Règle d'or** : les Variants (issus de `Dictionary.get`, `JSON`, autoloads dynamiques, duck-typing `player`/`member`, API drag&drop Godot) laissés **non typés** pour ne pas casser la compilation.
+- **Outillage** : `tests/CheckScripts.tscn` (validateur de compile complet, **104 scripts**) ajouté au flux de vérif — il attrape les erreurs de compilation de `main.gd`/UI que `TestRunner` n'exerce pas (ex. une inférence `:=` cassée corrigée dans `player_control_panel.gd`).
+
+### Refactor god-object — main.gd dégonflé (2 juin 2026)
+*172/172 assertions vertes + boot live vérifié (MCP). Comportement identique.*
+- 🟠 **`main.gd` : ~1080 → ~720 lignes** via 2 extractions à comportement identique :
+  - **`DebugMenuPanel`** (`scripts/ui/components/debug_menu.gd`) : le menu de debug (debug-only) + ses actions, instancié par `main` (qui lui passe le `WindowManager`). F1/F2 → `trigger()`.
+  - **`SystemNotifier`** (`scripts/systems/system_notifier.gd`) : relais des signaux managers (National/Esport/Cohésion) → chat/toast. Le seul cas couplé (popup modal de drama, qui met le jeu en pause) reste dans `main`, re-signalé via `drama_response_needed`.
+- 🟠 **`fenetre_monde.gd` : 1222 → 768 lignes** — extraction de tout l'onglet Recrutement dans **`RecruitmentPanel`** (`scripts/ui/windows/recruitment_panel.gd`, composant autonome). Émet `player_recruited`, ré-émis par la fenêtre. Bonus : suppression d'un hack de navigation d'arbre (remplacé par une réf membre). **Flux de recrutement vérifié en live** (liste, sélection, détails, filtre, signal) ; classement conservé dans la fenêtre. Référencé via `preload` (robuste cache/export/CI).
+
+### Correctifs d'audit — vague 1 : bugs critiques UI/Gameplay/Code (2 juin 2026)
+*172 assertions vertes (Godot 4.6.2 headless) + validation runtime MCP. Implémentation de `AuditAmeliorations2.md` via 8 sous-agents (modules isolés) + correctifs cœur. Codes C* = entrées de la synthèse de l'audit.*
+
+- 🔴 **C1 — Désync du perso-joueur après chargement (root cause trouvée en live)** : après un load, `SaveManager` reconstruit le joueur et remplace `GuildManager.player_character`, mais `main` + le panneau de contrôle continuaient de piloter l'**ancien** objet orphelin (hors guilde) → le joueur « montait niveau 17 au chat » tout en restant « Niv.1 » dans l'UI/guilde, objectif Phase 0 inatteignable. **Fix** : re-wiring sur `SaveManager.load_completed` (`_rewire_player_after_load` dans `main.gd`) qui re-pointe main + panneau + signaux vers le personnage chargé. Vérifié en jeu : niveau 1→19, toutes les références cohérentes.
+- 🔴 **C3 — Or détruit + spam de toasts** : `gold_storage` niv 3 relevé 1000→8000 (`guild_perks_data.gd`) ; `Guild.add_gold` ne notifie qu'**une fois** à la transition « trésorerie pleine » (fin du spam).
+- 🔴 **C4 — Boucle énergie/épuisement intrusive** : `_perform_rest` rendu **non bloquant** (plus de modale « Épuisement total » → repos instantané + toast) ; drains d'énergie adoucis (LEVELING 15→9/h, etc.), seuil de fatigue 4h→6h.
+- 🟠 **C5** : recalcul de classement débouncé sur `day_changed` (flag « dirty » au lieu de `create_timer` empilés) ; graphe social ré-indexé (`id→membre` + adjacence) → O(degré) au lieu de O(M⁴).
+- 🔴 **C6** : ternaire à précédence piégeuse corrigé (`guild_ranking.gd`).
+- 🟠 **C7** : signal `member_left` déclaré + émis dans `remove_member` (la notif de départ se déclenche enfin).
+- ✅ **C9** : déjà câblé (`main._process` → `update_dungeons`). **C10** : l'activité ne produit plus de gains hors-ligne (garde `is_online`). **C11** : rôles de combat lus via `get_role()`. **C12** : binding de signaux d'`EffectSystem` réparé (lambdas à signature exacte + disconnect symétrique). **C13** : fermer un événement le résout (plus de file figée). **C14** : popups loot/drama résolus par défaut à la fermeture (plus de soft-lock) + abandon de donjon idempotent à propriétaire unique. **C15** : le perso-joueur protégé des départs aléatoires. **C16** : raccourcis clavier respectent les verrous de phase.
+- 🧹 **Propreté** : ~couleurs sémantiques dérivées de `UIConstants` (source unique), polling UI supprimé (`time_display`/`player_control_panel` → signaux), clamp des fenêtres au viewport, activité « Fun » retirée de l'organisation de groupe, contenu de donjon gaté par phase/niveau, nombreux warnings éditeur réglés (params/signaux/shadowing/division entière).
+
+### Correctifs d'audit — vague 2 : réactivité UI, BBCode, scaling IA, CI (2 juin 2026)
+*172/172 assertions vertes + validation runtime MCP. Warnings éditeur 273→111.*
+- 🟠 **Fermeture propre des fenêtres** : Personnage/Guilde/Monde émettent désormais `close_requested` (teardown propre par `WindowManager`) au lieu de `hide()` qui désynchronisait l'état (bouton de menu actif incorrect).
+- 🟠 **Réactivité live** : fenêtre Personnage rafraîchit le niveau sur `member_leveled_up` (polling 3 s supprimé) ; liste Guilde réactive aux level-up / recrutements / départs ; classement Monde réactif à `ranking_updated`.
+- 🟠 **Fuite BBCode** : panneaux de description (recrue / guilde) passés de `Label` à `RichTextLabel` (`bbcode_enabled`).
+- 🟠 **Équilibrage IA** : nombre de guildes National 49→13, Esport 99→15 ; progression **hebdomadaire lissée** (fin du gate `week % 4` → classement en marches d'escalier à haute vitesse).
+- ✅ **CI** : workflow GitHub Actions (`.github/workflows/tests.yml`) — Godot 4.6.2 → `CheckScripts` + `TestRunner` sur PR/push main.
+
 ### Banque de guilde + drag&drop d'équipement (2 juin 2026)
 *171 assertions vertes + E2E drag&drop 5/5 (Godot 4.6.2). Dernier lot « reporté » de l'audit livré.*
 - ✅ **Banque de guilde** : `Guild.bank_items` devient une vraie banque d'`Item` (`add_to_bank`/`remove_from_bank`/`get_bank_items`, plafonnée à 60 avec trim par rareté/iLvl). Sérialisée dans `SaveManager` (rétrocompatible).

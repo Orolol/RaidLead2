@@ -34,33 +34,33 @@ enum TargetType {
 @export var blocks_actions: Array = []  # Array[String] - Actions bloquées par l'effet
 @export var enables_actions: Array = []  # Array[String] - Actions activées par l'effet
 
-func _init():
+func _init() -> void:
 	pass
 
 func get_tooltip() -> String:
-	var tooltip = "[b]%s[/b]\n%s" % [name, description]
-	
+	var tooltip: String = "[b]%s[/b]\n%s" % [name, description]
+
 	if duration > 0:
 		tooltip += "\n[color=gray]Durée: %.1f heures[/color]" % duration
 	else:
 		tooltip += "\n[color=gray]Permanent[/color]"
-	
+
 	if can_stack and max_stacks > 1:
 		tooltip += "\n[color=yellow]Peut se cumuler (max %d)[/color]" % max_stacks
-	
+
 	if stat_modifiers.size() > 0 or percentage_modifiers.size() > 0:
 		tooltip += "\n[b]Effets:[/b]"
-		
+
 		for stat in stat_modifiers:
 			var value = stat_modifiers[stat]
-			var sign_str = "+" if value > 0 else ""
+			var sign_str: String = "+" if value > 0 else ""
 			tooltip += "\n  %s %s%s" % [stat, sign_str, str(value)]
-		
+
 		for stat in percentage_modifiers:
 			var value = percentage_modifiers[stat]
-			var sign_str = "+" if value > 0 else ""
+			var sign_str: String = "+" if value > 0 else ""
 			tooltip += "\n  %s %s%d%%" % [stat, sign_str, value]
-	
+
 	return tooltip
 
 func is_compatible_with(other_effect: Effect) -> bool:

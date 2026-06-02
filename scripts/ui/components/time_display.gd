@@ -21,16 +21,17 @@ const SPEED_PRESETS := [
 ]
 var _speed_preset_buttons: Array = []
 
-func _ready():
+func _ready() -> void:
 	# On récupérera l'instance de GameTime depuis l'autoload
 	game_time = GameTime
 	server_version = ServerVersion
 	
 	if game_time:
-		# Connecte les signaux
+		# Connecte les signaux (event-driven, plus de polling dans _process)
+		game_time.minute_changed.connect(_on_minute_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 		game_time.day_changed.connect(_on_day_changed)
-		
+
 		# Configure les contrôles
 		pause_button.pressed.connect(_on_pause_button_pressed)
 		debug_version_button.visible = OS.is_debug_build()
@@ -44,39 +45,47 @@ func _ready():
 		_setup_speed_presets()
 
 		# Mise à jour initiale
+		_update_time_label()
 		_update_display()
 		_update_speed_label()
-	
+
 	if server_version:
 		server_version.version_updated.connect(_on_server_version_updated)
 		_update_server_version_display()
 
-func _process(_delta):
-	if game_time:
-		time_label.text = game_time.get_current_time_string()
-		# Ajouter un indicateur de pause
-		if game_time.is_paused:
-			time_label.text += " [PAUSE]"
-			time_label.modulate = Color(1, 1, 0.5)  # Jaune pâle
-		else:
-			time_label.modulate = Color.WHITE
+func _on_minute_changed(_minute: int, _hour: int) -> void:
+	_update_time_label()
 
-func _on_hour_changed(_hour: int):
+func _on_hour_changed(_hour: int) -> void:
 	_update_display()
 
-func _on_day_changed(_day: int, _week: int, _year: int):
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	_update_display()
 
-func _update_display():
+func _update_time_label() -> void:
+	if not game_time:
+		return
+	time_label.text = game_time.get_current_time_string()
+	# Indicateur de pause (mis à jour aussi depuis le callback du bouton)
+	if game_time.is_paused:
+		time_label.text += " [PAUSE]"
+		time_label.modulate = Color(1, 1, 0.5)  # Jaune pâle
+	else:
+		time_label.modulate = Color.WHITE
+
+func _update_display() -> void:
 	if game_time:
 		date_label.text = game_time.get_current_date_string()
 
-func _on_pause_button_pressed():
+func _on_pause_button_pressed() -> void:
 	if game_time:
 		game_time.toggle_pause()
 		pause_button.text = "Reprendre" if game_time.is_paused else "Pause"
+		# Le label [PAUSE] est rafraîchi immédiatement (sinon il attendrait
+		# le prochain tick de minute, qui est figé pendant la pause).
+		_update_time_label()
 
-func _on_debug_version_button_pressed():
+func _on_debug_version_button_pressed() -> void:
 	if server_version:
 		var current = server_version.get_current_version()
 		var next_version = null
@@ -91,7 +100,7 @@ func _on_debug_version_button_pressed():
 			server_version.force_version_update(next_version)
 			print("Version forcée vers %s" % next_version)
 
-func _on_speed_changed(value: float):
+func _on_speed_changed(value: float) -> void:
 	if game_time:
 		game_time.set_time_speed(value)
 		_update_speed_label()
@@ -126,14 +135,14 @@ func _highlight_active_preset() -> void:
 	for entry in _speed_preset_buttons:
 		entry.button.set_pressed_no_signal(is_equal_approx(entry.value, game_time.time_speed))
 
-func _update_speed_label():
+func _update_speed_label() -> void:
 	if game_time:
 		speed_label.text = "Vitesse: x%.1f" % game_time.time_speed
 
-func _on_server_version_updated(_new_version: float, _update_name: String):
+func _on_server_version_updated(_new_version: float, _update_name: String) -> void:
 	_update_server_version_display()
 
-func _update_server_version_display():
+func _update_server_version_display() -> void:
 	if server_version and server_version_label:
 		var version_info = server_version.get_current_version_info()
 		var days_until_next = server_version.get_days_until_next_version()

@@ -2,8 +2,6 @@ class_name RandomEventResource
 extends Resource
 const Singletons = preload("res://scripts/utils/singletons.gd")
 
-const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
-
 @export var id: String = ""
 @export var title: String = ""
 @export var description: String = ""
@@ -32,7 +30,7 @@ const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
 @export var category: String = "general"
 @export var tags: Array = []  # Array[String] - temporarily untyped for compatibility
 
-func _init():
+func _init() -> void:
 	pass
 
 func is_eligible(game_state: Dictionary = {}) -> bool:
@@ -43,7 +41,7 @@ func is_eligible(game_state: Dictionary = {}) -> bool:
 	
 	return true
 
-func _evaluate_condition(condition_data: Dictionary, game_state: Dictionary) -> bool:
+func _evaluate_condition(condition_data: Dictionary, _game_state: Dictionary) -> bool:
 	var condition_type = condition_data.get("type", "")
 	var condition_value = condition_data.get("value", null)
 	
@@ -120,8 +118,8 @@ func _check_value_condition(actual_value, condition_value) -> bool:
 		return actual_value >= condition_value
 
 func get_available_choices(player_data: Dictionary = {}, guild_data: Dictionary = {}) -> Array:
-	var available_choices = []
-	
+	var available_choices: Array = []
+
 	for choice in choices:
 		if choice.is_available(player_data, guild_data):
 			available_choices.append(choice)
@@ -148,7 +146,7 @@ func get_display_data() -> Dictionary:
 	}
 
 func get_tooltip() -> String:
-	var tooltip = "[b]%s[/b]\n%s" % [title, description]
+	var tooltip: String = "[b]%s[/b]\n%s" % [title, description]
 	
 	if event_chain_id != "":
 		tooltip += "\n[color=yellow]Partie %d de la chaîne '%s'[/color]" % [chain_position + 1, event_chain_id]

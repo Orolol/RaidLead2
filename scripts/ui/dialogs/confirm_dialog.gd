@@ -37,13 +37,14 @@ const ICON_SYMBOLS = {
 	IconType.SUCCESS: "✅"
 }
 
-# Couleurs par type
+# Couleurs par type (sémantiques dérivées de la palette canonique UIConstants ;
+# QUESTION garde sa teinte propre, sans équivalent sémantique)
 const ICON_COLORS = {
 	IconType.QUESTION: Color(0.4, 0.7, 1.0),
-	IconType.WARNING: Color(0.9, 0.7, 0.2),
-	IconType.DANGER: Color(0.9, 0.3, 0.3),
-	IconType.INFO: Color(0.4, 0.7, 1.0),
-	IconType.SUCCESS: Color(0.3, 0.8, 0.3)
+	IconType.WARNING: UIConstants.COLOR_WARNING,
+	IconType.DANGER: UIConstants.COLOR_ERROR,
+	IconType.INFO: UIConstants.COLOR_INFO,
+	IconType.SUCCESS: UIConstants.COLOR_SUCCESS
 }
 
 # Éléments UI
@@ -57,11 +58,11 @@ var cancel_button: Button
 var confirm_callback: Callable
 var cancel_callback: Callable
 
-func _ready():
+func _ready() -> void:
 	super._ready()
 	_setup_confirm_dialog()
 
-func _setup_confirm_dialog():
+func _setup_confirm_dialog() -> void:
 	"""Configure le dialogue de confirmation"""
 	
 	# Taille par défaut
@@ -77,9 +78,9 @@ func _setup_confirm_dialog():
 	# Focus par défaut
 	_set_default_focus()
 
-func _create_content():
+func _create_content() -> void:
 	"""Crée le contenu du dialogue"""
-	
+
 	content_container = HBoxContainer.new()
 	content_container.add_theme_constant_override("separation", 15)
 	set_content(content_container)
@@ -105,14 +106,14 @@ func _create_content():
 	message_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content_container.add_child(message_label)
 
-func _create_buttons():
+func _create_buttons() -> void:
 	"""Crée les boutons du dialogue"""
-	
+
 	# Bouton Cancel
 	cancel_button = add_button(cancel_text, _on_cancel_pressed, ButtonStyle.SECONDARY)
-	
+
 	# Bouton Confirm
-	var confirm_style = ButtonStyle.PRIMARY
+	var confirm_style: ButtonStyle = ButtonStyle.PRIMARY
 	match icon_type:
 		IconType.DANGER:
 			confirm_style = ButtonStyle.DANGER
@@ -120,10 +121,10 @@ func _create_buttons():
 			confirm_style = ButtonStyle.WARNING
 		IconType.SUCCESS:
 			confirm_style = ButtonStyle.SUCCESS
-	
+
 	confirm_button = add_button(confirm_text, _on_confirm_pressed, confirm_style)
 
-func _set_default_focus():
+func _set_default_focus() -> void:
 	"""Définit le focus par défaut"""
 	await get_tree().process_frame
 	
@@ -139,45 +140,45 @@ func _set_default_focus():
 
 # ==================== SETTERS ====================
 
-func set_message(new_message: String):
+func set_message(new_message: String) -> void:
 	message = new_message
 	if message_label:
 		message_label.text = message
 
-func set_confirm_text(text: String):
+func set_confirm_text(text: String) -> void:
 	confirm_text = text
 	if confirm_button:
 		confirm_button.text = text
 
-func set_cancel_text(text: String):
+func set_cancel_text(text: String) -> void:
 	cancel_text = text
 	if cancel_button:
 		cancel_button.text = text
 
-func set_show_icon(show: bool):
-	show_icon = show
+func set_show_icon(should_show: bool) -> void:
+	show_icon = should_show
 	if icon_label:
-		icon_label.visible = show
+		icon_label.visible = should_show
 
-func set_icon_type(type: IconType):
+func set_icon_type(type: IconType) -> void:
 	icon_type = type
 	if icon_label:
 		icon_label.text = ICON_SYMBOLS[type]
 		icon_label.add_theme_color_override("font_color", ICON_COLORS[type])
 
-func set_default_button(button: DefaultButton):
+func set_default_button(button: DefaultButton) -> void:
 	default_button = button
 	if is_inside_tree():
 		_set_default_focus()
 
 # ==================== API PUBLIQUE ====================
 
-func set_callbacks(on_confirm: Callable = Callable(), on_cancel: Callable = Callable()):
+func set_callbacks(on_confirm: Callable = Callable(), on_cancel: Callable = Callable()) -> void:
 	"""Définit les callbacks pour les actions"""
 	confirm_callback = on_confirm
 	cancel_callback = on_cancel
 
-func setup_question(question: String, on_yes: Callable = Callable(), on_no: Callable = Callable()):
+func setup_question(question: String, on_yes: Callable = Callable(), on_no: Callable = Callable()) -> void:
 	"""Configure comme question Oui/Non"""
 	set_message(question)
 	set_confirm_text("Oui")
@@ -185,7 +186,7 @@ func setup_question(question: String, on_yes: Callable = Callable(), on_no: Call
 	set_icon_type(IconType.QUESTION)
 	set_callbacks(on_yes, on_no)
 
-func setup_warning(warning: String, on_proceed: Callable = Callable(), on_cancel: Callable = Callable()):
+func setup_warning(warning: String, on_proceed: Callable = Callable(), on_cancel: Callable = Callable()) -> void:
 	"""Configure comme avertissement"""
 	set_message(warning)
 	set_confirm_text("Continuer")
@@ -194,7 +195,7 @@ func setup_warning(warning: String, on_proceed: Callable = Callable(), on_cancel
 	set_default_button(DefaultButton.CANCEL)  # Cancel par défaut pour les warnings
 	set_callbacks(on_proceed, on_cancel)
 
-func setup_danger(danger_message: String, on_proceed: Callable = Callable(), on_cancel: Callable = Callable()):
+func setup_danger(danger_message: String, on_proceed: Callable = Callable(), on_cancel: Callable = Callable()) -> void:
 	"""Configure comme action dangereuse"""
 	set_message(danger_message)
 	set_confirm_text("Supprimer")
@@ -203,9 +204,9 @@ func setup_danger(danger_message: String, on_proceed: Callable = Callable(), on_
 	set_default_button(DefaultButton.CANCEL)  # Cancel par défaut pour les actions dangereuses
 	set_callbacks(on_proceed, on_cancel)
 
-func setup_delete_confirmation(item_name: String, on_delete: Callable = Callable(), on_cancel: Callable = Callable()):
+func setup_delete_confirmation(item_name: String, on_delete: Callable = Callable(), on_cancel: Callable = Callable()) -> void:
 	"""Configure pour confirmation de suppression"""
-	var message_text = "Êtes-vous sûr de vouloir supprimer [b]%s[/b] ?\n\nCette action est [color=red]irréversible[/color]." % item_name
+	var message_text: String = "Êtes-vous sûr de vouloir supprimer [b]%s[/b] ?\n\nCette action est [color=red]irréversible[/color]." % item_name
 	set_message(message_text)
 	set_confirm_text("Supprimer")
 	set_cancel_text("Annuler")
@@ -213,15 +214,15 @@ func setup_delete_confirmation(item_name: String, on_delete: Callable = Callable
 	set_default_button(DefaultButton.CANCEL)
 	set_callbacks(on_delete, on_cancel)
 
-func setup_save_confirmation(on_save: Callable = Callable(), on_dont_save: Callable = Callable(), on_cancel: Callable = Callable()):
+func setup_save_confirmation(on_save: Callable = Callable(), on_dont_save: Callable = Callable(), on_cancel: Callable = Callable()) -> void:
 	"""Configure pour confirmation de sauvegarde"""
 	set_message("Voulez-vous sauvegarder les modifications ?")
 	set_icon_type(IconType.QUESTION)
-	
+
 	# Supprimer les boutons par défaut
 	for child in button_area.get_children():
 		child.queue_free()
-	
+
 	# Ajouter trois boutons
 	add_button("Annuler", on_cancel, ButtonStyle.SECONDARY)
 	add_button("Ne pas sauvegarder", on_dont_save, ButtonStyle.WARNING)
@@ -229,29 +230,29 @@ func setup_save_confirmation(on_save: Callable = Callable(), on_dont_save: Calla
 
 # ==================== GESTIONNAIRES D'ÉVÉNEMENTS ====================
 
-func _on_confirm_pressed():
+func _on_confirm_pressed() -> void:
 	"""Bouton confirmer pressé"""
 	set_result_data("confirmed", true)
 	set_result_data("action", "confirm")
-	
+
 	if confirm_callback.is_valid():
 		confirm_callback.call(get_result())
-	
+
 	confirm_dialog(get_result())
 
-func _on_cancel_pressed():
+func _on_cancel_pressed() -> void:
 	"""Bouton annuler pressé"""
 	set_result_data("confirmed", false)
 	set_result_data("action", "cancel")
-	
+
 	if cancel_callback.is_valid():
 		cancel_callback.call(get_result())
-	
+
 	cancel_dialog()
 
 # ==================== GESTION CLAVIER ====================
 
-func _unhandled_key_input(event: InputEvent):
+func _unhandled_key_input(event: InputEvent) -> void:
 	"""Gère les raccourcis clavier spécifiques"""
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
@@ -271,7 +272,7 @@ func _unhandled_key_input(event: InputEvent):
 
 static func show_question(title: String, question: String, on_yes: Callable = Callable(), on_no: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche une question simple"""
-	var dialog = ModalConfirmDialog.new()
+	var dialog := ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_question(question, on_yes, on_no)
 	
@@ -285,7 +286,7 @@ static func show_question(title: String, question: String, on_yes: Callable = Ca
 
 static func show_warning(title: String, warning: String, on_proceed: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche un avertissement"""
-	var dialog = ModalConfirmDialog.new()
+	var dialog := ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_warning(warning, on_proceed, on_cancel)
 	
@@ -299,7 +300,7 @@ static func show_warning(title: String, warning: String, on_proceed: Callable = 
 
 static func show_delete_confirmation(title: String, item_name: String, on_delete: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche une confirmation de suppression"""
-	var dialog = ModalConfirmDialog.new()
+	var dialog := ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_delete_confirmation(item_name, on_delete, on_cancel)
 	
@@ -313,7 +314,7 @@ static func show_delete_confirmation(title: String, item_name: String, on_delete
 
 static func show_save_confirmation(title: String = "Sauvegarder", on_save: Callable = Callable(), on_dont_save: Callable = Callable(), on_cancel: Callable = Callable(), parent: Node = null) -> ModalConfirmDialog:
 	"""Affiche une confirmation de sauvegarde"""
-	var dialog = ModalConfirmDialog.new()
+	var dialog := ModalConfirmDialog.new()
 	dialog.dialog_title = title
 	dialog.setup_save_confirmation(on_save, on_dont_save, on_cancel)
 	
@@ -327,27 +328,27 @@ static func show_save_confirmation(title: String = "Sauvegarder", on_save: Calla
 
 # ==================== CONFIGURATIONS PRÉDÉFINIES ====================
 
-func setup_for_guild_member_removal(member_name: String, on_remove: Callable = Callable()):
+func setup_for_guild_member_removal(member_name: String, on_remove: Callable = Callable()) -> void:
 	"""Configuration pour suppression de membre de guilde"""
-	var message_text = "Êtes-vous sûr de vouloir retirer [b]%s[/b] de la guilde ?\n\nLe joueur perdra tous ses privilèges et son historique." % member_name
+	var message_text: String = "Êtes-vous sûr de vouloir retirer [b]%s[/b] de la guilde ?\n\nLe joueur perdra tous ses privilèges et son historique." % member_name
 	setup_danger(message_text, on_remove)
 	set_confirm_text("Retirer")
 
-func setup_for_equipment_replacement(item_name: String, on_replace: Callable = Callable()):
+func setup_for_equipment_replacement(item_name: String, on_replace: Callable = Callable()) -> void:
 	"""Configuration pour remplacement d'équipement"""
-	var message_text = "Remplacer l'équipement actuel par [b]%s[/b] ?" % item_name
+	var message_text: String = "Remplacer l'équipement actuel par [b]%s[/b] ?" % item_name
 	setup_question(message_text, on_replace)
 	set_confirm_text("Remplacer")
 
-func setup_for_dungeon_abandon(on_abandon: Callable = Callable()):
+func setup_for_dungeon_abandon(on_abandon: Callable = Callable()) -> void:
 	"""Configuration pour abandon de donjon"""
-	var message_text = "Abandonner le donjon en cours ?\n\n[color=orange]Attention :[/color] Tous les progrès seront perdus."
+	var message_text: String = "Abandonner le donjon en cours ?\n\n[color=orange]Attention :[/color] Tous les progrès seront perdus."
 	setup_warning(message_text, on_abandon)
 	set_confirm_text("Abandonner")
 
-func setup_for_phase_transition(phase_name: String, on_proceed: Callable = Callable()):
+func setup_for_phase_transition(phase_name: String, on_proceed: Callable = Callable()) -> void:
 	"""Configuration pour transition de phase"""
-	var message_text = "Passer à la phase [b]%s[/b] ?\n\nCette action déclenchera de nouveaux défis et mécaniques." % phase_name
+	var message_text: String = "Passer à la phase [b]%s[/b] ?\n\nCette action déclenchera de nouveaux défis et mécaniques." % phase_name
 	setup_question(message_text, on_proceed)
 	set_confirm_text("Progresser")
 	set_icon_type(IconType.SUCCESS)

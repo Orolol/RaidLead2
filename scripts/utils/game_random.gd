@@ -48,7 +48,7 @@ static func weighted_pick(options: Array, weights: Array):
 		return null
 
 	var total_weight: float = 0.0
-	for w in weights:
+	for w: float in weights:
 		total_weight += w
 
 	var roll: float = randf() * total_weight

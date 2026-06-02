@@ -1,5 +1,7 @@
 extends PanelContainer
 
+signal close_requested
+
 const PlayerTagsData = preload("res://scripts/data/player_tags.gd")
 const EquipmentWindow = preload("res://scenes/Fenetre_Equipement.tscn")
 
@@ -33,12 +35,12 @@ var drag_offset: Vector2
 var resize_start_pos: Vector2
 var resize_start_size: Vector2
 
-func _ready():
+func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(800, 600)
 	size = Vector2(1000, 700)
-	
-	var vbox = VBoxContainer.new()
+
+	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 0)
 	add_child(vbox)
 	
@@ -53,6 +55,9 @@ func _ready():
 		guild_manager.member_disconnected.connect(_on_member_status_changed)
 		guild_manager.guild_level_changed.connect(_on_guild_level_changed)
 		guild_manager.guild_perk_unlocked.connect(_on_guild_perk_unlocked)
+		guild_manager.member_leveled_up.connect(_on_member_leveled_up)
+		guild_manager.member_recruited.connect(_on_member_recruited)
+		guild_manager.member_left.connect(_on_member_left)
 	
 	hide()
 	_load_test_members()
@@ -63,14 +68,14 @@ func refresh_window() -> void:
 	_refresh_member_list()
 	_update_guild_info()
 
-func _setup_header(parent: VBoxContainer):
+func _setup_header(parent: VBoxContainer) -> void:
 	# Barre de titre personnalisée
 	title_bar = Panel.new()
 	title_bar.custom_minimum_size = Vector2(0, 30)
 	title_bar.modulate = Color(0.8, 0.8, 0.9)
 	parent.add_child(title_bar)
-	
-	var header = HBoxContainer.new()
+
+	var header: HBoxContainer = HBoxContainer.new()
 	header.add_theme_constant_override("separation", 10)
 	title_bar.add_child(header)
 	
@@ -95,7 +100,7 @@ func _setup_header(parent: VBoxContainer):
 	# Connecte les événements pour le drag
 	title_bar.gui_input.connect(_on_title_bar_input)
 
-func _setup_content(parent: VBoxContainer):
+func _setup_content(parent: VBoxContainer) -> void:
 	# Panel d'informations de guilde
 	var guild_info_panel: PanelContainer = PanelContainer.new()
 	guild_info_panel.custom_minimum_size = Vector2(0, 80)
@@ -161,25 +166,25 @@ func _setup_content(parent: VBoxContainer):
 
 	_setup_loot_history_tab(history_tab)
 
-func _setup_member_details():
-	var details_label = Label.new()
+func _setup_member_details() -> void:
+	var details_label: Label = Label.new()
 	details_label.text = "Détails du Membre"
 	details_label.add_theme_font_size_override("font_size", 16)
 	member_details.add_child(details_label)
-	
-	var info_label = Label.new()
+
+	var info_label: Label = Label.new()
 	info_label.text = "Sélectionnez un membre pour voir ses détails"
 	info_label.modulate = Color(0.7, 0.7, 0.7)
 	member_details.add_child(info_label)
 
-func _load_test_members():
+func _load_test_members() -> void:
 	# Utiliser les membres existants du GuildManager au lieu d'en créer de nouveaux
 	if guild_manager:
 		guild_members = guild_manager.guild_members.duplicate()
 	
 	_refresh_member_list()
 
-func _refresh_member_list():
+func _refresh_member_list() -> void:
 	# Synchroniser avec le GuildManager au cas où de nouveaux membres auraient été ajoutés
 	if guild_manager:
 		guild_members = guild_manager.guild_members.duplicate()
@@ -188,13 +193,13 @@ func _refresh_member_list():
 
 	members_list.clear()
 	for member in guild_members:
-		var status = "[Hors ligne]"
+		var status: String = "[Hors ligne]"
 		if member.is_online:
 			status = "[En ligne]"
 			if member.current_activity:
 				status = "[%s]" % member.current_activity.get_type_string()
 
-		var text = "%s %s - %s Niv.%d" % [member.nom, status, member.personnage_classe, member.personnage_niveau]
+		var text: String = "%s %s - %s Niv.%d" % [member.nom, status, member.personnage_classe, member.personnage_niveau]
 		var portrait: Texture2D = AssetLoader.get_class_portrait(member.personnage_classe)
 		if portrait:
 			members_list.add_item(text, portrait)
@@ -206,14 +211,14 @@ func _refresh_member_list():
 		else:
 			members_list.set_item_custom_fg_color(idx, Color(0.90, 0.90, 0.93))
 
-func _on_member_selected(index: int):
+func _on_member_selected(index: int) -> void:
 	if index < 0 or index >= guild_members.size():
 		return
-	
+
 	selected_member = guild_members[index]
 	_update_member_details()
 
-func _update_member_details():
+func _update_member_details() -> void:
 	for child in member_details.get_children():
 		child.queue_free()
 	
@@ -221,41 +226,41 @@ func _update_member_details():
 		return
 	
 	# Header avec portrait
-	var header_hbox = HBoxContainer.new()
+	var header_hbox: HBoxContainer = HBoxContainer.new()
 	header_hbox.add_theme_constant_override("separation", 12)
 	member_details.add_child(header_hbox)
 
 	var portrait: Texture2D = AssetLoader.get_class_portrait(selected_member.personnage_classe)
 	if portrait:
-		var portrait_rect = TextureRect.new()
+		var portrait_rect: TextureRect = TextureRect.new()
 		portrait_rect.texture = portrait
 		portrait_rect.custom_minimum_size = Vector2(64, 64)
 		portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		header_hbox.add_child(portrait_rect)
 
-	var name_vbox = VBoxContainer.new()
+	var name_vbox: VBoxContainer = VBoxContainer.new()
 	header_hbox.add_child(name_vbox)
 
-	var details_label = Label.new()
+	var details_label: Label = Label.new()
 	details_label.text = selected_member.nom
 	details_label.add_theme_font_size_override("font_size", 18)
 	name_vbox.add_child(details_label)
 
-	var subtitle_hbox = HBoxContainer.new()
+	var subtitle_hbox: HBoxContainer = HBoxContainer.new()
 	subtitle_hbox.add_theme_constant_override("separation", 6)
 	name_vbox.add_child(subtitle_hbox)
 
 	var role_icon: Texture2D = AssetLoader.get_role_icon(selected_member.get_role())
 	if role_icon:
-		var role_rect = TextureRect.new()
+		var role_rect: TextureRect = TextureRect.new()
 		role_rect.texture = role_icon
 		role_rect.custom_minimum_size = Vector2(20, 20)
 		role_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		role_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		subtitle_hbox.add_child(role_rect)
 
-	var subtitle_label = Label.new()
+	var subtitle_label: Label = Label.new()
 	subtitle_label.text = "%s %s - Niv.%d" % [selected_member.get_role(), selected_member.personnage_classe, selected_member.personnage_niveau]
 	subtitle_label.add_theme_font_size_override("font_size", 13)
 	subtitle_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
@@ -263,29 +268,29 @@ func _update_member_details():
 
 	member_details.add_child(HSeparator.new())
 
-	var info_grid = GridContainer.new()
+	var info_grid: GridContainer = GridContainer.new()
 	info_grid.columns = 2
 	info_grid.add_theme_constant_override("h_separation", 20)
 	info_grid.add_theme_constant_override("v_separation", 10)
 	member_details.add_child(info_grid)
 
 	_add_detail_row(info_grid, "Équipement:", selected_member.get_equipment_summary())
-	
+
 	member_details.add_child(HSeparator.new())
-	
+
 	# Titre des métriques
-	var metrics_label = Label.new()
+	var metrics_label: Label = Label.new()
 	metrics_label.text = "Métriques:"
 	metrics_label.add_theme_font_size_override("font_size", 14)
 	member_details.add_child(metrics_label)
-	
+
 	# Container pour les StatDisplay
-	var stats_container = VBoxContainer.new()
+	var stats_container: VBoxContainer = VBoxContainer.new()
 	stats_container.add_theme_constant_override("separation", 8)
 	member_details.add_child(stats_container)
-	
+
 	# Énergie avec StatDisplay
-	var energy_display = StatDisplay.new()
+	var energy_display: StatDisplay = StatDisplay.new()
 	energy_display.stat_name = "Énergie"
 	energy_display.current_value = selected_member.energy
 	energy_display.max_value = 100.0
@@ -295,7 +300,7 @@ func _update_member_details():
 	stats_container.add_child(energy_display)
 	
 	# Humeur avec StatDisplay
-	var mood_display = StatDisplay.new()
+	var mood_display: StatDisplay = StatDisplay.new()
 	mood_display.stat_name = "Humeur"
 	mood_display.current_value = selected_member.mood
 	mood_display.max_value = 100.0
@@ -305,7 +310,7 @@ func _update_member_details():
 	stats_container.add_child(mood_display)
 	
 	# Intégration avec StatDisplay
-	var integration_display = StatDisplay.new()
+	var integration_display: StatDisplay = StatDisplay.new()
 	integration_display.stat_name = "Intégration"
 	integration_display.current_value = selected_member.integration
 	integration_display.max_value = 100.0
@@ -315,7 +320,7 @@ func _update_member_details():
 	stats_container.add_child(integration_display)
 	
 	# Skill avec StatDisplay
-	var skill_display = StatDisplay.new()
+	var skill_display: StatDisplay = StatDisplay.new()
 	skill_display.stat_name = "Compétence"
 	skill_display.current_value = selected_member.skill
 	skill_display.max_value = 100.0
@@ -324,13 +329,13 @@ func _update_member_details():
 	skill_display.custom_minimum_size = Vector2(300, 25)
 	stats_container.add_child(skill_display)
 	
-	var status = "Hors ligne"
+	var status: String = "Hors ligne"
 	if selected_member.is_online:
 		status = "En ligne"
 	_add_detail_row(info_grid, "Statut:", status)
-	
+
 	if selected_member.current_activity:
-		var activity_text = selected_member.current_activity.get_type_string()
+		var activity_text: String = selected_member.current_activity.get_type_string()
 		if selected_member.current_activity.location != "":
 			activity_text += " à " + selected_member.current_activity.location
 		_add_detail_row(info_grid, "Activité:", activity_text)
@@ -345,27 +350,27 @@ func _update_member_details():
 	
 	member_details.add_child(HSeparator.new())
 	
-	var tags_label = Label.new()
+	var tags_label: Label = Label.new()
 	tags_label.text = "Tags comportementaux connus:"
 	member_details.add_child(tags_label)
-	
-	var tags_container = HFlowContainer.new()
+
+	var tags_container: HFlowContainer = HFlowContainer.new()
 	tags_container.add_theme_constant_override("h_separation", 5)
 	tags_container.add_theme_constant_override("v_separation", 5)
 	member_details.add_child(tags_container)
-	
+
 	# Affiche les tags visibles
 	for tag in selected_member.tags_comportement:
-		var tag_button = Button.new()
+		var tag_button: Button = Button.new()
 		tag_button.text = tag
 		tag_button.flat = true
 		tag_button.tooltip_text = PlayerTagsData.get_tag_description(tag)
 		tag_button.modulate = Color(0.8, 0.8, 1.0)
 		tags_container.add_child(tag_button)
-	
+
 	# Affiche le nombre de tags cachés
 	if selected_member.tags_caches.size() > 0:
-		var hidden_label = Label.new()
+		var hidden_label: Label = Label.new()
 		hidden_label.text = "\n(%d tags encore cachés)" % selected_member.tags_caches.size()
 		hidden_label.modulate = Color(0.6, 0.6, 0.6)
 		member_details.add_child(hidden_label)
@@ -381,13 +386,13 @@ func _update_member_details():
 		})
 		
 		if potential_reveals.size() > 0:
-			var hint_label = Label.new()
+			var hint_label: Label = Label.new()
 			hint_label.text = "Prochain tag pourrait être révélé bientôt..."
 			hint_label.modulate = Color(0.7, 0.7, 0.5)
 			hint_label.add_theme_font_size_override("font_size", 12)
 			member_details.add_child(hint_label)
 
-func _setup_loot_history_tab(parent: VBoxContainer):
+func _setup_loot_history_tab(parent: VBoxContainer) -> void:
 	var title_label_hist: Label = Label.new()
 	title_label_hist.text = "Historique des Loots"
 	title_label_hist.add_theme_font_size_override("font_size", 16)
@@ -405,7 +410,7 @@ func _setup_loot_history_tab(parent: VBoxContainer):
 
 	_refresh_loot_history()
 
-func _refresh_loot_history():
+func _refresh_loot_history() -> void:
 	if not loot_history_container:
 		return
 
@@ -467,42 +472,55 @@ func _refresh_loot_history():
 		dungeon_label.modulate = Color(0.7, 0.7, 0.7)
 		hbox.add_child(dungeon_label)
 
-func _add_detail_row(parent: GridContainer, label_text: String, value_text: String):
-	var label = Label.new()
+func _add_detail_row(parent: GridContainer, label_text: String, value_text: String) -> void:
+	var label: Label = Label.new()
 	label.text = label_text
 	label.add_theme_font_size_override("font_size", 14)
 	parent.add_child(label)
-	
-	var value = Label.new()
+
+	var value: Label = Label.new()
 	value.text = value_text
 	value.add_theme_font_size_override("font_size", 14)
 	value.modulate = Color(0.9, 0.9, 1.0)
 	parent.add_child(value)
 
-func _on_close_pressed():
-	hide()
+func _on_close_pressed() -> void:
+	close_requested.emit()
 
-func add_member(player):
+func add_member(player) -> void:
 	guild_members.append(player)
 	if guild_manager:
 		guild_manager.add_member(player)
 	_refresh_member_list()
 	_update_guild_info()
 
-func _on_member_activity_changed(player, _activity):
+func _on_member_activity_changed(player, _activity) -> void:
 	if player in guild_members:
 		_refresh_member_list()
 		if selected_member == player:
 			_update_member_details()
 
-func _on_member_status_changed(player):
+func _on_member_status_changed(player) -> void:
 	if player in guild_members:
 		_refresh_member_list()
 		if selected_member == player:
 			_update_member_details()
+
+func _on_member_leveled_up(player, _new_level: int) -> void:
+	_refresh_member_list()
+	if selected_member == player:
+		_update_member_details()
+
+func _on_member_recruited(_player) -> void:
+	_refresh_member_list()
+	_update_guild_info()
+
+func _on_member_left(_player) -> void:
+	_refresh_member_list()
+	_update_guild_info()
 
 # Gestion du drag de la fenêtre
-func _on_title_bar_input(event: InputEvent):
+func _on_title_bar_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
@@ -511,12 +529,12 @@ func _on_title_bar_input(event: InputEvent):
 			else:
 				is_dragging = false
 
-func _gui_input(event: InputEvent):
+func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		if is_dragging:
 			global_position = event.global_position + drag_offset
 		elif is_resizing:
-			var new_size = resize_start_size + (event.global_position - resize_start_pos)
+			var new_size: Vector2 = resize_start_size + (event.global_position - resize_start_pos)
 			size = Vector2(
 				max(custom_minimum_size.x, new_size.x),
 				max(custom_minimum_size.y, new_size.y)
@@ -536,52 +554,52 @@ func _gui_input(event: InputEvent):
 				is_resizing = false
 
 func _is_on_resize_edge(pos: Vector2) -> bool:
-	var margin = 10
+	var margin: int = 10
 	return (pos.x > size.x - margin and pos.y > size.y - margin) or \
 		   (pos.x > size.x - margin) or \
 		   (pos.y > size.y - margin)
 
-func _update_cursor(pos: Vector2):
+func _update_cursor(pos: Vector2) -> void:
 	if _is_on_resize_edge(pos):
 		mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
 	else:
 		mouse_default_cursor_shape = Control.CURSOR_ARROW
 
-func _setup_guild_info(parent: VBoxContainer):
-	var guild_name_label = Label.new()
+func _setup_guild_info(parent: VBoxContainer) -> void:
+	var guild_name_label: Label = Label.new()
 	guild_name_label.text = "Ma Guilde"
 	guild_name_label.add_theme_font_size_override("font_size", 20)
 	parent.add_child(guild_name_label)
-	
-	var info_hbox = HBoxContainer.new()
+
+	var info_hbox: HBoxContainer = HBoxContainer.new()
 	info_hbox.add_theme_constant_override("separation", 30)
 	parent.add_child(info_hbox)
-	
+
 	# Niveau et XP
-	var level_vbox = VBoxContainer.new()
+	var level_vbox: VBoxContainer = VBoxContainer.new()
 	info_hbox.add_child(level_vbox)
-	
+
 	guild_level_label = Label.new()
 	guild_level_label.text = "Niveau 1"
 	guild_level_label.add_theme_font_size_override("font_size", 16)
 	level_vbox.add_child(guild_level_label)
-	
+
 	guild_xp_label = Label.new()
 	guild_xp_label.text = "XP: 0 / 200"
 	guild_xp_label.modulate = Color(0.8, 0.8, 0.8)
 	level_vbox.add_child(guild_xp_label)
-	
+
 	# Membres
 	guild_members_label = Label.new()
 	guild_members_label.text = "Membres: 0 / 5"
 	guild_members_label.add_theme_font_size_override("font_size", 14)
 	info_hbox.add_child(guild_members_label)
-	
+
 	# Perks actifs
-	var perks_vbox = VBoxContainer.new()
+	var perks_vbox: VBoxContainer = VBoxContainer.new()
 	info_hbox.add_child(perks_vbox)
-	
-	var perks_title = Label.new()
+
+	var perks_title: Label = Label.new()
 	perks_title.text = "Perks actifs:"
 	perks_title.add_theme_font_size_override("font_size", 12)
 	perks_vbox.add_child(perks_title)
@@ -594,7 +612,7 @@ func _setup_guild_info(parent: VBoxContainer):
 	
 	_update_guild_info()
 
-func _update_guild_info():
+func _update_guild_info() -> void:
 	if not guild_manager or not guild_manager.guild:
 		return
 		
@@ -618,14 +636,14 @@ func _update_guild_info():
 			perk_names.append(perk.name)
 		guild_perks_label.text = ", ".join(perk_names)
 
-func _on_guild_level_changed(_new_level: int):
+func _on_guild_level_changed(_new_level: int) -> void:
 	_update_guild_info()
-	
-func _on_guild_perk_unlocked(perk_name: String, _level: int):
+
+func _on_guild_perk_unlocked(_perk_name: String, _level: int) -> void:
 	_update_guild_info()
 	# On pourrait afficher une notification ici
 
-func _setup_context_menu():
+func _setup_context_menu() -> void:
 	# Créer le menu contextuel
 	context_menu = PopupMenu.new()
 	add_child(context_menu)
@@ -644,12 +662,12 @@ func _setup_context_menu():
 	# Connecter le signal de sélection
 	context_menu.id_pressed.connect(_on_context_menu_pressed)
 
-func _on_context_menu_pressed(id: int):
+func _on_context_menu_pressed(id: int) -> void:
 	if right_clicked_member_index < 0 or right_clicked_member_index >= guild_members.size():
 		return
-		
+
 	var member = guild_members[right_clicked_member_index]
-	
+
 	match id:
 		0: # Voir l'équipement
 			_show_equipment_window(member)
@@ -658,7 +676,7 @@ func _on_context_menu_pressed(id: int):
 		2: # Exclure de la guilde
 			_confirm_kick_member(member)
 
-func _confirm_kick_member(member):
+func _confirm_kick_member(member) -> void:
 	"""Affiche une confirmation avant d'exclure un membre"""
 	var dialog = load("res://scripts/ui/components/confirm_dialog.gd").new()
 	dialog.dialog_type = dialog.DialogType.DESTRUCTIVE
@@ -669,7 +687,7 @@ func _confirm_kick_member(member):
 	get_tree().root.add_child(dialog)
 	dialog.show_dialog()
 
-func _kick_member(member):
+func _kick_member(member) -> void:
 	"""Exclut un membre de la guilde"""
 	if guild_manager:
 		guild_manager.remove_member(member)
@@ -684,7 +702,7 @@ func _kick_member(member):
 				"Membre exclu"
 			)
 
-func _show_equipment_window(member):
+func _show_equipment_window(member) -> void:
 	# Nettoyer l'ancienne instance si elle existe
 	if equipment_window_instance:
 		equipment_window_instance.queue_free()
@@ -697,11 +715,11 @@ func _show_equipment_window(member):
 	# Afficher l'équipement du membre
 	equipment_window_instance.show_member_equipment(member)
 
-func _on_members_list_gui_input(event: InputEvent):
+func _on_members_list_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			# Trouver l'index de l'item sous la souris
-			var item_index = members_list.get_item_at_position(event.position, true)
+			var item_index: int = members_list.get_item_at_position(event.position, true)
 			if item_index >= 0 and item_index < guild_members.size():
 				right_clicked_member_index = item_index
 				
@@ -710,6 +728,6 @@ func _on_members_list_gui_input(event: InputEvent):
 				_on_member_selected(item_index)
 				
 				# Afficher le menu contextuel à la position du clic
-				var global_position = members_list.global_position + event.position
-				context_menu.position = Vector2i(global_position)
+				var menu_position: Vector2 = members_list.global_position + event.position
+				context_menu.position = Vector2i(menu_position)
 				context_menu.popup()

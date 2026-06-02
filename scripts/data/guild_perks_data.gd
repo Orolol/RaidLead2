@@ -14,7 +14,7 @@ static var PERKS = {
 		"description": "Débloque l'activité Farming pour générer de l'or et des potions",
 		"effects": {
 			"unlock_farming": true,
-			"gold_storage": 1000
+			"gold_storage": 8000
 		}
 	},
 	4: {
@@ -78,15 +78,15 @@ static func get_xp_for_level(level: int) -> int:
 	return (level - 1) * 200 + get_xp_for_level(level - 1)
 
 static func get_level_from_xp(xp: int) -> int:
-	var level = 1
+	var level: int = 1
 	while get_xp_for_level(level + 1) <= xp and level < 10:
 		level += 1
 	return level
 
 static func get_xp_progress(xp: int) -> Dictionary:
-	var level = get_level_from_xp(xp)
-	var current_level_xp = get_xp_for_level(level)
-	var next_level_xp = get_xp_for_level(level + 1)
+	var level: int = get_level_from_xp(xp)
+	var current_level_xp: int = get_xp_for_level(level)
+	var next_level_xp: int = get_xp_for_level(level + 1)
 	
 	return {
 		"level": level,
@@ -98,16 +98,16 @@ static func get_xp_progress(xp: int) -> Dictionary:
 	}
 
 static func get_active_perks(level: int) -> Array:
-	var active_perks = []
+	var active_perks: Array = []
 	for perk_level in PERKS.keys():
 		if perk_level <= level:
-			var perk_data = PERKS[perk_level].duplicate()
+			var perk_data: Dictionary = PERKS[perk_level].duplicate()
 			perk_data["level"] = perk_level
 			active_perks.append(perk_data)
 	return active_perks
 
 static func get_combined_effects(level: int) -> Dictionary:
-	var effects = {
+	var effects: Dictionary = {
 		"max_members": 10,  # Commence avec 10 membres au niveau 1
 		"can_recruit": false,
 		"unlock_farming": false,
@@ -122,7 +122,7 @@ static func get_combined_effects(level: int) -> Dictionary:
 	
 	for perk_level in PERKS.keys():
 		if perk_level <= level:
-			var perk_effects = PERKS[perk_level]["effects"]
+			var perk_effects: Dictionary = PERKS[perk_level]["effects"]
 			for effect_key in perk_effects:
 				if effect_key in effects:
 					if typeof(effects[effect_key]) == TYPE_FLOAT or typeof(effects[effect_key]) == TYPE_INT:

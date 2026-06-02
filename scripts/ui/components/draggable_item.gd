@@ -34,33 +34,33 @@ signal drag_cancelled(item: DraggableItem, data: Dictionary)
 signal hover_drop_zone(item: DraggableItem, drop_zone: Control)
 signal leave_drop_zone(item: DraggableItem, drop_zone: Control)
 
-func _ready():
+func _ready() -> void:
 	if not content_container:
 		content_container = self
-	
+
 	_setup_mouse_handling()
 
-func _setup_mouse_handling():
+func _setup_mouse_handling() -> void:
 	"""Configure la gestion de la souris"""
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	gui_input.connect(_on_gui_input)
 
 # ==================== SETTERS ====================
 
-func set_drag_enabled(enabled: bool):
+func set_drag_enabled(enabled: bool) -> void:
 	drag_enabled = enabled
 	if is_inside_tree():
 		mouse_filter = Control.MOUSE_FILTER_PASS if enabled else Control.MOUSE_FILTER_IGNORE
 
-func set_drag_data(data: Dictionary):
+func set_drag_data(data: Dictionary) -> void:
 	drag_data = data
 
-func set_drag_types(types: Array[String]):
+func set_drag_types(types: Array[String]) -> void:
 	drag_types = types
 
 # ==================== GESTION DES ÉVÉNEMENTS ====================
 
-func _on_gui_input(event: InputEvent):
+func _on_gui_input(event: InputEvent) -> void:
 	if not drag_enabled:
 		return
 		
@@ -74,34 +74,34 @@ func _on_gui_input(event: InputEvent):
 	elif event is InputEventMouseMotion and is_dragging:
 		_on_mouse_drag(event.position)
 
-func _on_mouse_press(mouse_pos: Vector2):
+func _on_mouse_press(mouse_pos: Vector2) -> void:
 	"""Démarre potentiellement un drag"""
 	drag_start_position = mouse_pos
 	original_position = global_position
 	original_parent = get_parent()
 	original_z_index = z_index
-	
+
 	# Capturer la souris pour les événements en dehors du control
 	set_process_unhandled_input(true)
 
-func _on_mouse_drag(mouse_pos: Vector2):
+func _on_mouse_drag(mouse_pos: Vector2) -> void:
 	"""Gère le drag en cours"""
-	var drag_distance = drag_start_position.distance_to(mouse_pos)
-	
+	var drag_distance: float = drag_start_position.distance_to(mouse_pos)
+
 	if not is_dragging and drag_distance > drag_threshold:
 		_start_drag()
-	
+
 	if is_dragging:
 		_update_drag_position(mouse_pos)
 
-func _on_mouse_release(mouse_pos: Vector2):
+func _on_mouse_release(_mouse_pos: Vector2) -> void:
 	"""Termine le drag"""
 	set_process_unhandled_input(false)
-	
+
 	if is_dragging:
 		_end_drag()
 
-func _unhandled_input(event: InputEvent):
+func _unhandled_input(event: InputEvent) -> void:
 	"""Gère les événements souris globaux pendant le drag"""
 	if not is_dragging:
 		return
@@ -118,37 +118,37 @@ func _unhandled_input(event: InputEvent):
 
 # ==================== LOGIQUE DRAG & DROP ====================
 
-func _start_drag():
+func _start_drag() -> void:
 	"""Démarre le drag"""
 	is_dragging = true
-	
+
 	# Créer le ghost
 	_create_ghost()
-	
+
 	# Modifier l'apparence de l'original
 	modulate.a = 0.5
-	
+
 	# Amener au premier plan
 	z_index = 1000
-	
+
 	# Émettre le signal
 	drag_started.emit(self, drag_data)
 
-func _update_drag_position(mouse_pos: Vector2):
+func _update_drag_position(_mouse_pos: Vector2) -> void:
 	"""Met à jour la position pendant le drag"""
 	if not is_dragging or not ghost_node:
 		return
-	
+
 	# Calculer la position globale de la souris
-	var global_mouse_pos = get_global_mouse_position()
-	
+	var global_mouse_pos: Vector2 = get_global_mouse_position()
+
 	# Positionner le ghost
 	ghost_node.global_position = global_mouse_pos - mouse_offset
 
-func _check_drop_zones(mouse_pos: Vector2):
+func _check_drop_zones(mouse_pos: Vector2) -> void:
 	"""Vérifie si on survole une drop zone valide"""
-	var new_drop_zone = _find_drop_zone_at_position(mouse_pos)
-	
+	var new_drop_zone: Control = _find_drop_zone_at_position(mouse_pos)
+
 	if new_drop_zone != current_drop_zone:
 		# Quitter l'ancienne zone
 		if current_drop_zone:
@@ -162,11 +162,11 @@ func _check_drop_zones(mouse_pos: Vector2):
 
 func _find_drop_zone_at_position(global_pos: Vector2) -> Control:
 	"""Trouve la drop zone à une position donnée"""
-	var space_state = get_world_2d().direct_space_state
-	var query = PhysicsPointQueryParameters2D.new()
+	var space_state := get_world_2d().direct_space_state
+	var query := PhysicsPointQueryParameters2D.new()
 	query.position = global_pos
 	query.collision_mask = 1  # Ajuster selon les besoins
-	
+
 	# Méthode alternative : parcourir les drop zones connues
 	return _find_drop_zone_recursive(get_tree().root, global_pos)
 
@@ -177,43 +177,43 @@ func _find_drop_zone_recursive(node: Node, global_pos: Vector2) -> Control:
 		if control.get_global_rect().has_point(global_pos):
 			if control.can_accept_drop(self, drag_data):
 				return control
-	
+
 	for child in node.get_children():
-		var result = _find_drop_zone_recursive(child, global_pos)
+		var result: Control = _find_drop_zone_recursive(child, global_pos)
 		if result:
 			return result
-	
+
 	return null
 
-func _enter_drop_zone(drop_zone: Control):
+func _enter_drop_zone(drop_zone: Control) -> void:
 	"""Entre dans une drop zone"""
 	if drop_zone.has_method("on_drag_hover_enter"):
 		drop_zone.on_drag_hover_enter(self, drag_data)
-	
+
 	hover_drop_zone.emit(self, drop_zone)
 
-func _leave_drop_zone(drop_zone: Control):
+func _leave_drop_zone(drop_zone: Control) -> void:
 	"""Quitte une drop zone"""
 	if drop_zone.has_method("on_drag_hover_exit"):
 		drop_zone.on_drag_hover_exit(self, drag_data)
-	
+
 	leave_drop_zone.emit(self, drop_zone)
 
-func _end_drag():
+func _end_drag() -> void:
 	"""Termine le drag"""
 	if not is_dragging:
 		return
 	
-	var successful_drop = false
-	
+	var successful_drop: bool = false
+
 	# Tenter le drop dans la zone courante
 	if current_drop_zone:
 		if current_drop_zone.has_method("accept_drop"):
 			successful_drop = current_drop_zone.accept_drop(self, drag_data)
-	
+
 	# Nettoyer
 	_cleanup_drag()
-	
+
 	if successful_drop:
 		drag_ended.emit(self, drag_data, current_drop_zone)
 	else:
@@ -221,16 +221,16 @@ func _end_drag():
 			_animate_back_to_original()
 		drag_cancelled.emit(self, drag_data)
 
-func _cancel_drag():
+func _cancel_drag() -> void:
 	"""Annule le drag (clic droit)"""
 	if not is_dragging:
 		return
-	
+
 	_cleanup_drag()
 	_animate_back_to_original()
 	drag_cancelled.emit(self, drag_data)
 
-func _cleanup_drag():
+func _cleanup_drag() -> void:
 	"""Nettoie après un drag"""
 	is_dragging = false
 	set_process_unhandled_input(false)
@@ -249,18 +249,18 @@ func _cleanup_drag():
 		_leave_drop_zone(current_drop_zone)
 		current_drop_zone = null
 
-func _animate_back_to_original():
+func _animate_back_to_original() -> void:
 	"""Anime le retour à la position originale"""
 	if not original_parent:
 		return
-	
-	var tween = create_tween()
+
+	var tween := create_tween()
 	tween.tween_property(self, "global_position", original_position, return_animation_duration)
 	tween.set_ease(Tween.EASE_OUT)
 
 # ==================== GESTION DU GHOST ====================
 
-func _create_ghost():
+func _create_ghost() -> void:
 	"""Crée l'image fantôme pendant le drag"""
 	if not content_container:
 		return
@@ -270,7 +270,7 @@ func _create_ghost():
 	ghost_node.name = "DragGhost"
 	
 	# Copier l'apparence
-	var ghost_content = _create_ghost_content()
+	var ghost_content: Control = _create_ghost_content()
 	ghost_node.add_child(ghost_content)
 	
 	# Style du ghost
@@ -290,13 +290,13 @@ func _create_ghost():
 func _create_ghost_content() -> Control:
 	"""Crée le contenu visuel du ghost"""
 	# Pour l'instant, copier simplement l'apparence
-	var ghost_content = ColorRect.new()
+	var ghost_content := ColorRect.new()
 	ghost_content.color = Color(0.8, 0.8, 0.8, 0.5)
 	ghost_content.size = content_container.size
-	
+
 	# Ajouter un label si on a des données textuelles
 	if drag_data.has("text"):
-		var label = Label.new()
+		var label := Label.new()
 		label.text = drag_data.text
 		label.add_theme_color_override("font_color", Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -308,7 +308,7 @@ func _create_ghost_content() -> Control:
 
 # ==================== API PUBLIQUE ====================
 
-func start_drag_programmatically():
+func start_drag_programmatically() -> void:
 	"""Démarre un drag par programmation"""
 	if drag_enabled and not is_dragging:
 		drag_start_position = Vector2.ZERO
@@ -317,21 +317,21 @@ func start_drag_programmatically():
 		original_z_index = z_index
 		_start_drag()
 
-func cancel_drag_programmatically():
+func cancel_drag_programmatically() -> void:
 	"""Annule un drag par programmation"""
 	if is_dragging:
 		_cancel_drag()
 
-func set_drag_content(content: Control):
+func set_drag_content(content: Control) -> void:
 	"""Définit le contenu à draguer"""
 	content_container = content
 
-func add_drag_type(type: String):
+func add_drag_type(type: String) -> void:
 	"""Ajoute un type de drag"""
 	if type not in drag_types:
 		drag_types.append(type)
 
-func remove_drag_type(type: String):
+func remove_drag_type(type: String) -> void:
 	"""Supprime un type de drag"""
 	drag_types.erase(type)
 
@@ -352,15 +352,15 @@ func get_drag_info() -> Dictionary:
 
 static func make_draggable(control: Control, types: Array[String] = ["default"], data: Dictionary = {}) -> DraggableItem:
 	"""Utilitaire pour rendre un Control draggable"""
-	var draggable = DraggableItem.new()
+	var draggable := DraggableItem.new()
 	draggable.name = "DraggableWrapper"
 	draggable.drag_types = types
 	draggable.drag_data = data
 	draggable.content_container = control
-	
+
 	# Remplacer le control par le draggable
-	var parent = control.get_parent()
-	var index = control.get_index()
+	var parent: Node = control.get_parent()
+	var index: int = control.get_index()
 	
 	parent.remove_child(control)
 	parent.add_child(draggable)
@@ -380,21 +380,21 @@ func get_content() -> Control:
 
 # ==================== CONFIGURATIONS PRÉDÉFINIES ====================
 
-func setup_for_equipment_item(item_data: Dictionary):
+func setup_for_equipment_item(item_data: Dictionary) -> void:
 	"""Configuration pour les objets d'équipement"""
 	drag_types = ["equipment", "item"]
 	drag_data = item_data
 	ghost_scale = 0.8
 	ghost_opacity = 0.8
 
-func setup_for_guild_member(member_data: Dictionary):
+func setup_for_guild_member(member_data: Dictionary) -> void:
 	"""Configuration pour les membres de guilde"""
 	drag_types = ["member", "player"]
 	drag_data = member_data
 	ghost_scale = 0.9
 	ghost_opacity = 0.7
 
-func setup_for_tab(tab_data: Dictionary):
+func setup_for_tab(tab_data: Dictionary) -> void:
 	"""Configuration pour les onglets"""
 	drag_types = ["tab"]
 	drag_data = tab_data

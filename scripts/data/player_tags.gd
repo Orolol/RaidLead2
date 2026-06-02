@@ -130,20 +130,20 @@ static var TAG_DATABASE = {
 
 # Génère des tags pour un nouveau joueur
 static func generate_tags_for_player() -> Dictionary:
-	var visible_tags = []
-	var hidden_tags = []
-	var all_tags = TAG_DATABASE.keys()
+	var visible_tags: Array = []
+	var hidden_tags: Array = []
+	var all_tags: Array = TAG_DATABASE.keys()
 	all_tags.shuffle()
-	
+
 	# Sélectionne 2-4 tags visibles
-	var visible_count = randi_range(1, 2)
-	var hidden_count = randi_range(2, 4)
-	
+	var visible_count: int = randi_range(1, 2)
+	var hidden_count: int = randi_range(2, 4)
+
 	for tag in all_tags:
 		if visible_tags.size() >= visible_count and hidden_tags.size() >= hidden_count:
 			break
-			
-		var tag_data = TAG_DATABASE[tag]
+
+		var tag_data: Dictionary = TAG_DATABASE[tag]
 		
 		# Décide si le tag est visible ou caché
 		if visible_tags.size() < visible_count and randf() < tag_data.visible_chance:
@@ -168,7 +168,7 @@ static func can_reveal_tag(tag: String, player_data: Dictionary) -> bool:
 	if not TAG_DATABASE.has(tag):
 		return false
 		
-	var tag_info = TAG_DATABASE[tag]
+	var tag_info: Dictionary = TAG_DATABASE[tag]
 	var progress = player_data.get("reveal_progress", {}).get(tag, 0)
 	
 	match tag_info.reveal_condition:
@@ -195,15 +195,15 @@ static func get_tag_description(tag: String) -> String:
 
 # Obtient les tags qui pourraient être révélés prochainement
 static func get_potential_reveals(player_data: Dictionary) -> Array:
-	var potential = []
+	var potential: Array = []
 	var hidden_tags = player_data.get("hidden_tags", [])
-	
+
 	for tag in hidden_tags:
 		if not TAG_DATABASE.has(tag):
 			continue
-			
-		var tag_info = TAG_DATABASE[tag]
-		var reveal_info = {
+
+		var tag_info: Dictionary = TAG_DATABASE[tag]
+		var reveal_info: Dictionary = {
 			"tag": tag,
 			"condition": tag_info.reveal_condition,
 			"threshold": tag_info.reveal_threshold,

@@ -16,7 +16,7 @@ const STAT_LABELS := {
 @export var weapon: ItemScript = null
 @export var ring: ItemScript = null
 
-func _init():
+func _init() -> void:
 	helmet = null
 	shoulders = null
 	chest = null
@@ -27,9 +27,9 @@ func equip_item(item: ItemScript) -> ItemScript:
 	"""Équipe un objet et retourne l'ancien objet équipé (null si aucun)"""
 	if not item:
 		return null
-		
-	var old_item = null
-	
+
+	var old_item: ItemScript = null
+
 	match item.slot:
 		ItemScript.EquipmentSlot.HELMET:
 			old_item = helmet
@@ -61,7 +61,7 @@ func get_item_in_slot(slot: ItemScript.EquipmentSlot) -> ItemScript:
 
 func remove_item(slot: ItemScript.EquipmentSlot) -> ItemScript:
 	"""Retire un objet d'un slot et le retourne"""
-	var item = get_item_in_slot(slot)
+	var item: ItemScript = get_item_in_slot(slot)
 	
 	match slot:
 		ItemScript.EquipmentSlot.HELMET: helmet = null
@@ -74,8 +74,8 @@ func remove_item(slot: ItemScript.EquipmentSlot) -> ItemScript:
 
 func get_total_ilvl() -> int:
 	"""Calcule l'iLvl total de tout l'équipement"""
-	var total = 0
-	
+	var total: int = 0
+
 	if helmet: total += helmet.ilvl
 	if shoulders: total += shoulders.ilvl
 	if chest: total += chest.ilvl
@@ -98,8 +98,8 @@ func get_equipped_items() -> Array[ItemScript]:
 
 func get_slot_count() -> int:
 	"""Retourne le nombre de slots équipés"""
-	var count = 0
-	
+	var count: int = 0
+
 	if helmet: count += 1
 	if shoulders: count += 1
 	if chest: count += 1
@@ -110,7 +110,7 @@ func get_slot_count() -> int:
 
 func get_average_ilvl() -> float:
 	"""Retourne l'iLvl moyen des objets équipés"""
-	var equipped_count = get_slot_count()
+	var equipped_count: int = get_slot_count()
 	if equipped_count == 0:
 		return 0.0
 	return float(get_total_ilvl()) / float(equipped_count)
@@ -121,8 +121,8 @@ func is_slot_equipped(slot: ItemScript.EquipmentSlot) -> bool:
 
 func get_equipment_summary() -> String:
 	"""Retourne un résumé de l'équipement"""
-	var stat_summary = get_stats_summary()
-	var base_summary = "iLvl Total: %d (Moy: %.1f) - %d/%d slots" % [
+	var stat_summary: String = get_stats_summary()
+	var base_summary: String = "iLvl Total: %d (Moy: %.1f) - %d/%d slots" % [
 		get_total_ilvl(),
 		get_average_ilvl(), 
 		get_slot_count(),
@@ -134,7 +134,7 @@ func get_equipment_summary() -> String:
 
 func get_total_stats() -> Dictionary:
 	"""Retourne la somme des statistiques de l'équipement"""
-	var totals = {
+	var totals: Dictionary = {
 		"strength": 0,
 		"agility": 0,
 		"intelligence": 0
@@ -149,12 +149,12 @@ func get_total_stats() -> Dictionary:
 
 func get_stat_total(stat_name: String) -> int:
 	"""Retourne la valeur totale d'une statistique donnée"""
-	var totals = get_total_stats()
+	var totals: Dictionary = get_total_stats()
 	return totals.get(stat_name, 0)
 
 func get_stats_summary() -> String:
 	"""Retourne un résumé formaté des statistiques cumulées"""
-	var totals = get_total_stats()
+	var totals: Dictionary = get_total_stats()
 	var parts: Array[String] = []
 	for key in STAT_KEYS:
 		var value = totals.get(key, 0)

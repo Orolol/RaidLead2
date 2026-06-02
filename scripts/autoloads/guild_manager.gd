@@ -1,7 +1,7 @@
 extends Node
 
 const ActivityScript = preload("res://scripts/resources/activity.gd")
-const AIGuild = preload("res://scripts/resources/ai_guild.gd")
+# AIGuild : résolu via son class_name global (le preload redondant masquait l'identifiant global).
 const PlayerCharacterScript = preload("res://scripts/resources/player_character.gd")
 
 signal member_connected(player)
@@ -11,6 +11,9 @@ signal guild_level_changed(new_level)
 signal guild_perk_unlocked(perk_name)
 signal member_leveled_up(player, new_level)
 signal member_recruited(player)
+signal member_left(player)
+# réservé : non encore émis (la popup de conflit de loot s'y abonne)
+@warning_ignore("unused_signal")
 signal loot_conflict_occurred(conflict)
 signal bank_changed()
 
@@ -262,6 +265,8 @@ func remove_member(player, was_voluntary: bool = true) -> void:
 		guild_members.erase(player)
 		if behavior_system and behavior_system.has_method("forget_player"):
 			behavior_system.forget_player(player)
+		# Notifie le départ (NotificationManager y est abonné)
+		member_left.emit(player)
 
 func get_online_members() -> Array:
 	var online = []

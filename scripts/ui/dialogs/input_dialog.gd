@@ -50,11 +50,11 @@ var last_valid_value: String = ""
 signal input_validated(text: String, is_valid: bool)
 signal input_submitted(value: String)
 
-func _ready():
+func _ready() -> void:
 	super._ready()
 	_setup_input_dialog()
 
-func _setup_input_dialog():
+func _setup_input_dialog() -> void:
 	"""Configure le dialogue de saisie"""
 	
 	# Taille par défaut selon le type
@@ -74,9 +74,9 @@ func _setup_input_dialog():
 	_apply_input_type()
 	_validate_input()
 
-func _create_content():
+func _create_content() -> void:
 	"""Crée le contenu du dialogue"""
-	
+
 	content_container = VBoxContainer.new()
 	content_container.add_theme_constant_override("separation", 10)
 	set_content(content_container)
@@ -121,12 +121,12 @@ func _create_content():
 	
 	_update_character_count()
 
-func _create_buttons():
+func _create_buttons() -> void:
 	"""Crée les boutons du dialogue"""
-	
+
 	cancel_button = add_button("Annuler", _on_cancel_pressed, ButtonStyle.SECONDARY)
 	ok_button = add_button("OK", _on_ok_pressed, ButtonStyle.PRIMARY)
-	
+
 	# Focus sur le champ de saisie
 	await get_tree().process_frame
 	if input_field:
@@ -134,9 +134,9 @@ func _create_buttons():
 	elif text_area:
 		text_area.grab_focus()
 
-func _apply_input_type():
+func _apply_input_type() -> void:
 	"""Applique la configuration selon le type de saisie"""
-	
+
 	var field = input_field if input_field else text_area
 	if not field:
 		return
@@ -181,54 +181,54 @@ func _apply_input_type():
 
 # ==================== SETTERS ====================
 
-func set_input_label(label: String):
+func set_input_label(label: String) -> void:
 	input_label = label
 	if label_element:
 		label_element.text = label
 
-func set_input_type(type: InputType):
+func set_input_type(type: InputType) -> void:
 	input_type = type
 	if is_inside_tree():
 		_apply_input_type()
 		_validate_input()
 
-func set_placeholder(text: String):
+func set_placeholder(text: String) -> void:
 	placeholder = text
 	if input_field:
 		input_field.placeholder_text = text
 	elif text_area:
 		text_area.placeholder_text = text
 
-func set_default_value(value: String):
+func set_default_value(value: String) -> void:
 	default_value = value
 	if input_field:
 		input_field.text = value
 	elif text_area:
 		text_area.text = value
 
-func set_max_length(length: int):
+func set_max_length(length: int) -> void:
 	max_length = length
 	if input_field:
 		input_field.max_length = length
 
-func set_multiline(is_multiline: bool):
+func set_multiline(is_multiline: bool) -> void:
 	multiline = is_multiline
 	# Recréer l'interface si nécessaire
 	if is_inside_tree():
 		_setup_input_dialog()
 
-func set_required(is_required: bool):
+func set_required(is_required: bool) -> void:
 	required = is_required
 	_validate_input()
 
 # ==================== VALIDATION ====================
 
-func _validate_input():
+func _validate_input() -> void:
 	"""Valide la saisie actuelle"""
-	
-	var current_text = get_current_text()
-	var validation_result = _perform_validation(current_text)
-	
+
+	var current_text: String = get_current_text()
+	var validation_result: Dictionary = _perform_validation(current_text)
+
 	is_valid_input = validation_result.is_valid
 	
 	# Mettre à jour l'UI de validation
@@ -288,7 +288,7 @@ func _perform_validation(text: String) -> Dictionary:
 func _validate_text(text: String) -> Dictionary:
 	"""Validation pour texte libre"""
 	if validation_regex != "":
-		var regex = RegEx.new()
+		var regex := RegEx.new()
 		regex.compile(validation_regex)
 		if not regex.search(text):
 			return {"is_valid": false, "error_message": "Format invalide."}
@@ -299,8 +299,8 @@ func _validate_number(text: String) -> Dictionary:
 	"""Validation pour nombre entier"""
 	if not text.is_valid_int():
 		return {"is_valid": false, "error_message": "Veuillez entrer un nombre entier valide."}
-	
-	var value = text.to_int()
+
+	var value: int = text.to_int()
 	if value < min_value or value > max_value:
 		return {"is_valid": false, "error_message": "La valeur doit être entre %d et %d." % [min_value, max_value]}
 	
@@ -310,8 +310,8 @@ func _validate_float(text: String) -> Dictionary:
 	"""Validation pour nombre décimal"""
 	if not text.is_valid_float():
 		return {"is_valid": false, "error_message": "Veuillez entrer un nombre décimal valide."}
-	
-	var value = text.to_float()
+
+	var value: float = text.to_float()
 	if value < min_value or value > max_value:
 		return {"is_valid": false, "error_message": "La valeur doit être entre %.2f et %.2f." % [min_value, max_value]}
 	
@@ -326,7 +326,7 @@ func _validate_password(text: String) -> Dictionary:
 
 func _validate_email(text: String) -> Dictionary:
 	"""Validation pour email"""
-	var regex = RegEx.new()
+	var regex := RegEx.new()
 	regex.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
 	
 	if not regex.search(text):
@@ -346,7 +346,7 @@ func _validate_guild_name(text: String) -> Dictionary:
 	if text.length() < 3:
 		return {"is_valid": false, "error_message": "Le nom de guilde doit contenir au moins 3 caractères."}
 	
-	var regex = RegEx.new()
+	var regex := RegEx.new()
 	regex.compile("^[a-zA-Z0-9\\s\\-_]+$")
 	
 	if not regex.search(text):
@@ -359,7 +359,7 @@ func _validate_player_name(text: String) -> Dictionary:
 	if text.length() < 2:
 		return {"is_valid": false, "error_message": "Le nom de joueur doit contenir au moins 2 caractères."}
 	
-	var regex = RegEx.new()
+	var regex := RegEx.new()
 	regex.compile("^[a-zA-Z0-9_]+$")
 	
 	if not regex.search(text):
@@ -369,26 +369,26 @@ func _validate_player_name(text: String) -> Dictionary:
 
 # ==================== ÉVÉNEMENTS ====================
 
-func _on_text_changed(new_text: String = ""):
+func _on_text_changed(_new_text: String = "") -> void:
 	"""Texte modifié"""
 	_validate_input()
 	_update_character_count()
 
-func _on_text_submitted(text: String):
+func _on_text_submitted(_text: String) -> void:
 	"""Texte soumis (Entrée)"""
 	if is_valid_input:
 		_on_ok_pressed()
 
-func _on_ok_pressed():
+func _on_ok_pressed() -> void:
 	"""Bouton OK pressé"""
-	var current_text = get_current_text()
-	
+	var current_text: String = get_current_text()
+
 	if not is_valid_input:
 		return
-	
+
 	set_result_data("text", current_text)
 	set_result_data("submitted", true)
-	
+
 	# Conversion selon le type
 	match input_type:
 		InputType.NUMBER:
@@ -397,34 +397,34 @@ func _on_ok_pressed():
 			set_result_data("value", current_text.to_float())
 		_:
 			set_result_data("value", current_text)
-	
+
 	input_submitted.emit(current_text)
 	confirm_dialog(get_result())
 
-func _on_cancel_pressed():
+func _on_cancel_pressed() -> void:
 	"""Bouton annuler pressé"""
 	set_result_data("text", "")
 	set_result_data("submitted", false)
 	cancel_dialog()
 
-func _update_character_count():
+func _update_character_count() -> void:
 	"""Met à jour le compteur de caractères"""
-	var current_text = get_current_text()
-	var count_text = "%d" % current_text.length()
-	
+	var current_text: String = get_current_text()
+	var count_text: String = "%d" % current_text.length()
+
 	if max_length > 0:
 		count_text += "/%d" % max_length
-		
+
 		# Couleur selon la proximité de la limite
-		var ratio = float(current_text.length()) / float(max_length)
-		var color = Color.WHITE
+		var ratio: float = float(current_text.length()) / float(max_length)
+		var color: Color = Color.WHITE
 		if ratio >= 0.9:
 			color = Color.RED
 		elif ratio >= 0.7:
 			color = Color.YELLOW
-		
+
 		character_count_label.add_theme_color_override("font_color", color)
-	
+
 	character_count_label.text = count_text
 
 # ==================== API PUBLIQUE ====================
@@ -437,25 +437,25 @@ func get_current_text() -> String:
 		return text_area.text
 	return ""
 
-func set_validation_callback(callback: Callable):
+func set_validation_callback(callback: Callable) -> void:
 	"""Définit un callback de validation personnalisée"""
 	validation_callback = callback
 	_validate_input()
 
-func set_number_range(min_val: float, max_val: float):
+func set_number_range(min_val: float, max_val: float) -> void:
 	"""Définit la plage pour les nombres"""
 	min_value = min_val
 	max_value = max_val
 	_validate_input()
 
-func clear_input():
+func clear_input() -> void:
 	"""Efface la saisie"""
 	if input_field:
 		input_field.text = ""
 	elif text_area:
 		text_area.text = ""
 
-func select_all():
+func select_all() -> void:
 	"""Sélectionne tout le texte"""
 	if input_field:
 		input_field.select_all()
@@ -466,7 +466,7 @@ func select_all():
 
 static func show_text_input(title: String, label: String, default: String = "", callback: Callable = Callable(), parent: Node = null) -> InputDialog:
 	"""Affiche une saisie de texte simple"""
-	var dialog = InputDialog.new()
+	var dialog := InputDialog.new()
 	dialog.dialog_title = title
 	dialog.set_input_label(label)
 	dialog.set_default_value(default)
@@ -485,7 +485,7 @@ static func show_text_input(title: String, label: String, default: String = "", 
 
 static func show_number_input(title: String, label: String, default_val: int = 0, min_val: int = 0, max_val: int = 999999, callback: Callable = Callable(), parent: Node = null) -> InputDialog:
 	"""Affiche une saisie de nombre"""
-	var dialog = InputDialog.new()
+	var dialog := InputDialog.new()
 	dialog.dialog_title = title
 	dialog.set_input_label(label)
 	dialog.set_default_value(str(default_val))
@@ -505,7 +505,7 @@ static func show_number_input(title: String, label: String, default_val: int = 0
 
 static func show_guild_name_input(title: String = "Nom de Guilde", default_name: String = "", callback: Callable = Callable(), parent: Node = null) -> InputDialog:
 	"""Affiche une saisie de nom de guilde"""
-	var dialog = InputDialog.new()
+	var dialog := InputDialog.new()
 	dialog.dialog_title = title
 	dialog.set_input_label("Entrez le nom de la guilde :")
 	dialog.set_default_value(default_name)

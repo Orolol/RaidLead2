@@ -3,7 +3,7 @@ extends Node
 # Système de classement des guildes
 # Gère la compétition entre la guilde du joueur et les guildes IA
 
-const AIGuild = preload("res://scripts/resources/ai_guild.gd")
+# AIGuild est disponible globalement via son `class_name` (pas besoin de preload qui masque l'identifiant global).
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
 
 signal ranking_updated(rankings: Array)
@@ -27,6 +27,11 @@ var world_rankings: Array = []     # Pour Phase 3
 # Historique des positions
 var ranking_history: Dictionary = {}
 var last_ranking_update: Dictionary = {}
+
+# Recalcul du classement différé (debounce) : les fins de donjon/recrutements posent
+# ce flag plutôt que de relancer un tri complet (~100 guildes) à chaque fois. Le flag
+# est consommé une seule fois par jour/semaine pour éviter l'empilement à haute vitesse.
+var _ranking_dirty: bool = false
 
 # Configuration du système de scores
 const SCORE_WEIGHTS = {
@@ -55,7 +60,8 @@ func _ready() -> void:
 		
 	if GameTime:
 		GameTime.connect("week_changed", _on_week_changed)
-		
+		GameTime.connect("day_changed", _on_day_changed)
+
 	# Se connecter au PhaseManager s'il existe
 	if PhaseManager:
 		PhaseManager.connect("phase_changed", _on_phase_changed)
@@ -80,7 +86,7 @@ func _initialize_rankings() -> void:
 	if GuildManager and GuildManager.guild:
 		ranking_history[GuildManager.guild.name] = []
 
-func register_guild(guild_name: String, is_player_guild: bool = false) -> void:
+func register_guild(guild_name: String, _is_player_guild: bool = false) -> void:
 	"""Enregistre une guilde dans le système de classement"""
 	if not ranking_history.has(guild_name):
 		ranking_history[guild_name] = []
@@ -89,33 +95,33 @@ func register_guild(guild_name: String, is_player_guild: bool = false) -> void:
 
 func calculate_guild_score(guild_name: String, guild_data: Dictionary) -> float:
 	"""Calcule le score d'une guilde pour le classement"""
-	var score = 0.0
-	
+	var score: float = 0.0
+
 	# Score de progression PvE
-	var pve_score = _calculate_pve_score(guild_name, guild_data)
+	var pve_score: float = _calculate_pve_score(guild_name, guild_data)
 	score += pve_score * SCORE_WEIGHTS["pve_progress"]
-	
+
 	# Score de niveau de guilde
-	var level_score = _calculate_level_score(guild_data)
+	var level_score: float = _calculate_level_score(guild_data)
 	score += level_score * SCORE_WEIGHTS["guild_level"]
-	
+
 	# Score d'activité des membres
-	var activity_score = _calculate_activity_score(guild_data)
+	var activity_score: float = _calculate_activity_score(guild_data)
 	score += activity_score * SCORE_WEIGHTS["member_activity"]
-	
+
 	# Score de réputation
-	var reputation_score = _calculate_reputation_score(guild_name, guild_data)
+	var reputation_score: float = _calculate_reputation_score(guild_name, guild_data)
 	score += reputation_score * SCORE_WEIGHTS["reputation"]
-	
+
 	# Score de stabilité
-	var stability_score = _calculate_stability_score(guild_data)
+	var stability_score: float = _calculate_stability_score(guild_data)
 	score += stability_score * SCORE_WEIGHTS["stability"]
-	
+
 	return score
 
 func _calculate_pve_score(guild_name: String, guild_data: Dictionary) -> float:
 	"""Calcule le score de progression PvE"""
-	var score = 0.0
+	var score: float = 0.0
 	
 	# Server firsts (bonus majeur)
 	for content_id in server_firsts:
@@ -150,28 +156,28 @@ func _calculate_activity_score(guild_data: Dictionary) -> float:
 	var total_members = guild_data.get("total_members_count", 1)
 	if total_members <= 0:
 		return 0.0
-	var activity_ratio = float(active_members) / float(total_members)
-	
+	var activity_ratio: float = float(active_members) / float(total_members)
+
 	return activity_ratio * 300.0 + active_members * 10.0
 
-func _calculate_reputation_score(guild_name: String, guild_data: Dictionary) -> float:
+func _calculate_reputation_score(_guild_name: String, guild_data: Dictionary) -> float:
 	"""Calcule le score de réputation"""
 	var reputation = guild_data.get("reputation", 50.0)
-	
+
 	# Bonus/malus selon la réputation
-	var base_score = (reputation - 50.0) * 4.0  # -200 à +200
-	
+	var base_score: float = (reputation - 50.0) * 4.0  # -200 à +200
+
 	# Bonus pour événements spéciaux
 	var special_events = guild_data.get("special_achievements", [])
 	base_score += special_events.size() * 30.0
-	
+
 	return max(0.0, base_score)
 
 func _calculate_stability_score(guild_data: Dictionary) -> float:
 	"""Calcule le score de stabilité de l'équipe"""
 	var turnover_rate = guild_data.get("monthly_turnover", 0.2)  # Taux de rotation mensuel
-	var stability = 1.0 - turnover_rate
-	
+	var stability: float = 1.0 - turnover_rate
+
 	return stability * 150.0
 
 func update_rankings() -> void:
@@ -190,38 +196,38 @@ func update_rankings() -> void:
 
 func _update_server_rankings() -> void:
 	"""Met à jour le classement serveur"""
-	var guilds_data = []
-	
+	var guilds_data: Array = []
+
 	# Ajouter la guilde du joueur
 	if GuildManager and GuildManager.guild:
-		var player_guild_data = _get_player_guild_data()
+		var player_guild_data: Dictionary = _get_player_guild_data()
 		player_guild_data["is_player"] = true
 		guilds_data.append(player_guild_data)
-	
+
 	# Ajouter les guildes IA
 	if AIGuildManager:
-		var ai_guilds = AIGuildManager.get_all_guilds()
+		var ai_guilds: Array = AIGuildManager.get_all_guilds()
 		for ai_guild in ai_guilds:
-			var ai_guild_data = ai_guild.get_guild_data_for_ranking()
+			var ai_guild_data: Dictionary = ai_guild.get_guild_data_for_ranking()
 			ai_guild_data["is_player"] = false
 			guilds_data.append(ai_guild_data)
-	
+
 	# Calculer les scores et trier
 	for guild_data in guilds_data:
 		guild_data["score"] = calculate_guild_score(guild_data["name"], guild_data)
-	
+
 	# Trier par score décroissant
 	guilds_data.sort_custom(func(a, b): return a["score"] > b["score"])
-	
+
 	# Assigner les positions
 	for i in range(guilds_data.size()):
 		guilds_data[i]["position"] = i + 1
 		guilds_data[i]["rank_change"] = _calculate_rank_change(guilds_data[i]["name"], i + 1)
-	
+
 	# Mettre à jour l'historique
 	_update_ranking_history(guilds_data)
-	
-	var old_server_rankings = server_rankings.duplicate()
+
+	var old_server_rankings: Array = server_rankings.duplicate()
 	server_rankings = guilds_data
 	
 	# Émettre le signal de mise à jour
@@ -235,13 +241,13 @@ func _update_server_rankings() -> void:
 
 func _update_national_rankings() -> void:
 	"""Met a jour le classement national (Phase 2)."""
-	var old_national_rankings = national_rankings.duplicate()
+	var old_national_rankings: Array = national_rankings.duplicate()
 	national_rankings = _build_rankings_for_phase(PhaseManager.GamePhase.NATIONAL)
 	_publish_rankings("national", old_national_rankings, national_rankings)
 
 func _update_world_rankings() -> void:
 	"""Met a jour le classement mondial (Phase 3)."""
-	var old_world_rankings = world_rankings.duplicate()
+	var old_world_rankings: Array = world_rankings.duplicate()
 	world_rankings = _build_rankings_for_phase(PhaseManager.GamePhase.ESPORT)
 	_publish_rankings("mondial", old_world_rankings, world_rankings)
 
@@ -306,17 +312,17 @@ func _get_player_guild_data() -> Dictionary:
 		return {}
 	
 	var guild = GuildManager.guild
-	var members = GuildManager.guild_members
-	
+	var members: Array = GuildManager.guild_members
+
 	# Calculer les données nécessaires
-	var active_members = GuildManager.get_online_members().size()
-	var total_members = members.size()
-	
-	var cleared_content = _get_player_guild_cleared_content()
-	var recent_clears = _get_recent_clears("player_guild")
-	
+	var active_members: int = GuildManager.get_online_members().size()
+	var total_members: int = members.size()
+
+	var cleared_content: Array = _get_player_guild_cleared_content()
+	var recent_clears: Array = _get_recent_clears("player_guild")
+
 	# Calculer le taux de rotation (simplified)
-	var turnover = _calculate_turnover_rate(members)
+	var turnover: float = _calculate_turnover_rate(members)
 	
 	return {
 		"name": guild.name,
@@ -346,11 +352,11 @@ func _calculate_turnover_rate(members: Array) -> float:
 	if members.size() == 0:
 		return 0.0
 	
-	var low_integration_count = 0
+	var low_integration_count: int = 0
 	for member in members:
 		if member.integration < 30.0:
 			low_integration_count += 1
-	
+
 	return float(low_integration_count) / float(members.size()) * 0.3
 
 func _calculate_rank_change(guild_name: String, new_position: int) -> int:
@@ -366,8 +372,8 @@ func _calculate_rank_change(guild_name: String, new_position: int) -> int:
 
 func _update_ranking_history(guilds_data: Array) -> void:
 	"""Met à jour l'historique des classements"""
-	var current_date = _get_current_date()
-	
+	var current_date: Dictionary = _get_current_date()
+
 	for guild_data in guilds_data:
 		var guild_name = guild_data["name"]
 		if not ranking_history.has(guild_name):
@@ -386,10 +392,10 @@ func _update_ranking_history(guilds_data: Array) -> void:
 func _check_position_changes(old_rankings: Array, new_rankings: Array) -> void:
 	"""Vérifie les changements de position et émet les signaux appropriés"""
 	# Créer un mapping des anciennes positions
-	var old_positions = {}
+	var old_positions: Dictionary = {}
 	for guild_data in old_rankings:
 		old_positions[guild_data["name"]] = guild_data["position"]
-	
+
 	# Vérifier les changements
 	for guild_data in new_rankings:
 		var guild_name = guild_data["name"]
@@ -398,8 +404,9 @@ func _check_position_changes(old_rankings: Array, new_rankings: Array) -> void:
 		
 		if old_position != new_position:
 			guild_position_changed.emit(guild_name, old_position, new_position)
-			
-			if guild_name == GuildManager.guild.name if GuildManager and GuildManager.guild else "":
+
+			var is_player_guild: bool = (GuildManager != null and GuildManager.guild != null) and guild_name == GuildManager.guild.name
+			if is_player_guild:
 				if new_position < old_position:
 					GameLog.d("🎉 Notre guilde monte au classement ! Position %d -> %d" % [old_position, new_position])
 				else:
@@ -410,8 +417,9 @@ func register_server_first(guild_name: String, content_id: String) -> void:
 	server_firsts[content_id] = guild_name
 	
 	new_server_first.emit(guild_name, "Server First: %s" % content_id)
-	
-	if guild_name == GuildManager.guild.name if GuildManager and GuildManager.guild else "":
+
+	var is_player_guild: bool = (GuildManager != null and GuildManager.guild != null) and guild_name == GuildManager.guild.name
+	if is_player_guild:
 		GameLog.d("🏆 SERVER FIRST! Nous avons fait le premier clear de %s!" % content_id)
 	else:
 		GameLog.d("📢 %s a fait le server first de %s" % [guild_name, content_id])
@@ -421,7 +429,7 @@ func register_server_first(guild_name: String, content_id: String) -> void:
 
 func _is_raid_content(content_id: String) -> bool:
 	"""Détermine si un contenu est un raid ou un donjon"""
-	var raid_contents = ["molten_core", "onyxias_lair", "blackwing_lair", "zul_gurub", "aq20", "aq40", "naxxramas"]
+	var raid_contents: Array[String] = ["molten_core", "onyxias_lair", "blackwing_lair", "zul_gurub", "aq20", "aq40", "naxxramas"]
 	return content_id in raid_contents
 
 func get_current_rankings() -> Array:
@@ -440,12 +448,12 @@ func get_current_rankings() -> Array:
 
 func get_guild_position(guild_name: String) -> int:
 	"""Retourne la position actuelle d'une guilde"""
-	var rankings = get_current_rankings()
-	
+	var rankings: Array = get_current_rankings()
+
 	for guild_data in rankings:
 		if guild_data["name"] == guild_name:
 			return guild_data["position"]
-	
+
 	return -1  # Non trouvé
 
 func get_player_guild_position() -> int:
@@ -456,12 +464,12 @@ func get_player_guild_position() -> int:
 
 func get_guild_ranking_info(guild_name: String) -> Dictionary:
 	"""Retourne les informations détaillées de classement d'une guilde"""
-	var rankings = get_current_rankings()
-	
+	var rankings: Array = get_current_rankings()
+
 	for guild_data in rankings:
 		if guild_data["name"] == guild_name:
 			return guild_data
-	
+
 	return {}
 
 func get_ranking_history(guild_name: String) -> Array:
@@ -563,32 +571,45 @@ func _trim_player_run_history(max_runs: int = 100) -> void:
 
 # Callbacks des signaux
 
-func _on_week_changed(week: int, year: int) -> void:
-	"""Met à jour les rankings chaque semaine"""
+func _mark_ranking_dirty() -> void:
+	"""Marque le classement comme à recalculer (consommé une fois par jour/semaine)."""
+	_ranking_dirty = true
+
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
+	"""Consomme le flag de recalcul différé une fois par jour (anti-empilement)."""
+	if _ranking_dirty:
+		_ranking_dirty = false
+		update_rankings()
+
+func _on_week_changed(_week: int, _year: int) -> void:
+	"""Met à jour les rankings chaque semaine (et consomme un éventuel flag différé)."""
+	_ranking_dirty = false
 	update_rankings()
 
-func _on_member_recruited(player) -> void:
-	"""Réagit au recrutement de nouveaux membres"""
-	# Attendre un peu avant de mettre à jour (laisser le temps à l'intégration)
-	get_tree().create_timer(1.0).timeout.connect(update_rankings)
+func _on_member_recruited(_player) -> void:
+	"""Réagit au recrutement de nouveaux membres (recalcul différé)."""
+	# Laisser le temps à l'intégration : recalcul au prochain changement de jour.
+	_mark_ranking_dirty()
 
-func _on_guild_level_changed(new_level: int) -> void:
+func _on_guild_level_changed(_new_level: int) -> void:
 	"""Réagit aux changements de niveau de guilde"""
 	# Mettre à jour immédiatement car c'est important pour le score
 	update_rankings()
 
-func _on_activity_completed(player, activity) -> void:
+func _on_activity_completed(_player, activity) -> void:
 	"""Réagit aux activités terminées"""
-	# Si c'est une activité de donjon/raid, ça peut affecter le ranking
+	# Si c'est une activité de donjon/raid, ça peut affecter le ranking : on marque
+	# le classement « dirty » plutôt que de relancer un tri complet à chaque fin de run
+	# (évite l'empilement de recalculs à haute vitesse).
 	if activity and activity.type in [activity.ActivityType.DUNGEON, activity.ActivityType.RAID]:
-		get_tree().create_timer(2.0).timeout.connect(update_rankings)
+		_mark_ranking_dirty()
 
-func _on_phase_changed(new_phase, old_phase) -> void:
+func _on_phase_changed(_new_phase, _old_phase) -> void:
 	"""Réagit aux changements de phase"""
 	GameLog.d("Changement de phase détecté : mise à jour du système de classement")
 	update_rankings()
 
-func _on_ai_simulation_completed(guilds_data: Array) -> void:
+func _on_ai_simulation_completed(_guilds_data: Array) -> void:
 	"""Appelé quand la simulation mensuelle des guildes IA est terminée"""
 	# Les données sont déjà intégrées dans les guildes IA
 	# On met juste à jour les rankings

@@ -2,7 +2,7 @@ extends Resource
 class_name DungeonInstance
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
-const LootTables = preload("res://scripts/data/loot_tables.gd")
+# LootTables est un global (class_name LootTables) — pas besoin d'un const qui masque l'identifiant.
 const PveRunReportScript = preload("res://scripts/systems/pve_run_report.gd")
 
 signal boss_reached(boss_index: int, boss_name: String)
@@ -78,14 +78,14 @@ func _calculate_boss_times_and_positions() -> void:
 	
 	if not dungeon_data.has("bosses"):
 		return
-		
+
 	var bosses = dungeon_data.bosses
-	var num_bosses = bosses.size()
+	var num_bosses: int = bosses.size()
 	if num_bosses == 0:
 		return
-		
-	var total_duration = dungeon_data.get("duration_minutes", 60) * 60.0
-	
+
+	var total_duration: float = dungeon_data.get("duration_minutes", 60) * 60.0
+
 	# Répartir les boss uniformément sur le chemin
 	# avec un peu plus de temps avant le dernier boss
 	for i in range(num_bosses):
@@ -96,15 +96,15 @@ func _calculate_boss_times_and_positions() -> void:
 		else:
 			# Les autres boss sont répartis uniformément sur les 80% premiers
 			position = (float(i) / float(num_bosses - 1)) * 0.8
-		
+
 		boss_positions.append(position)
 		expected_boss_times.append(position * total_duration)
-		
+
 		# Calculer le temps entre chaque boss
 		if i == 0:
 			boss_times.append(position * total_duration)
 		else:
-			var prev_time = expected_boss_times[i-1]
+			var prev_time: float = expected_boss_times[i-1]
 			boss_times.append(position * total_duration - prev_time)
 
 func update(delta: float, game_time_ref = null) -> void:
@@ -136,36 +136,36 @@ func update(delta: float, game_time_ref = null) -> void:
 		return
 		
 	# Mettre à jour le pourcentage de progression global (monotone : ne recule jamais).
-	var boss_progress = float(current_boss_index) / float(dungeon_data.bosses.size())
-	var path_progress = current_position * 0.1  # Le chemin compte pour 10%
+	var boss_progress: float = float(current_boss_index) / float(dungeon_data.bosses.size())
+	var path_progress: float = current_position * 0.1  # Le chemin compte pour 10%
 	progress_percent = maxf(progress_percent, (boss_progress * 0.9 + path_progress) * 100.0)
 	progress_updated.emit(progress_percent)
 
 func _update_progression(delta: float, game_time_ref = null) -> void:
 	# Utiliser le delta du temps du jeu au lieu du temps réel
-	var game_delta = delta
-	
+	var game_delta: float = delta
+
 	# Ne pas progresser si le jeu est en pause
 	if game_time_ref:
 		if game_time_ref.is_paused:
 			return
 		if game_time_ref.time_speed > 0:
 			game_delta = delta * game_time_ref.time_speed
-	
+
 	time_to_next_boss -= game_delta
-	
+
 	if time_to_next_boss <= 0.0 and current_boss_index < boss_positions.size():
 		# Arrivé au boss
 		_start_boss_fight(game_time_node)
 	else:
 		# Mettre à jour la position sur le chemin entre les boss
 		if current_boss_index < boss_positions.size():
-			var current_boss_pos = boss_positions[current_boss_index]
-			var prev_boss_pos = boss_positions[current_boss_index - 1] if current_boss_index > 0 else 0.0
-			var segment_length = current_boss_pos - prev_boss_pos
-			var time_for_segment = boss_times[current_boss_index] if current_boss_index < boss_times.size() else 300.0
-			var time_in_segment = time_for_segment - time_to_next_boss
-			var segment_progress = clamp(time_in_segment / time_for_segment, 0.0, 1.0)
+			var current_boss_pos: float = boss_positions[current_boss_index]
+			var prev_boss_pos: float = boss_positions[current_boss_index - 1] if current_boss_index > 0 else 0.0
+			var segment_length: float = current_boss_pos - prev_boss_pos
+			var time_for_segment: float = boss_times[current_boss_index] if current_boss_index < boss_times.size() else 300.0
+			var time_in_segment: float = time_for_segment - time_to_next_boss
+			var segment_progress: float = clamp(time_in_segment / time_for_segment, 0.0, 1.0)
 			current_position = prev_boss_pos + segment_progress * segment_length
 		else:
 			current_position = 1.0
@@ -184,16 +184,15 @@ func _start_boss_fight(game_time_ref = null) -> void:
 	# et non plus via un timer temps-réel qui se désynchronisait à haute vitesse.
 
 func _simulate_boss_fight() -> void:
-	var boss_name = dungeon_data.bosses[current_boss_index]
-	var is_final_boss = current_boss_index == dungeon_data.bosses.size() - 1
-	
+	var is_final_boss: bool = current_boss_index == dungeon_data.bosses.size() - 1
+
 	# Calculer la difficulté du boss
-	var boss_difficulty = dungeon_data.get("difficulty", 1.0)
+	var boss_difficulty: float = dungeon_data.get("difficulty", 1.0)
 	if is_final_boss:
 		boss_difficulty *= dungeon_data.get("boss_difficulty_multiplier", 1.2)
-	
+
 	# Calculer les chances de succès du groupe
-	var success_chance = _calculate_boss_success_chance(boss_difficulty)
+	var success_chance: float = _calculate_boss_success_chance(boss_difficulty)
 	
 	# Appliquer une pénalité basée sur le nombre de wipes
 	success_chance *= pow(0.95, wipe_count)  # -5% par wipe
@@ -210,23 +209,23 @@ func _simulate_boss_fight() -> void:
 		_on_boss_failed()
 
 func _calculate_boss_success_chance(boss_difficulty: float) -> float:
-	var base_score = 0.0
-	var total_members = group_members.size()
-	
+	var base_score: float = 0.0
+	var total_members: int = group_members.size()
+
 	if total_members == 0:
 		return 0.0
-		
+
 	# Calculer le score moyen du groupe
 	for member in group_members:
-		var member_score = 0.0
-		
+		var member_score: float = 0.0
+
 		# Niveau par rapport au donjon
 		var level_diff = member.personnage_niveau - dungeon_data.level_recommended
 		member_score += 0.3 * (1.0 + level_diff / 10.0)
-		
+
 		# Skill
 		member_score += 0.3 * (member.skill / 100.0)
-		
+
 		# Équipement
 		var expected_equipment = dungeon_data.level_recommended * 3
 		member_score += 0.2 * (member.get_total_ilvl() / expected_equipment)
@@ -240,10 +239,10 @@ func _calculate_boss_success_chance(boss_difficulty: float) -> float:
 		base_score += member_score
 		
 	base_score /= total_members
-	
+
 	# Vérifier la composition du groupe
-	var composition = DungeonDataScript.get_group_composition(dungeon_id)
-	var composition_penalty = _check_group_composition(composition)
+	var composition: Dictionary = DungeonDataScript.get_group_composition(dungeon_id)
+	var composition_penalty: float = _check_group_composition(composition)
 	base_score *= composition_penalty
 
 	# Familiarité avec le contenu : la connaissance du donjon (0-100) ajoute jusqu'à +50%.
@@ -267,20 +266,22 @@ func _calculate_boss_success_chance(boss_difficulty: float) -> float:
 			base_score *= circ_sum / float(total_members)
 
 	# Appliquer la difficulté
-	var success_chance = base_score / boss_difficulty
+	var success_chance: float = base_score / boss_difficulty
 
 	return clamp(success_chance, 0.1, 0.95)
 
 func _check_group_composition(required_comp: Dictionary) -> float:
-	var actual_comp = {"Tank": 0, "Healer": 0, "DPS": 0}
-	
+	var actual_comp: Dictionary = {"Tank": 0, "Healer": 0, "DPS": 0}
+
 	for member in group_members:
-		var role = member.personnage_role
+		# Rôle de COMBAT : get_role() est fiable (fallback sur la classe) alors que
+		# personnage_role peut être vide/désynchronisé avec l'organisation du groupe.
+		var role: String = member.get_role()
 		if actual_comp.has(role):
 			actual_comp[role] += 1
-			
-	var penalty = 1.0
-	
+
+	var penalty: float = 1.0
+
 	# Pénalités pour composition incorrecte
 	if actual_comp["Tank"] < required_comp.get("Tank", 1):
 		penalty *= 0.5  # Grosse pénalité sans tank
@@ -373,8 +374,8 @@ func _on_boss_defeated() -> void:
 		_complete_dungeon()
 	else:
 		# Calculer le temps jusqu'au prochain boss
-		var current_time = get_elapsed_time(game_time_node) - time_lost_to_wipes
-		var next_boss_time = expected_boss_times[current_boss_index]
+		var current_time: float = get_elapsed_time(game_time_node) - time_lost_to_wipes
+		var next_boss_time: float = expected_boss_times[current_boss_index]
 		time_to_next_boss = max(30.0, next_boss_time - current_time)  # Au moins 30 secondes
 
 func _on_boss_failed() -> void:
@@ -428,7 +429,7 @@ func _update_boss_fight(delta: float) -> void:
 func _complete_dungeon() -> void:
 	is_active = false
 	_grant_knowledge(10.0)  # bonus de familiarité pour avoir terminé le contenu
-	var total_time = get_elapsed_time(game_time_node)
+	var total_time: float = get_elapsed_time(game_time_node)
 	var gold_reward: int = int(dungeon_data.get("gold_reward", 100))
 	if BalanceManager:
 		gold_reward = int(gold_reward * BalanceManager.tunable_float("pve.gold_reward_mult", 1.0))
@@ -445,6 +446,9 @@ func _complete_dungeon() -> void:
 
 	# Part personnelle (flavor) + bonus de moral pour les participants.
 	var member_count: int = max(1, group_members.size())
+	# Part personnelle entière partagée entre les participants : la troncature est voulue
+	# (chacun touche un nombre entier d'or, le reste est négligé côté flavor).
+	@warning_ignore("integer_division")
 	var gold_per_member: int = int(gold_reward * 0.2) / member_count
 	for member in group_members:
 		member.or_actuel += gold_per_member
@@ -505,8 +509,8 @@ func get_elapsed_time(game_time_ref = null) -> float:
 		return 0.0
 
 func get_estimated_remaining_time() -> float:
-	var total_duration = dungeon_data.get("duration_minutes", 60) * 60.0
-	var elapsed = get_elapsed_time(game_time_node)
+	var total_duration: float = dungeon_data.get("duration_minutes", 60) * 60.0
+	var elapsed: float = get_elapsed_time(game_time_node)
 	return max(0.0, total_duration - elapsed + time_lost_to_wipes)
 
 func _grant_knowledge(amount: float) -> void:
@@ -524,7 +528,7 @@ func _pick_loot_winner(item: Item) -> SimulatedPlayer:
 		if m.would_be_upgrade(item):
 			upgraders.append(m)
 	var pool: Array = upgraders if not upgraders.is_empty() else group_members
-	var best = pool[0]
+	var best: SimulatedPlayer = pool[0]
 	for m in pool:
 		if m.get_total_ilvl() < best.get_total_ilvl():
 			best = m

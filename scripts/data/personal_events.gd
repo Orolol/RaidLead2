@@ -229,25 +229,25 @@ static func get_event(event_id: String) -> Dictionary:
 
 static func get_random_event() -> Dictionary:
 	"""Retourne un événement aléatoire selon les probabilités"""
-	var total_prob = 0.0
-	var probabilities = []
-	
+	var total_prob: float = 0.0
+	var probabilities: Array = []
+
 	# Calculer les probabilités cumulées
 	for event_id in EVENTS_DATABASE:
-		var event = EVENTS_DATABASE[event_id]
+		var event: Dictionary = EVENTS_DATABASE[event_id]
 		if event.probability > 0:
 			total_prob += event.probability
 			probabilities.append({
 				"id": event_id,
 				"cumulative": total_prob
 			})
-	
+
 	# Sélectionner un événement
-	var roll = randf() * total_prob
-	
+	var roll: float = randf() * total_prob
+
 	for prob_data in probabilities:
 		if roll <= prob_data.cumulative:
-			var event = get_event(prob_data.id)
+			var event: Dictionary = get_event(prob_data.id)
 			event["id"] = prob_data.id
 			return event
 	
@@ -257,7 +257,7 @@ static func should_trigger_event(player) -> bool:
 	"""Détermine si un événement devrait se déclencher pour un joueur"""
 	
 	# Facteurs influençant la probabilité d'événements
-	var base_chance = 0.15  # 15% de base par jour
+	var base_chance: float = 0.15  # 15% de base par jour
 	
 	# Modificateurs selon le profil comportemental
 	# (player est une Resource : pas de .has() — on teste la propriété directement)
@@ -279,11 +279,11 @@ static func should_trigger_event(player) -> bool:
 static func get_event_for_player(player) -> Dictionary:
 	"""Sélectionne un événement approprié pour un joueur"""
 	
-	var suitable_events = []
-	
+	var suitable_events: Array = []
+
 	for event_id in EVENTS_DATABASE:
-		var event = EVENTS_DATABASE[event_id]
-		
+		var event: Dictionary = EVENTS_DATABASE[event_id]
+
 		# Filtrer selon l'état du joueur
 		if event.effect_type == "immediate_disconnect" and not player.is_online:
 			continue
@@ -306,12 +306,12 @@ static func get_event_for_player(player) -> Dictionary:
 	if suitable_events.is_empty():
 		return {}
 	
-	var total_prob = 0.0
+	var total_prob: float = 0.0
 	for event in suitable_events:
 		total_prob += event.probability
-	
-	var roll = randf() * total_prob
-	var cumulative = 0.0
+
+	var roll: float = randf() * total_prob
+	var cumulative: float = 0.0
 	
 	for event in suitable_events:
 		cumulative += event.probability
@@ -328,10 +328,10 @@ static func get_event_for_player(player) -> Dictionary:
 static func detect_pattern(player_history: Array) -> Dictionary:
 	"""Détecte des patterns récurrents dans l'historique d'un joueur"""
 	
-	var detected_patterns = {}
-	
+	var detected_patterns: Dictionary = {}
+
 	# Analyser les connexions par jour de la semaine
-	var weekday_stats = {
+	var weekday_stats: Dictionary = {
 		"monday": {"late": 0, "absent": 0, "total": 0},
 		"tuesday": {"late": 0, "absent": 0, "total": 0},
 		"wednesday": {"late": 0, "absent": 0, "total": 0},
@@ -363,7 +363,7 @@ static func detect_pattern(player_history: Array) -> Dictionary:
 	
 	# Détecter "always_late_monday"
 	if weekday_stats.monday.total >= 3:
-		var late_ratio = float(weekday_stats.monday.late) / float(weekday_stats.monday.total)
+		var late_ratio: float = float(weekday_stats.monday.late) / float(weekday_stats.monday.total)
 		if late_ratio > 0.6:
 			detected_patterns["always_late_monday"] = {
 				"confidence": late_ratio,
@@ -374,7 +374,7 @@ static func detect_pattern(player_history: Array) -> Dictionary:
 	var weekend_total = weekday_stats.saturday.total + weekday_stats.sunday.total
 	var weekend_active = weekday_stats.saturday.active + weekday_stats.sunday.active
 	if weekend_total >= 8:  # Au moins 4 weekends
-		var active_ratio = float(weekend_active) / float(weekend_total)
+		var active_ratio: float = float(weekend_active) / float(weekend_total)
 		if active_ratio > 0.75:
 			detected_patterns["weekend_warrior"] = {
 				"confidence": active_ratio,
@@ -385,7 +385,7 @@ static func detect_pattern(player_history: Array) -> Dictionary:
 	var midweek_total = weekday_stats.tuesday.total + weekday_stats.wednesday.total + weekday_stats.thursday.total
 	var midweek_absent = weekday_stats.tuesday.absent + weekday_stats.wednesday.absent + weekday_stats.thursday.absent
 	if midweek_total >= 9:  # Au moins 3 semaines
-		var absent_ratio = float(midweek_absent) / float(midweek_total)
+		var absent_ratio: float = float(midweek_absent) / float(midweek_total)
 		if absent_ratio > 0.5:
 			detected_patterns["midweek_absence"] = {
 				"confidence": absent_ratio,
@@ -394,7 +394,7 @@ static func detect_pattern(player_history: Array) -> Dictionary:
 	
 	# Détecter "marathon_fridays"
 	if weekday_stats.friday.total >= 3:
-		var marathon_ratio = float(weekday_stats.friday.marathon) / float(weekday_stats.friday.total)
+		var marathon_ratio: float = float(weekday_stats.friday.marathon) / float(weekday_stats.friday.total)
 		if marathon_ratio > 0.6:
 			detected_patterns["marathon_fridays"] = {
 				"confidence": marathon_ratio,
@@ -403,7 +403,7 @@ static func detect_pattern(player_history: Array) -> Dictionary:
 	
 	return detected_patterns
 
-static func apply_event_effects(player, event: Dictionary):
+static func apply_event_effects(player, event: Dictionary) -> void:
 	"""Applique les effets d'un événement sur un joueur"""
 	
 	# Impact sur l'humeur

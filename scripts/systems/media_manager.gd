@@ -4,6 +4,8 @@ extends Node
 ## Les membres celebres peuvent devenir streamers, generant revenus et conflits.
 
 signal streamer_started(member_name: String)
+# réservé : non encore émis
+@warning_ignore("unused_signal")
 signal streamer_stopped(member_name: String)
 signal media_incident(member_name: String, incident_type: String, description: String)
 

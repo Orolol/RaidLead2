@@ -25,12 +25,12 @@ enum ActivityType {
 @export var integration_gain_per_hour: float = 0.0
 @export var xp_gain_per_hour: int = 0
 
-func _init(p_type = ActivityType.NONE, p_name: String = ""):
+func _init(p_type: ActivityType = ActivityType.NONE, p_name: String = "") -> void:
 	type = p_type
 	name = p_name
 	_setup_activity_defaults()
 
-func _setup_activity_defaults():
+func _setup_activity_defaults() -> void:
 	match type:
 		ActivityType.LEVELING:
 			name = "Leveling" if name == "" else name

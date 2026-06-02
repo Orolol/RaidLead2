@@ -14,7 +14,7 @@ const EffectResource = preload("res://scripts/resources/effect.gd")
 signal expired(effect_instance: EffectInstance)
 signal stack_changed(effect_instance: EffectInstance, new_count: int)
 
-func _init(p_effect: EffectResource = null, p_source: String = "", p_target: Resource = null):
+func _init(p_effect: EffectResource = null, p_source: String = "", p_target: Resource = null) -> void:
 	if p_effect:
 		effect = p_effect
 		remaining_duration = p_effect.duration
@@ -77,7 +77,7 @@ func get_remaining_time_string() -> String:
 		return "%.1f h" % remaining_duration
 
 func get_tooltip() -> String:
-	var tooltip = effect.get_tooltip()
+	var tooltip: String = effect.get_tooltip()
 	
 	if stack_count > 1:
 		tooltip += "\n[color=yellow]Cumul: x%d[/color]" % stack_count

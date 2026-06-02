@@ -70,7 +70,7 @@ const STRATEGY_CONFIG = {
 	}
 }
 
-func _init(guild_name: String = "", strategy: Strategy = Strategy.BALANCED, initialize_members: bool = true):
+func _init(guild_name: String = "", strategy: Strategy = Strategy.BALANCED, initialize_members: bool = true) -> void:
 	super._init()
 	if guild_name != "":
 		name = guild_name
@@ -78,9 +78,9 @@ func _init(guild_name: String = "", strategy: Strategy = Strategy.BALANCED, init
 	if initialize_members:
 		_initialize_ai_guild()
 
-func _initialize_ai_guild():
+func _initialize_ai_guild() -> void:
 	"""Initialise la guilde IA avec des membres de départ"""
-	var config = STRATEGY_CONFIG[ai_strategy]
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
 	
 	# Ajuster les stats de base selon la stratégie
 	reputation = 50.0 + (config.reputation_modifier * 20.0)
@@ -89,7 +89,7 @@ func _initialize_ai_guild():
 	stability = 1.0 - config.turnover_tolerance
 	
 	# Générer des membres initiaux
-	var member_count = randi_range(12, 25)
+	var member_count: int = randi_range(12, 25)
 	_generate_initial_members(member_count)
 	
 	# XP initiale selon la réputation
@@ -97,13 +97,13 @@ func _initialize_ai_guild():
 	
 	GameLog.d("Guilde IA '%s' créée - Stratégie: %s, Réputation: %.1f" % [name, Strategy.keys()[ai_strategy], reputation])
 
-func _generate_initial_members(count: int):
+func _generate_initial_members(count: int) -> void:
 	"""Génère des membres initiaux pour la guilde IA"""
-	var classes = ["Guerrier", "Prêtre", "Mage", "Voleur", "Chasseur", "Druide"]
-	var config = STRATEGY_CONFIG[ai_strategy]
-	
+	var classes: Array = ["Guerrier", "Prêtre", "Mage", "Voleur", "Chasseur", "Druide"]
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
+
 	for i in range(count):
-		var member = {
+		var member: Dictionary = {
 			"name": _generate_member_name(),
 			"class": classes.pick_random(),
 			"level": _generate_member_level(),
@@ -127,8 +127,8 @@ func _generate_initial_members(count: int):
 
 func _generate_member_name() -> String:
 	"""Génère un nom de membre aléatoire"""
-	var prefixes = ["Dar", "Kor", "Mal", "Thar", "Zen", "Kael", "Mor", "Vel", "Xan", "Jor"]
-	var suffixes = ["ion", "ak", "oth", "eus", "in", "el", "an", "ur", "is", "on"]
+	var prefixes: Array[String] = ["Dar", "Kor", "Mal", "Thar", "Zen", "Kael", "Mor", "Vel", "Xan", "Jor"]
+	var suffixes: Array[String] = ["ion", "ak", "oth", "eus", "in", "el", "an", "ur", "is", "on"]
 	return prefixes.pick_random() + suffixes.pick_random()
 
 func _generate_member_level() -> int:
@@ -149,7 +149,7 @@ func _generate_member_level() -> int:
 
 func _generate_member_skill() -> float:
 	"""Génère un niveau de skill selon la stratégie"""
-	var base_skill = randf_range(40.0, 80.0)
+	var base_skill: float = randf_range(40.0, 80.0)
 	
 	match ai_strategy:
 		Strategy.HARDCORE:
@@ -167,7 +167,7 @@ func get_strategy_name() -> String:
 
 func get_active_members_count() -> int:
 	"""Retourne le nombre de membres actifs"""
-	var active = 0
+	var active: int = 0
 	for member in members:
 		if member.satisfaction > 0.3:
 			active += 1
@@ -195,42 +195,60 @@ func get_average_skill() -> float:
 
 func get_star_players() -> Array:
 	"""Retourne les joueurs stars de la guilde"""
-	var stars = []
+	var stars: Array = []
 	for member in members:
 		if member.is_star_player:
 			stars.append(member)
 	return stars
 
-func simulate_monthly_progress():
-	"""Simule la progression mensuelle de la guilde IA"""
+func simulate_weekly_progress() -> void:
+	"""Simule la progression PvE hebdomadaire (lissée, ~1/4 du rythme mensuel d'origine).
+
+	Découplée du mensuel (recrutement/turnover/réputation) pour que le classement avance
+	chaque semaine plutôt que par à-coups tous les 4 weeks."""
+	# Progression PvE à amplitude réduite (les tentatives sont divisées par ~4 dans la méthode).
+	_simulate_pve_progression(true)
+
+	# Le focus peut évoluer chaque semaine (suit le niveau moyen de la guilde).
+	_update_current_focus()
+
+	# XP de niveau lissé : ~1/4 de l'ex-gain mensuel pour conserver le rythme global.
 	var config = STRATEGY_CONFIG[ai_strategy]
-	
-	# Simulation de progression PvE
-	_simulate_pve_progression()
-	
+	var weekly_xp: int = int((120 + reputation * 4.0 + config.raid_focus * 200.0) / 4.0)
+	gain_xp(weekly_xp, "Progression hebdomadaire")
+
+func simulate_monthly_progress() -> void:
+	"""Simule la progression mensuelle de la guilde IA (recrutement, turnover, réputation).
+
+	La progression PvE et l'XP de niveau sont désormais hebdomadaires
+	(voir simulate_weekly_progress)."""
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
+
 	# Simulation de recrutement
 	if randf() < config.recruitment_frequency:
 		_attempt_recruitment()
-	
+
 	# Simulation du turnover
 	_simulate_member_turnover()
-	
+
 	# Mise à jour de la réputation
 	_update_reputation()
-	
+
 	# Mise à jour du focus
 	_update_current_focus()
 
-	# Progression de niveau crédible : XP mensuel adossé à la réputation/stratégie, pour que
-	# le score de niveau (20% du classement) reste disputé face au joueur.
-	var monthly_xp: int = int(120 + reputation * 4.0 + config.raid_focus * 200.0)
+	# Petit bonus d'XP mensuel passif (réputation/effectif), distinct de la progression PvE
+	# hebdomadaire : garde une progression de niveau crédible sur le rythme mensuel.
+	var monthly_xp: int = int(40 + reputation * 1.0)
 	gain_xp(monthly_xp, "Progression mensuelle")
 
 	GameLog.d("Progression mensuelle simulée pour %s - Membres: %d, Réputation: %.1f" % [name, members.size(), reputation])
 
-func _simulate_pve_progression():
-	"""Simule la progression PvE de la guilde"""
-	var config = STRATEGY_CONFIG[ai_strategy]
+func _simulate_pve_progression(weekly: bool = false) -> void:
+	"""Simule la progression PvE de la guilde.
+
+	weekly=true lisse l'amplitude (~1/4 des tentatives) pour une cadence hebdomadaire."""
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
 	var success_chance = success_rate * config.raid_focus
 
 	# Équilibrage adaptatif : rubber-band — les IA progressent plus vite si le joueur domine (US 6.4)
@@ -239,23 +257,31 @@ func _simulate_pve_progression():
 		success_chance *= balance_manager.get_ai_progression_mult()
 
 	# Tentatives de progression selon le focus actuel
-	var progression_attempts = 1
+	var progression_attempts: int = 1
 	if current_focus == "raids":
 		progression_attempts = 3
 	elif current_focus == "dungeons":
 		progression_attempts = 2
-	
+
+	# Cadence hebdomadaire lissée : on réduit l'amplitude (~1/4) via une probabilité d'essai.
+	# 1 tentative -> ~25% de chance d'avoir 1 essai cette semaine ; 2/3 -> proportionnel.
+	if weekly:
+		var expected_attempts: float = progression_attempts / 4.0
+		progression_attempts = int(expected_attempts)
+		if randf() < (expected_attempts - float(progression_attempts)):
+			progression_attempts += 1
+
 	for i in range(progression_attempts):
 		if randf() < success_chance:
 			_achieve_pve_success()
 
-func _achieve_pve_success():
+func _achieve_pve_success() -> void:
 	"""La guilde réalise un succès PvE"""
-	var available_content = _get_available_content_for_level()
+	var available_content: Array = _get_available_content_for_level()
 	if available_content.is_empty():
 		return
-	
-	var content = available_content.pick_random()
+
+	var content: Dictionary = available_content.pick_random()
 	recent_achievements.append({
 		"type": "pve_clear",
 		"content": content,
@@ -264,7 +290,7 @@ func _achieve_pve_success():
 	})
 	
 	# Gain XP pour la guilde
-	var xp_gain = 50
+	var xp_gain: int = 50
 	if content.has("raid") and content.raid:
 		xp_gain = 150
 	
@@ -281,9 +307,9 @@ func _achieve_pve_success():
 
 func _get_available_content_for_level() -> Array:
 	"""Retourne le contenu disponible pour le niveau moyen de la guilde"""
-	var avg_level = get_average_level()
-	var available = []
-	
+	var avg_level: float = get_average_level()
+	var available: Array = []
+
 	# Contenu de base toujours disponible
 	if avg_level >= 15:
 		available.append({"id": "deadmines", "name": "Mines de la Mort", "raid": false})
@@ -302,16 +328,16 @@ func _get_available_content_for_level() -> Array:
 	
 	return available
 
-func _attempt_recruitment():
+func _attempt_recruitment() -> void:
 	"""Tente de recruter de nouveaux membres"""
-	var config = STRATEGY_CONFIG[ai_strategy]
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
 	recruitment_attempts += 1
-	
+
 	# Chances de succès selon la réputation et la stratégie
-	var success_chance = (reputation / 100.0) * 0.7 + 0.2
-	
+	var success_chance: float = (reputation / 100.0) * 0.7 + 0.2
+
 	if randf() < success_chance:
-		var new_member = {
+		var new_member: Dictionary = {
 			"name": _generate_member_name(),
 			"class": ["Guerrier", "Prêtre", "Mage", "Voleur", "Chasseur"].pick_random(),
 			"level": _generate_member_level(),
@@ -326,13 +352,13 @@ func _attempt_recruitment():
 		members.append(new_member)
 		GameLog.d("Guilde IA %s a recruté %s" % [name, new_member.name])
 
-func _simulate_member_turnover():
+func _simulate_member_turnover() -> void:
 	"""Simule les départs de membres"""
-	var config = STRATEGY_CONFIG[ai_strategy]
-	var members_to_remove = []
-	
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
+	var members_to_remove: Array = []
+
 	for i in range(members.size()):
-		var member = members[i]
+		var member: Dictionary = members[i]
 		member.days_in_guild += 30  # Un mois
 		
 		# Probabilité de départ selon satisfaction et loyauté
@@ -350,16 +376,16 @@ func _simulate_member_turnover():
 	# Supprimer les membres qui partent (en ordre inverse pour préserver les indices)
 	members_to_remove.reverse()
 	for index in members_to_remove:
-		var leaving_member = members[index]
+		var leaving_member: Dictionary = members[index]
 		GameLog.d("Membre %s quitte la guilde %s" % [leaving_member.name, name])
 		members.remove_at(index)
 	
 	# Calculer le taux de turnover
 	monthly_turnover = float(members_to_remove.size()) / float(max(1, members.size() + members_to_remove.size()))
 
-func _update_reputation():
+func _update_reputation() -> void:
 	"""Met à jour la réputation de la guilde"""
-	var change = 0.0
+	var change: float = 0.0
 	
 	# Bonus pour succès récents
 	if last_major_success_days >= 0:
@@ -376,15 +402,15 @@ func _update_reputation():
 		change += 0.5
 	
 	# Dérive naturelle vers 50
-	var drift = (50.0 - reputation) * 0.05
+	var drift: float = (50.0 - reputation) * 0.05
 	change += drift
 	
 	reputation = clamp(reputation + change, 0.0, 100.0)
 
-func _update_current_focus():
+func _update_current_focus() -> void:
 	"""Met à jour le focus actuel de la guilde"""
-	var avg_level = get_average_level()
-	var config = STRATEGY_CONFIG[ai_strategy]
+	var avg_level: float = get_average_level()
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
 	
 	if avg_level < 30:
 		current_focus = "leveling"
@@ -401,13 +427,13 @@ func _update_current_focus():
 
 func attempt_poaching(target_guild_members: Array) -> Dictionary:
 	"""Tente de débaucher des membres d'une autre guilde"""
-	var config = STRATEGY_CONFIG[ai_strategy]
-	
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
+
 	if randf() > config.poaching_tendency:
 		return {"success": false, "reason": "Guilde pas intéressée par le débauchage"}
-	
+
 	# Filtrer les cibles intéressantes
-	var potential_targets = []
+	var potential_targets: Array = []
 	for member in target_guild_members:
 		if _is_attractive_target(member):
 			potential_targets.append(member)
@@ -419,8 +445,8 @@ func attempt_poaching(target_guild_members: Array) -> Dictionary:
 	var target = potential_targets.pick_random()
 	
 	# Calculer les chances de succès
-	var success_chance = _calculate_poaching_success_chance(target)
-	
+	var success_chance: float = _calculate_poaching_success_chance(target)
+
 	if randf() < success_chance:
 		return {
 			"success": true,
@@ -436,11 +462,11 @@ func attempt_poaching(target_guild_members: Array) -> Dictionary:
 
 func _is_attractive_target(member) -> bool:
 	"""Détermine si un membre est une cible attractive pour le débauchage"""
-	var config = STRATEGY_CONFIG[ai_strategy]
-	
+	var config: Dictionary = STRATEGY_CONFIG[ai_strategy]
+
 	# Vérifier les critères minimums selon la stratégie
-	var min_level = 30 if ai_strategy == Strategy.HARDCORE else 20
-	var min_skill = 70 if ai_strategy == Strategy.HARDCORE else 50
+	var min_level: int = 30 if ai_strategy == Strategy.HARDCORE else 20
+	var min_skill: int = 70 if ai_strategy == Strategy.HARDCORE else 50
 	
 	# Gérer les deux types : SimulatedPlayer et Dictionary
 	var level: int
@@ -478,7 +504,7 @@ func _is_attractive_target(member) -> bool:
 
 func _calculate_poaching_success_chance(member) -> float:
 	"""Calcule les chances de succès d'un débauchage"""
-	var base_chance = 0.2
+	var base_chance: float = 0.2
 	
 	# Gérer les deux types : SimulatedPlayer et Dictionary
 	var integration: float
@@ -500,7 +526,7 @@ func _calculate_poaching_success_chance(member) -> float:
 		base_chance += 0.2
 	
 	# Notre réputation vs leur satisfaction
-	var reputation_factor = reputation / 100.0
+	var reputation_factor: float = reputation / 100.0
 	base_chance += reputation_factor * 0.3
 	
 	# Facteurs défavorables

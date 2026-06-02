@@ -2,9 +2,8 @@ extends Control
 
 const MenuBarScript = preload("res://scripts/ui/components/menu_bar.gd")
 const WindowManagerScript = preload("res://scripts/managers/window_manager.gd")
-const RandomEventResource = preload("res://scripts/resources/random_event.gd")
-const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
-const EventPopupWindow = preload("res://scripts/ui/windows/event_popup.gd")
+# RandomEventResource / EventChoiceResource / EventPopupWindow : résolus via leur class_name global
+# (les preloads redondants masquaient l'identifiant global → SHADOWED_GLOBAL_IDENTIFIER).
 const PlayerControlPanelScript = preload("res://scripts/ui/components/player_control_panel.gd")
 # const FastForwardDialog = preload("res://scripts/ui/windows/fast_forward_dialog.gd")  # Supprimé - système simplifié
 const NO_SAVE_AUTOLOAD_ARG: String = "--no-save-autoload"
@@ -23,6 +22,8 @@ var player_character = null  # Référence au personnage joueur
 var is_in_forced_rest: bool = false  # Verrou pendant un repos (forcé ou volontaire)
 var _auto_paused_for_idle: bool = false  # Le temps a été mis en pause car le joueur attend un ordre
 var _activity_prompt: CanvasLayer = null  # Overlay thémé de choix d'activité (pause-si-oisif)
+var _debug_menu: DebugMenuPanel = null  # Menu de debug (builds debug-only), extrait de main
+var _system_notifier: SystemNotifier = null  # Relais de notifications systèmes, extrait de main
 # var fast_forward_manager: Node = null  # Supprimé - système simplifié
 
 func _ready() -> void:
@@ -44,9 +45,7 @@ func _ready() -> void:
 	_connect_window_signals()
 	_connect_event_system()
 	_connect_loot_conflict_system()
-	_connect_national_systems()
-	_connect_esport_systems()
-	_connect_culture_systems()
+	_setup_system_notifier()
 	_setup_player_systems()
 
 	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
@@ -115,49 +114,11 @@ func _on_phase_changed_for_chat(new_phase: Variant, _old_phase: Variant) -> void
 	chat_panel.add_phase_notification(phase_name)
 
 func _setup_debug_menu() -> void:
-	# Créer un conteneur pour le menu debug
-	var debug_container = PanelContainer.new()
-	debug_container.custom_minimum_size = Vector2(150, 30)
-	# Ancrage top-left pour supporter toutes les résolutions
-	debug_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	debug_container.offset_left = 10
-	debug_container.offset_top = 80
-	debug_container.offset_right = 10 + 150
-	debug_container.offset_bottom = 80 + 30
-	
-	var menu_button = MenuButton.new()
-	menu_button.text = "Debug"
-	menu_button.flat = false
-	debug_container.add_child(menu_button)
-	
-	var popup = menu_button.get_popup()
-	
-	# Ajouter les options de debug
-	popup.add_item("Ajouter 100 XP à la guilde")
-	popup.add_item("Ajouter 1000 XP à la guilde")
-	popup.add_separator()
-	popup.add_item("Level up un membre aléatoire")
-	popup.add_item("Level up tous les membres")
-	popup.add_separator()
-	popup.add_item("Ajouter 1000 or à la guilde")
-	popup.add_item("Donner équipement aux membres")
-	popup.add_separator()
-	popup.add_item("Forcer mise à jour serveur")
-	popup.add_item("Compléter un donjon (succès)")
-	popup.add_separator()
-	popup.add_item("Déclencher événement test")
-	popup.add_item("Afficher stats événements")
-	popup.add_separator()
-	popup.add_item("Test notification INFO")
-	popup.add_item("Test notification SUCCESS")
-	popup.add_item("Test notification WARNING")
-	popup.add_item("Test notification ERROR")
-	popup.add_item("Test notification ACHIEVEMENT")
-	
-	# Connecter les signaux
-	popup.id_pressed.connect(_on_debug_menu_pressed)
-	
-	add_child(debug_container)
+	# Le menu de debug vit désormais dans son propre composant (DebugMenuPanel)
+	# pour alléger main.gd.
+	_debug_menu = DebugMenuPanel.new()
+	add_child(_debug_menu)
+	_debug_menu.setup(window_manager)
 
 func _is_debug_ui_enabled() -> bool:
 	return OS.is_debug_build()
@@ -250,111 +211,6 @@ func _on_player_recruited(player: SimulatedPlayer) -> void:
 		if org_inst:
 			org_inst.set_guild_members(guild_manager_node.guild_members)
 
-func _on_debug_menu_pressed(id: int) -> void:
-	GameLog.d("Debug menu pressed - Option ID: %d" % id)
-	var guild_manager = GuildManager
-	if not guild_manager:
-		GameLog.d("ERREUR: GuildManager non trouvé")
-		return
-		
-	match id:
-		0: # Ajouter 100 XP à la guilde
-			if guild_manager.guild:
-				guild_manager.guild.gain_xp(100, "Debug: +100 XP")
-				GameLog.d("Debug: +100 XP à la guilde")
-				
-		1: # Ajouter 1000 XP à la guilde
-			if guild_manager.guild:
-				guild_manager.guild.gain_xp(1000, "Debug: +1000 XP")
-				GameLog.d("Debug: +1000 XP à la guilde")
-				
-		2: # Level up un membre aléatoire
-			if guild_manager.guild_members.size() > 0:
-				var member = guild_manager.guild_members[randi() % guild_manager.guild_members.size()]
-				member.gain_experience(member.personnage_niveau * member.personnage_niveau * 100)
-				GameLog.d("Debug: Level up de %s" % member.nom)
-				
-		3: # Level up tous les membres
-			for member in guild_manager.guild_members:
-				member.gain_experience(member.personnage_niveau * member.personnage_niveau * 100)
-			GameLog.d("Debug: Level up de tous les membres")
-			
-		4: # Ajouter 1000 or à la guilde
-			if guild_manager.guild:
-				guild_manager.guild.add_gold(1000)
-				GameLog.d("Debug: +1000 or à la guilde")
-				
-		5: # Donner équipement aux membres
-			for member in guild_manager.guild_members:
-				# TODO: Avec le nouveau système, donner des objets spécifiques
-				# member.personnage_equipement += 10
-				pass
-			GameLog.d("Debug: +10 équipement à tous les membres")
-			
-		6: # Forcer mise à jour serveur
-			var server_version = ServerVersion
-			if server_version:
-				server_version._check_version_update()
-				GameLog.d("Debug: Vérification de mise à jour serveur forcée")
-				
-		7: # Compléter un donjon (succès)
-			if guild_manager.guild:
-				guild_manager.guild.gain_xp(100, "Debug: Donjon complété")
-				GameLog.d("Debug: Simulation de donjon complété (+100 XP)")
-		
-		8: # Déclencher événement test
-			var event_manager = EventManager
-			if event_manager:
-				event_manager.force_event("member_dispute")
-				GameLog.d("Debug: Événement 'dispute entre membres' forcé")
-		
-		9: # Afficher stats événements
-			var event_manager = EventManager
-			if event_manager:
-				var stats = event_manager.get_event_stats()
-				GameLog.d("=== STATS ÉVÉNEMENTS ===")
-				GameLog.d("Événements aujourd'hui: %d" % stats.events_today)
-				GameLog.d("Événement en attente: %s" % ("Oui" if stats.pending_event else "Non"))
-				GameLog.d("Chaînes actives: %s" % str(stats.active_chains))
-				GameLog.d("Total événements: %d" % stats.total_events)
-				GameLog.d("========================")
-				
-		10: # Test notification INFO
-			var notification_manager = NotificationManager
-			if notification_manager:
-				notification_manager.show_info("Ceci est un test de notification info", "Test Info")
-				GameLog.d("Debug: Test notification INFO")
-				
-		11: # Test notification SUCCESS
-			var notification_manager = NotificationManager
-			if notification_manager:
-				notification_manager.show_success("Ceci est un test de notification succès", "Test Success")
-				GameLog.d("Debug: Test notification SUCCESS")
-				
-		12: # Test notification WARNING
-			var notification_manager = NotificationManager
-			if notification_manager:
-				notification_manager.show_warning("Ceci est un test de notification avertissement", "Test Warning")
-				GameLog.d("Debug: Test notification WARNING")
-				
-		13: # Test notification ERROR
-			var notification_manager = NotificationManager
-			if notification_manager:
-				notification_manager.show_error("Ceci est un test de notification erreur", "Test Error")
-				GameLog.d("Debug: Test notification ERROR")
-				
-		14: # Test notification ACHIEVEMENT
-			var notification_manager = NotificationManager
-			if notification_manager:
-				notification_manager.show_achievement("Ceci est un test de notification achievement", "Test Achievement")
-				GameLog.d("Debug: Test notification ACHIEVEMENT")
-	
-	# Rafraîchir la fenêtre guilde si elle est ouverte
-	var guilde_inst: Control = window_manager.get_window_instance("guilde")
-	if guilde_inst and guilde_inst.visible:
-		guilde_inst._refresh_member_list()
-		guilde_inst._update_guild_info()
-
 func _process(delta: float) -> void:
 	# Mettre à jour les donjons actifs via l'ActivityManager
 	var activity_manager = ActivityManager
@@ -396,13 +252,11 @@ func _input(event: InputEvent) -> void:
 			KEY_ESCAPE:  # Échap pour fermer la fenêtre active
 				window_manager.close_active_window()
 			KEY_F1:  # F1 pour déclencher un événement test
-				if _is_debug_ui_enabled():
-					GameLog.d("F1 pressed - Tentative de déclencher un événement")
-					_on_debug_menu_pressed(8)  # ID 8 = Déclencher événement test
+				if _debug_menu:
+					_debug_menu.trigger(8)  # ID 8 = Déclencher événement test
 			KEY_F2:  # F2 pour afficher les stats
-				if _is_debug_ui_enabled():
-					GameLog.d("F2 pressed - Affichage des stats")
-					_on_debug_menu_pressed(9)  # ID 9 = Afficher stats événements
+				if _debug_menu:
+					_debug_menu.trigger(9)  # ID 9 = Afficher stats événements
 			KEY_F5:  # F5 pour sauvegarder
 				SaveManager.save_game()
 
@@ -539,6 +393,19 @@ func _on_loot_conflict(conflict: Dictionary) -> void:
 		)
 		vbox.add_child(btn)
 
+	# Fermeture sans choix (Échap/croix) : attribue par défaut au 1er candidat pour
+	# éviter un soft-lock (jeu resté en pause + verrou _loot_dialog_active) (C14).
+	dialog.close_requested.connect(func():
+		if not _loot_dialog_active:
+			return
+		_resolve_loot_conflict(item, candidates[0], candidates, dungeon_name, boss_name)
+		dialog.queue_free()
+		if game_time_node and not was_paused:
+			game_time_node.toggle_pause()
+		_loot_dialog_active = false
+		_show_next_pending_event.call_deferred()
+	)
+
 	_loot_dialog_active = true
 	add_child(dialog)
 	dialog.popup_centered(Vector2(500, 300))
@@ -570,57 +437,13 @@ func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Arr
 var _drama_popup_active: bool = false
 var _pending_dramas: Array = []
 
-func _connect_national_systems() -> void:
-	"""Connecte les signaux des systèmes médias, sponsors et dramas (Phase Nationale)."""
-	var media: Node = MediaManager
-	if media:
-		media.media_incident.connect(_on_media_incident)
-		media.streamer_started.connect(_on_streamer_started)
-
-	var sponsors: Node = SponsorshipManager
-	if sponsors:
-		sponsors.sponsor_acquired.connect(_on_sponsor_acquired)
-		sponsors.sponsor_lost.connect(_on_sponsor_lost)
-
-	var dramas: Node = DramaManager
-	if dramas:
-		dramas.drama_occurred.connect(_on_drama_occurred)
-		dramas.drama_response_needed.connect(_on_drama_response_needed)
-		dramas.drama_resolved.connect(_on_drama_resolved)
-
-func _on_media_incident(_member_name: String, _incident_type: String, description: String) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Média] %s" % description, "warning")
-
-func _on_streamer_started(member_name: String) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Stream] %s commence à streamer !" % member_name, "activity")
-	if NotificationManager:
-		NotificationManager.show_info("%s est désormais streamer" % member_name, "Nouveau streamer")
-
-func _on_sponsor_acquired(sponsor) -> void:
-	if NotificationManager:
-		NotificationManager.show_success(
-			"Contrat signé avec %s (+%d or/sem.)" % [sponsor.sponsor_name, sponsor.weekly_revenue],
-			"Sponsor")
-	if chat_panel:
-		chat_panel.add_message("[Sponsor] Nouveau contrat : %s" % sponsor.sponsor_name, "loot")
-
-func _on_sponsor_lost(sponsor, reason: String) -> void:
-	if NotificationManager:
-		NotificationManager.show_warning("%s : %s" % [sponsor.sponsor_name, reason], "Sponsor perdu")
-
-func _on_drama_occurred(drama) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Drama] %s" % drama.description, "error")
-	if NotificationManager:
-		NotificationManager.show_warning(
-			drama.description,
-			"%s (%s)" % [drama.get_type_name(), drama.get_severity_name()])
-
-func _on_drama_resolved(drama) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Drama] Crise résolue : %s" % drama.get_type_name(), "info")
+func _setup_system_notifier() -> void:
+	"""Délègue le relais des notifications systèmes (National/Esport/Cohésion) à
+	SystemNotifier. Le popup modal de drama reste géré ici (couplé à la pause)."""
+	_system_notifier = SystemNotifier.new()
+	add_child(_system_notifier)
+	_system_notifier.setup(chat_panel)
+	_system_notifier.drama_response_needed.connect(_on_drama_response_needed)
 
 func _on_drama_response_needed(drama) -> void:
 	# File d'attente pour éviter les popups simultanées
@@ -697,6 +520,20 @@ func _show_drama_popup(drama) -> void:
 		desc.modulate = Color(0.65, 0.67, 0.72)
 		vbox.add_child(desc)
 
+	# Fermeture sans choix (Échap/croix) : réponse « silence » par défaut pour éviter
+	# un soft-lock (jeu resté en pause + verrou _drama_popup_active) (C14).
+	dialog.close_requested.connect(func():
+		if not _drama_popup_active:
+			return
+		DramaManager.resolve_drama(drama, "silence")
+		dialog.queue_free()
+		if game_time_node and not was_paused:
+			game_time_node.toggle_pause()
+		_drama_popup_active = false
+		_process_next_drama()
+		_show_next_pending_event.call_deferred()
+	)
+
 	add_child(dialog)
 	dialog.popup_centered(Vector2(540, 380))
 
@@ -707,71 +544,6 @@ func _process_next_drama() -> void:
 		if next and next.active:
 			_show_drama_popup(next)
 			return
-
-# === SYSTÈMES ESPORT (Milestone 4 : staff, tournois, transferts, legacy) ===
-
-func _connect_esport_systems() -> void:
-	"""Connecte les notifications des systèmes de la phase Esport."""
-	if TournamentManager:
-		TournamentManager.tournament_completed.connect(_on_tournament_completed)
-	if StaffManager:
-		StaffManager.staff_hired.connect(_on_staff_hired)
-	if TransferManager:
-		TransferManager.transfer_completed.connect(_on_transfer_completed)
-		TransferManager.transfer_window_opened.connect(_on_transfer_window_opened)
-	if LegacyManager:
-		LegacyManager.title_unlocked.connect(_on_legacy_title_unlocked)
-
-func _on_tournament_completed(_tournament, _stage_reached: int, is_champion: bool, results: Dictionary) -> void:
-	if chat_panel:
-		if is_champion:
-			chat_panel.add_message("[Esport] Victoire au %s ! (+%d or)" % [results.get("tournament", ""), results.get("gold", 0)], "loot")
-		else:
-			chat_panel.add_message("[Esport] Éliminé : %s (tour %d/%d)" % [results.get("tournament", ""), results.get("stage_reached", 0), results.get("rounds", 0)], "info")
-	if NotificationManager:
-		if is_champion:
-			NotificationManager.show_achievement("Champion : %s" % results.get("tournament", ""), "Tournoi")
-		else:
-			NotificationManager.show_info("Tournoi terminé (tour %d/%d)" % [results.get("stage_reached", 0), results.get("rounds", 0)], "Esport")
-
-func _on_staff_hired(staff) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Staff] %s rejoint le staff (%s)" % [staff.staff_name, staff.get_role_name()], "activity")
-
-func _on_transfer_completed(player) -> void:
-	if NotificationManager:
-		NotificationManager.show_success("%s rejoint la guilde (transfert international)" % player.nom, "Transfert")
-	if chat_panel:
-		chat_panel.add_message("[Transfert] %s arrive de %s" % [player.nom, player.get_meta("region", "?")], "loot")
-
-func _on_transfer_window_opened() -> void:
-	if NotificationManager:
-		NotificationManager.show_info("La fenêtre de transfert internationale est ouverte", "Transferts")
-
-func _on_legacy_title_unlocked(title) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Legacy] Nouveau titre débloqué : %s" % title, "loot")
-
-# === SYSTÈME DE COHÉSION (Milestone 5 : moral, social, team-building, traditions, conflits) ===
-
-func _connect_culture_systems() -> void:
-	"""Connecte les notifications du système de cohésion de guilde."""
-	if GuildCultureManager:
-		GuildCultureManager.tension_detected.connect(_on_tension_detected)
-		GuildCultureManager.team_building_done.connect(_on_team_building_done)
-		GuildCultureManager.tradition_established.connect(_on_tradition_established)
-
-func _on_tension_detected(player1_name: String, player2_name: String, reason: String) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Cohésion] Tension entre %s et %s (%s)" % [player1_name, player2_name, reason], "warning")
-
-func _on_team_building_done(activity_name: String, _morale_gain: float) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Cohésion] Team-building : %s" % activity_name, "activity")
-
-func _on_tradition_established(tradition_name: String) -> void:
-	if chat_panel:
-		chat_panel.add_message("[Cohésion] Nouvelle tradition établie : %s" % tradition_name, "loot")
 
 func _setup_player_systems() -> void:
 	"""Configure les systèmes spécifiques au joueur"""
@@ -830,12 +602,49 @@ func _connect_player_systems() -> void:
 		if player_character.has_signal("player_state_changed"):
 			player_character.player_state_changed.connect(_on_player_state_changed)
 
+	# Après un chargement de save, SaveManager reconstruit le personnage joueur :
+	# il faut re-pointer l'UI vers ce nouvel objet (bug C1).
+	if SaveManager and not SaveManager.load_completed.is_connected(_on_save_loaded):
+		SaveManager.load_completed.connect(_on_save_loaded)
+
 	if OS.is_debug_build():
 		GameLog.d("Systèmes joueur configurés")
 
 	# Au démarrage, si le joueur n'a aucune activité, on bloque le temps et on
 	# demande un ordre (sauf en mode test sans save autoload).
 	call_deferred("_on_player_state_changed")
+
+func _on_save_loaded(success: bool) -> void:
+	"""Une sauvegarde vient d'être chargée : re-synchronise l'UI joueur (C1)."""
+	if success:
+		_rewire_player_after_load()
+
+func _rewire_player_after_load() -> void:
+	"""Après un chargement, SaveManager remplace GuildManager.player_character par un
+	NOUVEL objet. Sans re-wiring, main + le panneau de contrôle continueraient de
+	piloter l'ancien objet (orphelin, hors guilde) pendant que la simulation/UI lit
+	le nouveau → niveau/énergie/activité désynchronisés (bug C1)."""
+	var gm: Node = GuildManager
+	if not gm:
+		return
+	var new_pc = gm.get_player_character()
+	if not new_pc or new_pc == player_character:
+		return
+	# Déconnecte les signaux de l'ancien objet joueur (orphelin)
+	if player_character:
+		if player_character.forced_disconnect_requested.is_connected(_on_player_forced_disconnect):
+			player_character.forced_disconnect_requested.disconnect(_on_player_forced_disconnect)
+		if player_character.has_signal("player_state_changed") and player_character.player_state_changed.is_connected(_on_player_state_changed):
+			player_character.player_state_changed.disconnect(_on_player_state_changed)
+	# Re-pointe vers le personnage chargé
+	player_character = new_pc
+	if player_control_panel:
+		player_control_panel.set_player_character(new_pc)
+	if not new_pc.forced_disconnect_requested.is_connected(_on_player_forced_disconnect):
+		new_pc.forced_disconnect_requested.connect(_on_player_forced_disconnect)
+	if new_pc.has_signal("player_state_changed") and not new_pc.player_state_changed.is_connected(_on_player_state_changed):
+		new_pc.player_state_changed.connect(_on_player_state_changed)
+	_on_player_state_changed()
 
 func _on_player_disconnect_requested(_return_hour: int, _return_minute: int) -> void:
 	"""Bouton « Se reposer » : repos volontaire avec reprise auto de l'activité."""
@@ -846,8 +655,10 @@ func _on_player_forced_disconnect(recovery_hours: int) -> void:
 	_perform_rest(recovery_hours, true)
 
 func _perform_rest(recovery_hours: int, forced: bool) -> void:
-	"""Repos unifié (forcé ou volontaire) : pause → confirmation → avance le temps
-	instantanément → récupère l'énergie → reconnecte → reprend la dernière activité."""
+	"""Repos unifié (forcé ou volontaire), NON bloquant : avance le temps
+	instantanément, restaure l'énergie, reconnecte et reprend la dernière activité.
+	Un toast informe le joueur — plus de modale « Épuisement total » qui interrompt
+	la partie (C4)."""
 	if is_in_forced_rest:
 		return
 	is_in_forced_rest = true
@@ -861,32 +672,7 @@ func _perform_rest(recovery_hours: int, forced: bool) -> void:
 	if player_character and player_character.is_online:
 		player_character.disconnect_player("Repos")
 
-	# Bloque tout (sauf le dialog en PROCESS_MODE_ALWAYS) pendant la confirmation
-	get_tree().paused = true
-
-	var dialog := AcceptDialog.new()
-	if forced:
-		dialog.title = "Épuisement total"
-		dialog.dialog_text = "Votre personnage est complètement épuisé !\n\nUn repos de %dh est nécessaire.\n• Récupération complète de l'énergie\n• Vous reprendrez automatiquement votre activité" % recovery_hours
-		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
-	else:
-		dialog.title = "Repos"
-		dialog.dialog_text = "Votre personnage va se reposer %dh.\n• Récupération complète de l'énergie\n• Reprise automatique de l'activité au réveil" % recovery_hours
-		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
-	dialog.process_mode = Node.PROCESS_MODE_ALWAYS  # Reste actif pendant la pause
-	dialog.exclusive = true
-	# Fermer via la croix doit aussi valider le repos, sinon le verrou de repos
-	# resterait actif et figerait le jeu.
-	dialog.close_requested.connect(func(): dialog.emit_signal("confirmed"))
-	get_tree().root.add_child(dialog)
-	dialog.popup_centered(Vector2(460, 220))
-
-	await dialog.confirmed
-	if is_instance_valid(dialog):
-		dialog.queue_free()
-
-	# Reprendre l'arbre, puis avancer le temps de jeu instantanément
-	get_tree().paused = false
+	# Avance le temps de jeu instantanément
 	if GameTime:
 		GameTime.fast_forward_hours(recovery_hours)
 
@@ -897,6 +683,15 @@ func _perform_rest(recovery_hours: int, forced: bool) -> void:
 		player_character.reconnect_player()
 
 	is_in_forced_rest = false
+
+	# Informe via un toast non bloquant (au lieu d'une modale)
+	if NotificationManager:
+		if forced:
+			NotificationManager.show_warning(
+				"Personnage épuisé : repos de %dh, énergie restaurée." % recovery_hours, "Repos")
+		else:
+			NotificationManager.show_info(
+				"Repos de %dh : énergie restaurée." % recovery_hours, "Repos")
 
 	# Reprise automatique de la dernière activité (sinon, demander un ordre)
 	if player_character and not player_character.resume_last_activity():

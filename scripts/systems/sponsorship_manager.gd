@@ -4,6 +4,8 @@ extends Node
 
 signal sponsor_acquired(sponsor)
 signal sponsor_lost(sponsor, reason)
+# réservé : non encore émis
+@warning_ignore("unused_signal")
 signal sponsor_offer_available(sponsor)
 
 const MAX_ACTIVE_SPONSORS := 3

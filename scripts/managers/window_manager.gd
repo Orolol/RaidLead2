@@ -28,14 +28,14 @@ signal window_opened(window_name)
 signal window_closed(window_name)
 signal window_focused(window_name)
 
-func _ready():
+func _ready() -> void:
 	# Charger les positions de fenêtres sauvegardées
 	_load_layouts()
 	GameLog.d("WindowManager initialisé (mode mono-fenêtre)")
 
 # ==================== GESTION DE BASE DES FENÊTRES ====================
 
-func register_window(window_name: String, window_scene_path: String, allow_multiple: bool = false):
+func register_window(window_name: String, window_scene_path: String, allow_multiple: bool = false) -> void:
 	"""Enregistre une fenêtre avec ses paramètres"""
 	windows[window_name] = {
 		"scene_path": window_scene_path,
@@ -103,7 +103,7 @@ func open_window(window_name: String, force_new: bool = false) -> Control:
 	
 	return instance
 
-func show_window(window_name: String):
+func show_window(window_name: String) -> Control:
 	"""Navigation par menu : affiche cette fenêtre seule (cache les autres ouvertes)
 	puis rafraîchit son contenu. Le multi-fenêtres reste possible via open_window()."""
 	# Navigation exclusive : cacher les autres fenêtres pour éviter l'empilement
@@ -127,7 +127,7 @@ func _refresh_window_content(instance) -> void:
 			instance.call(method_name)
 			return
 
-func close_window(window_name: String, instance_id: String = ""):
+func close_window(window_name: String, instance_id: String = "") -> void:
 	"""Ferme une fenêtre ou instance spécifique"""
 	if not open_windows.has(window_name):
 		return
@@ -148,7 +148,7 @@ func close_window(window_name: String, instance_id: String = ""):
 		else:
 			_finalize_window_close(window_name, to_remove)
 
-func _finalize_window_close(window_name: String, inst_data: Dictionary):
+func _finalize_window_close(window_name: String, inst_data: Dictionary) -> void:
 	"""Finalise la fermeture d'une fenêtre"""
 	# Mémoriser la position/taille puis la persister sur disque (restaurée au boot)
 	_save_window_position(window_name, inst_data.instance)
@@ -172,7 +172,7 @@ func _finalize_window_close(window_name: String, inst_data: Dictionary):
 	
 	window_closed.emit(window_name)
 
-func hide_window(window_name: String, instance_id: String = ""):
+func hide_window(window_name: String, instance_id: String = "") -> void:
 	"""Cache une fenêtre sans la fermer"""
 	if not open_windows.has(window_name):
 		return
@@ -186,7 +186,7 @@ func hide_window(window_name: String, instance_id: String = ""):
 
 # ==================== GESTION MULTI-FENÊTRES ET Z-ORDER ====================
 
-func bring_to_front(window_name: String, instance_id: String = ""):
+func bring_to_front(window_name: String, instance_id: String = "") -> void:
 	"""Amène une fenêtre au premier plan"""
 	var instance_data = _find_instance(window_name, instance_id)
 	if not instance_data:
@@ -200,6 +200,8 @@ func bring_to_front(window_name: String, instance_id: String = ""):
 	
 	# Afficher si cachée
 	instance_data.instance.show()
+	# Garder la fenêtre dans l'écran (au cas où le viewport a été redimensionné)
+	_keep_window_on_screen(instance_data.instance)
 
 	# Mettre comme active
 	active_window = window_name
@@ -221,7 +223,7 @@ func refresh_window(window_name: String) -> void:
 
 # ==================== LAYOUTS ET SAUVEGARDE ====================
 
-func close_all_instances(window_name: String):
+func close_all_instances(window_name: String) -> void:
 	"""Ferme toutes les instances d'une fenêtre"""
 	if not open_windows.has(window_name):
 		return
@@ -232,7 +234,7 @@ func close_all_instances(window_name: String):
 
 # ==================== MÉTHODES UTILITAIRES PRIVÉES ====================
 
-func _setup_window_instance(instance: Control, window_name: String, instance_id: String, config: Dictionary):
+func _setup_window_instance(instance: Control, window_name: String, instance_id: String, _config: Dictionary) -> void:
 	"""Configure une instance de fenêtre"""
 	# Z-index
 	instance.z_index = max_z_index
@@ -262,12 +264,15 @@ func _apply_window_layout(instance: Control, window_name: String, config: Dictio
 	# Position
 	if window_positions.has(window_name):
 		var saved: Dictionary = window_positions[window_name]
-		instance.position = saved.get("position", Vector2.ZERO)
-		instance.size = saved.get("size", config.default_size)
+		instance.position = _to_vec2(saved.get("position"), Vector2.ZERO)
+		instance.size = _to_vec2(saved.get("size"), config.default_size)
 	elif config.default_position != Vector2(-1, -1):
 		instance.position = config.default_position
 	else:
 		_center_window(instance)
+
+	# Borne la fenêtre dans l'écran courant (évite une position/taille restaurée hors champ)
+	_keep_window_on_screen(instance)
 
 	# S'assurer que la fenêtre est visible et déclencher l'animation
 	instance.visible = true
@@ -275,7 +280,21 @@ func _apply_window_layout(instance: Control, window_name: String, config: Dictio
 	if use_animations:
 		_animate_window_open(instance)
 
-func _connect_window_signals(instance: Control, window_name: String, instance_id: String):
+func _keep_window_on_screen(win: Control) -> void:
+	"""Borne la position et la taille d'une fenêtre dans le viewport courant.
+	Protège contre une fenêtre restaurée (ou déplacée) hors écran."""
+	if not is_instance_valid(win):
+		return
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var margin: float = 8.0
+	# La taille ne doit pas dépasser l'écran (en gardant une marge minimale).
+	var max_size: Vector2 = (viewport_size - Vector2(margin, margin) * 2.0).max(Vector2(100, 100))
+	win.size = win.size.min(max_size)
+	# La position doit garder la fenêtre entièrement visible.
+	var max_pos: Vector2 = (viewport_size - win.size - Vector2(margin, margin)).max(Vector2(margin, margin))
+	win.position = win.position.clamp(Vector2(margin, margin), max_pos)
+
+func _connect_window_signals(instance: Control, window_name: String, instance_id: String) -> void:
 	"""Connecte les signaux d'une fenêtre"""
 	# Signal de fermeture
 	if instance.has_signal("close_requested"):
@@ -336,52 +355,64 @@ func _get_instance_id(window_name: String, instance: Control) -> String:
 	
 	return ""
 
-func _add_to_z_order(window_name: String, instance_id: String):
+func _add_to_z_order(window_name: String, instance_id: String) -> void:
 	"""Ajoute une fenêtre au z-order"""
-	var key = window_name + ":" + instance_id
+	var key: String = window_name + ":" + instance_id
 	window_z_order.push_front(key)
 
-func _remove_from_z_order(window_name: String, instance_id: String):
+func _remove_from_z_order(window_name: String, instance_id: String) -> void:
 	"""Supprime une fenêtre du z-order"""
-	var key = window_name + ":" + instance_id
+	var key: String = window_name + ":" + instance_id
 	window_z_order.erase(key)
 
-func _move_to_front_in_z_order(window_name: String, instance_id: String):
+func _move_to_front_in_z_order(window_name: String, instance_id: String) -> void:
 	"""Déplace une fenêtre au début du z-order"""
 	_remove_from_z_order(window_name, instance_id)
 	_add_to_z_order(window_name, instance_id)
 
-func _apply_z_order():
+func _apply_z_order() -> void:
 	"""Applique les z-index selon l'ordre"""
 	for i in range(window_z_order.size()):
 		var key = window_z_order[i]
 		var parts = key.split(":")
-		var name = parts[0]
+		var win_name = parts[0]
 		var instance_id = parts[1]
-		
-		var inst_data = _find_instance(name, instance_id)
+
+		var inst_data: Dictionary = _find_instance(win_name, instance_id)
 		if inst_data and inst_data.instance:
 			inst_data.instance.z_index = max_z_index - i
 
-func _update_active_window():
+func _update_active_window() -> void:
 	"""Met à jour la fenêtre active"""
 	if window_z_order.is_empty():
 		active_window = null
 		return
-	
+
 	var key = window_z_order[0]
 	var parts = key.split(":")
 	active_window = parts[0]
 	window_focused.emit(active_window)
 
 func _save_window_position(window_name: String, instance: Control):
-	"""Sauvegarde la position d'une fenêtre"""
+	"""Sauvegarde la position d'une fenêtre (format JSON-safe : tableaux [x, y],
+	car JSON.stringify ne sérialise pas les Vector2 — ils deviendraient des String
+	illisibles au rechargement)."""
 	window_positions[window_name] = {
-		"position": instance.position,
-		"size": instance.size
+		"position": [instance.position.x, instance.position.y],
+		"size": [instance.size.x, instance.size.y]
 	}
 
-func _save_layouts():
+func _to_vec2(value, fallback: Vector2) -> Vector2:
+	"""Reconstruit un Vector2 depuis un tableau [x, y] (sauvegarde sur disque),
+	un Vector2 (même session), sinon renvoie le repli (anciennes sauvegardes
+	corrompues où le Vector2 avait été sérialisé en String)."""
+	if value is Array and value.size() >= 2:
+		return Vector2(value[0], value[1])
+	if value is Vector2:
+		return value
+	return fallback
+
+func _save_layouts() -> void:
 	"""Sauvegarde les positions/tailles des fenêtres sur disque."""
 	var save_data = {
 		"window_positions": window_positions
@@ -392,7 +423,7 @@ func _save_layouts():
 		file.store_string(JSON.stringify(save_data))
 		file.close()
 
-func _load_layouts():
+func _load_layouts() -> void:
 	"""Charge les positions/tailles des fenêtres depuis le disque."""
 	if not FileAccess.file_exists(SAVE_FILE_PATH):
 		return

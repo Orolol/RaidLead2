@@ -78,7 +78,7 @@ static var _id_counter: int = 0
 
 # Propriétés pour la compatibilité
 
-func _init():
+func _init() -> void:
 	_id_counter += 1
 	player_id = "p%d" % _id_counter
 	nom = _generate_random_name()
@@ -86,19 +86,14 @@ func _init():
 	_initialize_behavior_profile()
 
 func _generate_random_name() -> String:
-	var first_names = ["Aragorn", "Legolas", "Gimli", "Frodo", "Gandalf", "Boromir", "Elrond", "Galadriel", "Samwise", "Merry"]
-	var last_names = ["Shadowbane", "Stormblade", "Firewalker", "Moonwhisper", "Ironforge", "Goldleaf", "Stargazer", "Dragonheart", "Windrunner", "Frostborn"]
+	var first_names: Array[String] = ["Aragorn", "Legolas", "Gimli", "Frodo", "Gandalf", "Boromir", "Elrond", "Galadriel", "Samwise", "Merry"]
+	var last_names: Array[String] = ["Shadowbane", "Stormblade", "Firewalker", "Moonwhisper", "Ironforge", "Goldleaf", "Stargazer", "Dragonheart", "Windrunner", "Frostborn"]
 	return first_names[randi() % first_names.size()] + last_names[randi() % last_names.size()]
 
-func _generate_random_stats():
-	var classes = ["Guerrier", "Mage", "Prêtre"]
+func _generate_random_stats() -> void:
+	var classes: Array[String] = ["Guerrier", "Mage", "Prêtre"]
 	personnage_classe = classes[randi() % classes.size()]
-	
-	# Respecter le niveau maximum selon la version serveur
-	var max_level = 60
-	if ServerVersion:
-		max_level = ServerVersion.get_max_player_level()
-	
+
 	personnage_niveau = 1  # Tous commencent niveau 1
 	
 	# Initialiser l'équipement
@@ -146,14 +141,14 @@ func get_role() -> String:
 		"Chaman": return "Healer"  # Par défaut Healer pour les chamans
 		_: return "DPS"
 
-func update_integration(delta: float):
+func update_integration(delta: float) -> void:
 	integration = clamp(integration + delta, 0.0, 100.0)
 	_check_tag_reveals()
 
-func update_energy(delta: float):
+func update_energy(delta: float) -> void:
 	energy = clamp(energy + delta, 0.0, 100.0)
 
-func update_mood(delta: float):
+func update_mood(delta: float) -> void:
 	mood = clamp(mood + delta, 0.0, 100.0)
 
 func is_available_now() -> bool:
@@ -171,11 +166,11 @@ func will_accept_activity(activity_type: String) -> bool:
 	
 	return true
 
-func go_online():
+func go_online() -> void:
 	is_online = true
 	energy = max(energy, 70.0)  # Au minimum 70 d'énergie en se connectant
-	
-func go_offline():
+
+func go_offline() -> void:
 	is_online = false
 	current_activity = null
 	
@@ -214,8 +209,8 @@ func should_disconnect(game_time: Node) -> bool:
 	var day_name = game_time.get_day_name().to_lower()
 	if planning.has(day_name):
 		var day_schedule = planning[day_name]
-		var in_schedule = false
-		
+		var in_schedule: bool = false
+
 		if game_time.is_evening() and day_schedule.get("soir", false):
 			in_schedule = true
 		elif game_time.is_afternoon() and day_schedule.get("apres_midi", false):
@@ -227,11 +222,11 @@ func should_disconnect(game_time: Node) -> bool:
 	return false
 
 # Système de révélation des tags
-func _check_tag_reveals():
-	var revealed_tags = []
-	
+func _check_tag_reveals() -> void:
+	var revealed_tags: Array = []
+
 	for tag in tags_caches:
-		var player_data = {
+		var player_data: Dictionary = {
 			"integration": integration,
 			"days_in_guild": days_in_guild,
 			"raid_successes": raid_successes,
@@ -249,13 +244,13 @@ func _check_tag_reveals():
 		tags_comportement.append(tag)
 		GameLog.d("Tag révélé pour %s: %s" % [nom, tag])
 
-func trigger_loot_conflict():
+func trigger_loot_conflict() -> void:
 	loot_conflicts += 1
 	if behavior_profile:
 		behavior_profile.adjust_from_experience("social_conflict", "negative")
 	_check_tag_reveals()
 
-func trigger_wipe():
+func trigger_wipe() -> void:
 	wipes_experienced += 1
 	mood = max(0, mood - 20)  # Baisse de moral importante
 	add_stress(4.0)  # La pression des wipes alimente le stress competitif
@@ -270,7 +265,7 @@ func trigger_wipe():
 
 	_check_tag_reveals()
 
-func trigger_raid_success():
+func trigger_raid_success() -> void:
 	raid_successes += 1
 	mood = min(100, mood + 15)  # Boost de moral
 	last_raid_success_day = _get_current_day()
@@ -283,11 +278,11 @@ func trigger_raid_success():
 	
 	_check_tag_reveals()
 
-func complete_activity():
+func complete_activity() -> void:
 	activities_completed += 1
 	_check_tag_reveals()
 
-func increment_days_in_guild():
+func increment_days_in_guild() -> void:
 	days_in_guild += 1
 	_check_tag_reveals()
 
@@ -302,7 +297,7 @@ func has_tag(tag: String) -> bool:
 
 func get_revealed_tags_count() -> int:
 	"""Retourne le nombre de tags révélés selon la phase actuelle"""
-	var total_tags = tags_comportement.size() + tags_caches.size()
+	var total_tags: int = tags_comportement.size() + tags_caches.size()
 	if total_tags == 0:
 		return 0
 	
@@ -355,7 +350,7 @@ func get_equipment_stats() -> Dictionary:
 func get_equipment_stats_summary() -> String:
 	"""Retourne un résumé formaté des statistiques d'équipement"""
 	if equipment:
-		var summary = equipment.get_stats_summary()
+		var summary: String = equipment.get_stats_summary()
 		if summary != "":
 			return summary
 	return "Aucune statistique d'équipement"
@@ -497,7 +492,7 @@ func equip_item(item) -> bool:
 	"""Fait équiper un objet au joueur"""
 	if not equipment:
 		equipment = EquipmentScript.new()
-	
+
 	var old_item = equipment.equip_item(item)
 	if old_item:
 		GameLog.d("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
@@ -508,7 +503,7 @@ func equip_item(item) -> bool:
 
 func get_effective_skill() -> float:
 	"""Retourne le skill effectif avec les modificateurs de phase"""
-	var base_skill = float(skill)
+	var base_skill: float = float(skill)
 	
 	# Appliquer malus de phase leveling
 	# Note: PhaseManager sera accessible depuis les autoloads quand implémenté
@@ -536,10 +531,10 @@ func gain_experience(amount: int) -> void:
 	
 	# Vérifier si on monte de niveau
 	var server_version = Singletons.get_autoload("ServerVersion")
-	var _max_level = 60 if server_version else 60
-	
+	var _max_level: int = 60 if server_version else 60
+
 	# Formule d'XP plus progressive et réaliste
-	var xp_for_next_level = _calculate_xp_for_level(personnage_niveau)
+	var xp_for_next_level: int = _calculate_xp_for_level(personnage_niveau)
 	
 	while personnage_xp >= xp_for_next_level and personnage_niveau < _max_level:
 		personnage_xp -= xp_for_next_level
@@ -564,7 +559,7 @@ func gain_experience(amount: int) -> void:
 		xp_for_next_level = _calculate_xp_for_level(personnage_niveau)
 
 func get_xp_progress() -> Dictionary:
-	var xp_for_next = _calculate_xp_for_level(personnage_niveau)
+	var xp_for_next: int = _calculate_xp_for_level(personnage_niveau)
 	
 	return {
 		"current_xp": personnage_xp,
@@ -655,7 +650,7 @@ func get_available_actions() -> Array[String]:
 	
 	return available_actions
 
-func _initialize_behavior_profile():
+func _initialize_behavior_profile() -> void:
 	"""Initialise le profil comportemental du joueur"""
 	behavior_profile = BehaviorProfileScript.new()
 	
@@ -680,7 +675,7 @@ func _initialize_behavior_profile():
 	# Initialiser les préférences d'activité
 	_initialize_activity_preferences()
 
-func _initialize_activity_preferences():
+func _initialize_activity_preferences() -> void:
 	"""Initialise les préférences d'activité selon le profil"""
 	activity_preferences = {
 		"LEVELING": 0.5,
@@ -717,9 +712,9 @@ func _get_current_day() -> int:
 		return game_time.get_total_days_elapsed()
 	return 0
 
-func equip_epic_item(item):
+func equip_epic_item(item) -> bool:
 	"""Équipe un objet épique et mémorise l'événement"""
-	var result = equip_item(item)
+	var result: bool = equip_item(item)
 	if result and item.rarity >= 3:  # Epic ou mieux
 		last_epic_loot_day = _get_current_day()
 		# Boost de moral pour loot épique

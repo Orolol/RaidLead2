@@ -34,7 +34,7 @@ func _on_poaching_attempt(target_member: SimulatedPlayer, source_guild: AIGuildS
 
 func _show_poaching_popup(member: SimulatedPlayer, source_guild: AIGuildScript) -> void:
 	"""Affiche le popup de gestion de débauchage"""
-	var poaching_popup_scene = load("res://scripts/ui/windows/poaching_popup.gd")
+	var poaching_popup_scene: Resource = load("res://scripts/ui/windows/poaching_popup.gd")
 	var popup := Window.new()
 	popup.set_script(poaching_popup_scene)
 
