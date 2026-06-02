@@ -2,9 +2,8 @@ extends Control
 
 const MenuBarScript = preload("res://scripts/ui/components/menu_bar.gd")
 const WindowManagerScript = preload("res://scripts/managers/window_manager.gd")
-const RandomEventResource = preload("res://scripts/resources/random_event.gd")
-const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
-const EventPopupWindow = preload("res://scripts/ui/windows/event_popup.gd")
+# RandomEventResource / EventChoiceResource / EventPopupWindow : résolus via leur class_name global
+# (les preloads redondants masquaient l'identifiant global → SHADOWED_GLOBAL_IDENTIFIER).
 const PlayerControlPanelScript = preload("res://scripts/ui/components/player_control_panel.gd")
 # const FastForwardDialog = preload("res://scripts/ui/windows/fast_forward_dialog.gd")  # Supprimé - système simplifié
 const NO_SAVE_AUTOLOAD_ARG: String = "--no-save-autoload"

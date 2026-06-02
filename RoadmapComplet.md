@@ -672,6 +672,14 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 - ✅ **C9** : déjà câblé (`main._process` → `update_dungeons`). **C10** : l'activité ne produit plus de gains hors-ligne (garde `is_online`). **C11** : rôles de combat lus via `get_role()`. **C12** : binding de signaux d'`EffectSystem` réparé (lambdas à signature exacte + disconnect symétrique). **C13** : fermer un événement le résout (plus de file figée). **C14** : popups loot/drama résolus par défaut à la fermeture (plus de soft-lock) + abandon de donjon idempotent à propriétaire unique. **C15** : le perso-joueur protégé des départs aléatoires. **C16** : raccourcis clavier respectent les verrous de phase.
 - 🧹 **Propreté** : ~couleurs sémantiques dérivées de `UIConstants` (source unique), polling UI supprimé (`time_display`/`player_control_panel` → signaux), clamp des fenêtres au viewport, activité « Fun » retirée de l'organisation de groupe, contenu de donjon gaté par phase/niveau, nombreux warnings éditeur réglés (params/signaux/shadowing/division entière).
 
+### Correctifs d'audit — vague 2 : réactivité UI, BBCode, scaling IA, CI (2 juin 2026)
+*172/172 assertions vertes + validation runtime MCP. Warnings éditeur 273→111.*
+- 🟠 **Fermeture propre des fenêtres** : Personnage/Guilde/Monde émettent désormais `close_requested` (teardown propre par `WindowManager`) au lieu de `hide()` qui désynchronisait l'état (bouton de menu actif incorrect).
+- 🟠 **Réactivité live** : fenêtre Personnage rafraîchit le niveau sur `member_leveled_up` (polling 3 s supprimé) ; liste Guilde réactive aux level-up / recrutements / départs ; classement Monde réactif à `ranking_updated`.
+- 🟠 **Fuite BBCode** : panneaux de description (recrue / guilde) passés de `Label` à `RichTextLabel` (`bbcode_enabled`).
+- 🟠 **Équilibrage IA** : nombre de guildes National 49→13, Esport 99→15 ; progression **hebdomadaire lissée** (fin du gate `week % 4` → classement en marches d'escalier à haute vitesse).
+- ✅ **CI** : workflow GitHub Actions (`.github/workflows/tests.yml`) — Godot 4.6.2 → `CheckScripts` + `TestRunner` sur PR/push main.
+
 ### Banque de guilde + drag&drop d'équipement (2 juin 2026)
 *171 assertions vertes + E2E drag&drop 5/5 (Godot 4.6.2). Dernier lot « reporté » de l'audit livré.*
 - ✅ **Banque de guilde** : `Guild.bank_items` devient une vraie banque d'`Item` (`add_to_bank`/`remove_from_bank`/`get_bank_items`, plafonnée à 60 avec trim par rareté/iLvl). Sérialisée dans `SaveManager` (rétrocompatible).

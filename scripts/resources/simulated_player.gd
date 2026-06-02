@@ -93,12 +93,7 @@ func _generate_random_name() -> String:
 func _generate_random_stats():
 	var classes = ["Guerrier", "Mage", "Prêtre"]
 	personnage_classe = classes[randi() % classes.size()]
-	
-	# Respecter le niveau maximum selon la version serveur
-	var max_level = 60
-	if ServerVersion:
-		max_level = ServerVersion.get_max_player_level()
-	
+
 	personnage_niveau = 1  # Tous commencent niveau 1
 	
 	# Initialiser l'équipement

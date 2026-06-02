@@ -2,8 +2,6 @@ class_name RandomEventResource
 extends Resource
 const Singletons = preload("res://scripts/utils/singletons.gd")
 
-const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
-
 @export var id: String = ""
 @export var title: String = ""
 @export var description: String = ""
@@ -43,7 +41,7 @@ func is_eligible(game_state: Dictionary = {}) -> bool:
 	
 	return true
 
-func _evaluate_condition(condition_data: Dictionary, game_state: Dictionary) -> bool:
+func _evaluate_condition(condition_data: Dictionary, _game_state: Dictionary) -> bool:
 	var condition_type = condition_data.get("type", "")
 	var condition_value = condition_data.get("value", null)
 	

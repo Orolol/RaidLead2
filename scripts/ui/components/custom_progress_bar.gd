@@ -85,7 +85,7 @@ func _draw():
 	if segment_count > 1:
 		_draw_segments(bar_rect)
 
-func _draw_segments(bar_rect: Rect2):
+func _draw_segments(_bar_rect: Rect2):
 	"""Dessine les lignes de séparation des segments"""
 	var segment_width = (size.x - 2 * border_width) / segment_count
 	

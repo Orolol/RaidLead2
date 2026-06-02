@@ -3,8 +3,6 @@ extends Resource
 
 # Base de données des événements aléatoires
 
-const RandomEventResource = preload("res://scripts/resources/random_event.gd")
-const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
 const EffectsDataResource = preload("res://scripts/data/effects_data.gd")
 
 static func get_all_events() -> Array:

@@ -303,18 +303,18 @@ func _update_guild_rankings(_guilds_data: Array):
 
 # Callbacks des signaux
 
-func _on_phase_changed(new_phase, old_phase):
+func _on_phase_changed(_new_phase, _old_phase):
 	"""Réagit aux changements de phase"""
 	GameLog.d("Changement de phase détecté: adaptation des guildes IA")
 	
 	# Réinitialiser les guildes pour la nouvelle phase
 	call_deferred("_initialize_guilds_for_current_phase")
 
-func _on_day_changed(day: int, week: int, year: int):
+func _on_day_changed(_day: int, _week: int, _year: int):
 	"""Vérifications quotidiennes (pilotées par GameTime, synchronisées à la vitesse de jeu)."""
 	_run_daily_checks()
 
-func _on_week_changed(week: int, year: int):
+func _on_week_changed(week: int, _year: int):
 	"""Cadence IA : progression PvE chaque semaine (lissée), logique mensuelle toutes les 4 semaines.
 
 	Découpler les deux évite le classement « en marches d'escalier » à haute vitesse tout en
@@ -325,7 +325,7 @@ func _on_week_changed(week: int, year: int):
 
 # API publique pour interactions
 
-func get_guild_attempting_poaching(member) -> AIGuild:
+func get_guild_attempting_poaching(_member) -> AIGuild:
 	"""Retourne la guilde qui tente de débaucher un membre (si applicable)"""
 	# Cette fonction sera utilisée par l'UI pour afficher les tentatives
 	var aggressive_guilds = get_guilds_by_strategy(AIGuild.Strategy.AGGRESSIVE)
@@ -336,7 +336,7 @@ func get_guild_attempting_poaching(member) -> AIGuild:
 	
 	return null
 
-func simulate_counter_offer_response(source_guild: AIGuild, member, counter_offer: Dictionary) -> bool:
+func simulate_counter_offer_response(source_guild: AIGuild, _member, counter_offer: Dictionary) -> bool:
 	"""Simule la réponse d'une guilde IA à une contre-offre"""
 	var guild_persistence = 0.5
 	

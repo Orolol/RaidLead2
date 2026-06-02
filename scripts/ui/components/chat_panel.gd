@@ -148,7 +148,7 @@ func _update_display():
 	# Auto-scroll vers le bas si activé
 	if auto_scroll:
 		await get_tree().process_frame
-		scroll_container.scroll_vertical = scroll_container.get_v_scroll_bar().max_value
+		scroll_container.scroll_vertical = int(scroll_container.get_v_scroll_bar().max_value)
 
 func clear_chat():
 	messages.clear()
@@ -183,7 +183,7 @@ func _on_activity_started(player: SimulatedPlayer, activity):
 		var msg = "%s commence à farmer %s" % [player.nom, location]
 		add_message(msg, "activity")
 
-func _on_activity_completed(player: SimulatedPlayer, activity):
+func _on_activity_completed(_player: SimulatedPlayer, _activity):
 	# Message de fin d'activité si pertinent
 	pass
 
@@ -206,22 +206,24 @@ func _on_dungeon_started(dungeon_instance):
 	if not dungeon_instance.loot_distributed.is_connected(_on_loot_distributed):
 		dungeon_instance.loot_distributed.connect(_on_loot_distributed)
 
-func _on_dungeon_ended(dungeon_instance):
+func _on_dungeon_ended(_dungeon_instance):
 	# Les signaux sont déjà connectés dans _on_dungeon_started
 	pass
 
-func _on_boss_defeated(boss_index: int, boss_name: String, loot_winner):
+func _on_boss_defeated(_boss_index: int, boss_name: String, loot_winner):
 	var msg = "Boss vaincu : %s" % boss_name
 	if loot_winner:
 		msg += " (Loot : %s)" % loot_winner.nom
 	add_message(msg, "dungeon")
 
-func _on_boss_failed(boss_index: int, boss_name: String, wipe_count: int):
+func _on_boss_failed(_boss_index: int, boss_name: String, wipe_count: int):
 	var msg = "Wipe sur %s (tentative #%d)" % [boss_name, wipe_count]
 	add_message(msg, "error")
 
 func _on_dungeon_completed(total_time: float, gold_reward: int, dungeon_instance = null):
-	var minutes = int(int(total_time) / 60)
+	# Troncature volontaire : on veut le nombre entier de minutes écoulées.
+	@warning_ignore("integer_division")
+	var minutes = int(total_time) / 60
 	var seconds = int(total_time) % 60
 	var dungeon_name = "Donjon"
 	var boss_count = 0
