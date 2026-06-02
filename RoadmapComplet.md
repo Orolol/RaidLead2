@@ -52,6 +52,8 @@
 - ✅ Gestion des wipes et conséquences
 - ✅ Compositions requises (tanks, healers, DPS)
 
+- ✅ Polish UI donjon : timeline lisible, marqueurs de boss stylés, liste de groupe clarifiée, rapport de loot sans débordement horizontal
+
 ### 1.5 Pool de Recrutement (RecruitmentPool)
 - ✅ Pool dynamique de 15-30 joueurs disponibles
 - ✅ Actualisation quotidienne
