@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://dmr5bshcj74qo"]
 
-[ext_resource type="Script" uid="uid://cvqujccu6v2rr" path="res://scripts/ui/windows/fenetre_personnage.gd" id="1_2xp3g"]
+[ext_resource type="Script" path="res://scripts/ui/windows/fenetre_personnage.gd" id="1_2xp3g"]
 
 [node name="root" type="PanelContainer"]
 script = ExtResource("1_2xp3g")

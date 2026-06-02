@@ -3,6 +3,7 @@ class_name DungeonInstance
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
 const LootTables = preload("res://scripts/data/loot_tables.gd")
+const PveRunReportScript = preload("res://scripts/systems/pve_run_report.gd")
 
 signal boss_reached(boss_index: int, boss_name: String)
 signal boss_defeated(boss_index: int, boss_name: String, loot_winner: SimulatedPlayer)
@@ -32,12 +33,14 @@ var boss_positions: Array[float] = []  # Positions des boss sur le chemin
 var time_to_next_boss: float = 0.0
 var is_fighting_boss: bool = false
 var boss_fight_start_time: float = 0.0
+var boss_fight_elapsed: float = 0.0  # temps de JEU écoulé dans le combat en cours
 
 # Configuration
 const WIPE_TIME_PENALTY: float = 180.0  # 3 minutes perdues par wipe
 const MORALE_LOSS_PER_WIPE: int = 10
 const MAX_WIPES_BEFORE_ABANDON: int = 10
 const BOSS_BASE_FIGHT_TIME: float = 120.0  # 2 minutes par boss de base
+const BOSS_RESOLVE_SECONDS: float = 2.0    # durée (temps de jeu) avant résolution d'un boss
 
 func initialize(p_dungeon_id: String, p_group_members: Array) -> void:
 	dungeon_id = p_dungeon_id
@@ -132,10 +135,10 @@ func update(delta: float, game_time_ref = null) -> void:
 		_complete_dungeon()
 		return
 		
-	# Mettre à jour le pourcentage de progression global
+	# Mettre à jour le pourcentage de progression global (monotone : ne recule jamais).
 	var boss_progress = float(current_boss_index) / float(dungeon_data.bosses.size())
 	var path_progress = current_position * 0.1  # Le chemin compte pour 10%
-	progress_percent = (boss_progress * 0.9 + path_progress) * 100.0
+	progress_percent = maxf(progress_percent, (boss_progress * 0.9 + path_progress) * 100.0)
 	progress_updated.emit(progress_percent)
 
 func _update_progression(delta: float, game_time_ref = null) -> void:
@@ -169,17 +172,16 @@ func _update_progression(delta: float, game_time_ref = null) -> void:
 
 func _start_boss_fight(game_time_ref = null) -> void:
 	is_fighting_boss = true
+	boss_fight_elapsed = 0.0
 	if game_time_ref:
 		boss_fight_start_time = game_time_ref.get_current_timestamp()
 	else:
 		boss_fight_start_time = 0.0
-	
+
 	var boss_name = dungeon_data.bosses[current_boss_index]
 	boss_reached.emit(current_boss_index, boss_name)
-	
-	# Simuler le résultat du combat après un court délai
-	await Engine.get_main_loop().create_timer(2.0).timeout
-	_simulate_boss_fight()
+	# La résolution se fait en TEMPS DE JEU dans _update_boss_fight (respecte pause/vitesse),
+	# et non plus via un timer temps-réel qui se désynchronisait à haute vitesse.
 
 func _simulate_boss_fight() -> void:
 	var boss_name = dungeon_data.bosses[current_boss_index]
@@ -195,7 +197,12 @@ func _simulate_boss_fight() -> void:
 	
 	# Appliquer une pénalité basée sur le nombre de wipes
 	success_chance *= pow(0.95, wipe_count)  # -5% par wipe
-	
+
+	# Bonus de coordination de guilde (perks Ventrilo / Teamspeak).
+	if GuildManager and GuildManager.guild:
+		success_chance *= (1.0 + GuildManager.guild.get_raid_success_bonus())
+	success_chance = clampf(success_chance, 0.05, 0.98)
+
 	# Résoudre le combat
 	if randf() < success_chance:
 		_on_boss_defeated()
@@ -238,10 +245,30 @@ func _calculate_boss_success_chance(boss_difficulty: float) -> float:
 	var composition = DungeonDataScript.get_group_composition(dungeon_id)
 	var composition_penalty = _check_group_composition(composition)
 	base_score *= composition_penalty
-	
+
+	# Familiarité avec le contenu : la connaissance du donjon (0-100) ajoute jusqu'à +50%.
+	var avg_knowledge: float = 0.0
+	for member in group_members:
+		avg_knowledge += float(member.connaissance_donjons.get(dungeon_id, 0.0))
+	avg_knowledge /= float(total_members)
+	base_score *= (1.0 + avg_knowledge / 200.0)
+
+	# Bonus du staff professionnel (coach/analyste) — rend l'investissement staff visible en PvE.
+	if StaffManager:
+		base_score *= (1.0 + minf(StaffManager.get_total_performance_bonus(), 0.3))
+
+	# Modificateur circadien moyen : les types matin/soir performent mieux/moins selon l'heure.
+	if GuildManager and GuildManager.behavior_system and game_time_node:
+		var bs = GuildManager.behavior_system
+		if bs.has_method("apply_circadian_modifier"):
+			var circ_sum: float = 0.0
+			for member in group_members:
+				circ_sum += bs.apply_circadian_modifier(member, game_time_node.current_hour)
+			base_score *= circ_sum / float(total_members)
+
 	# Appliquer la difficulté
 	var success_chance = base_score / boss_difficulty
-	
+
 	return clamp(success_chance, 0.1, 0.95)
 
 func _check_group_composition(required_comp: Dictionary) -> float:
@@ -267,6 +294,9 @@ func _check_group_composition(required_comp: Dictionary) -> float:
 func _on_boss_defeated() -> void:
 	var boss_name: String = dungeon_data.bosses[current_boss_index]
 
+	# Familiarité progressive avec le donjon (lue par le calcul de réussite).
+	_grant_knowledge(5.0)
+
 	# Vérifier si le boss drop du loot
 	var is_heroic: bool = DungeonDataScript.is_heroic_dungeon(dungeon_id)
 	var loot_chance: float = LootTables.get_boss_loot_chance(current_boss_index, dungeon_data.bosses.size(), is_heroic)
@@ -288,7 +318,7 @@ func _on_boss_defeated() -> void:
 					if member.would_be_upgrade(looted_item):
 						eligible_members.append(member)
 
-				if eligible_members.size() >= 2:
+				if eligible_members.size() >= 2 and randf() >= (GuildManager.guild.get_loot_conflict_reduction() if (GuildManager and GuildManager.guild) else 0.0):
 					# Conflit de loot - laisser le joueur décider
 					var conflict: Dictionary = {
 						"item": looted_item,
@@ -298,7 +328,7 @@ func _on_boss_defeated() -> void:
 					}
 					GuildManager.loot_conflict_occurred.emit(conflict)
 					# Ne pas distribuer maintenant, le signal gère la suite
-					boss_defeated.emit(current_boss_index, boss_name, null, looted_item)
+					boss_defeated.emit(current_boss_index, boss_name, null)
 
 					# Continuer la progression normalement
 					wipe_count = 0
@@ -314,16 +344,18 @@ func _on_boss_defeated() -> void:
 						time_to_next_boss = max(30.0, next_boss_time - current_time)
 					return
 
-			# Distribution normale (pas de conflit)
-			loot_winner = group_members.pick_random()
+			# Distribution équitable : priorité au membre éligible le moins équipé (pas d'aléatoire pur).
+			loot_winner = _pick_loot_winner(looted_item)
 
 			if loot_winner and looted_item:
-				loot_winner.try_auto_equip(looted_item)
+				# Auto-équipe si upgrade, sinon dépose en banque de guilde (plus de loot perdu)
+				GuildManager.route_loot(loot_winner, looted_item)
 				GuildManager.add_loot_entry(looted_item, loot_winner.nom, d_name, boss_name)
 				# Émettre le signal de distribution de loot pour le chat
 				loot_distributed.emit(loot_winner, looted_item)
 
-	boss_defeated.emit(current_boss_index, boss_name, loot_winner, looted_item)
+	# Le signal boss_defeated ne déclare que 3 paramètres (boss_index, boss_name, loot_winner)
+	boss_defeated.emit(current_boss_index, boss_name, loot_winner)
 	
 	# Réinitialiser le compteur de wipes pour ce boss
 	wipe_count = 0
@@ -379,24 +411,75 @@ func _on_boss_failed() -> void:
 	is_fighting_boss = false
 	time_to_next_boss = 30.0  # 30 secondes avant de retenter
 
-func _update_boss_fight(_delta: float) -> void:
-	# Le combat est résolu instantanément dans _simulate_boss_fight
-	# Cette fonction pourrait être utilisée pour des animations futures
-	pass
+func _update_boss_fight(delta: float) -> void:
+	# Résout le combat après un court laps de TEMPS DE JEU (respecte pause et vitesse).
+	var gdelta: float = delta
+	if game_time_node:
+		if game_time_node.is_paused:
+			return
+		if game_time_node.time_speed > 0:
+			gdelta = delta * game_time_node.time_speed
+	boss_fight_elapsed += gdelta
+	if boss_fight_elapsed >= BOSS_RESOLVE_SECONDS:
+		boss_fight_elapsed = 0.0
+		if is_active and current_boss_index < dungeon_data.bosses.size():
+			_simulate_boss_fight()
 
 func _complete_dungeon() -> void:
 	is_active = false
+	_grant_knowledge(10.0)  # bonus de familiarité pour avoir terminé le contenu
 	var total_time = get_elapsed_time(game_time_node)
-	var gold_reward = dungeon_data.get("gold_reward", 100)
-	
-	# Distribuer l'or aux membres
-	var gold_per_member = gold_reward / group_members.size()
+	var gold_reward: int = int(dungeon_data.get("gold_reward", 100))
+	if BalanceManager:
+		gold_reward = int(gold_reward * BalanceManager.tunable_float("pve.gold_reward_mult", 1.0))
+
+	# Récompense d'or → trésorerie de guilde : c'est le revenu principal de la boucle PvE.
+	if GuildManager and GuildManager.guild:
+		GuildManager.guild.add_gold(gold_reward)
+		# XP de guilde (fait progresser le niveau, 20% du score de classement).
+		var is_raid_clear: bool = int(dungeon_data.get("type", -1)) == DungeonDataScript.InstanceType.RAID
+		var guild_xp: int = 250 if is_raid_clear else 100
+		if DungeonDataScript.is_heroic_dungeon(dungeon_id):
+			guild_xp += 100
+		GuildManager.guild.gain_xp(guild_xp, "Contenu complété : " + str(dungeon_data.get("name", "")))
+
+	# Part personnelle (flavor) + bonus de moral pour les participants.
+	var member_count: int = max(1, group_members.size())
+	var gold_per_member: int = int(gold_reward * 0.2) / member_count
 	for member in group_members:
 		member.or_actuel += gold_per_member
 		# Bonus de moral pour avoir terminé
 		member.mood = min(100, member.mood + 20)
-		
+
 	dungeon_completed.emit(total_time, gold_reward)
+	
+	if GuildRanking:
+		var participant_names: Array = []
+		for member in group_members:
+			participant_names.append(member.nom)
+		var total_bosses: int = dungeon_data.get("bosses", []).size()
+		var expected_duration_seconds: float = float(dungeon_data.get("duration_minutes", 60)) * 60.0
+		var run_details: Dictionary = {
+			"duration_seconds": total_time,
+			"gold_reward": gold_reward,
+			"wipes": total_wipes,
+			"bosses_defeated": total_bosses,
+			"total_bosses": total_bosses,
+			"expected_duration_seconds": expected_duration_seconds
+		}
+		run_details["performance_score"] = PveRunReportScript.calculate_performance_score(true, total_time, gold_reward, 0, run_details)
+		GuildRanking.register_player_content_clear(
+			dungeon_id,
+			dungeon_data.get("name", ""),
+			dungeon_data.get("type", -1),
+			DungeonDataScript.is_heroic_dungeon(dungeon_id),
+			participant_names,
+			run_details
+		)
+
+	# Progression de phase : compléter un donjon héroïque fait avancer la Phase 0 -> Serveur
+	if DungeonDataScript.is_heroic_dungeon(dungeon_id) and PhaseManager:
+		PhaseManager.complete_heroic_dungeon(dungeon_data.get("name", ""))
 
 func _abandon_dungeon(reason: String) -> void:
 	is_active = false
@@ -425,3 +508,24 @@ func get_estimated_remaining_time() -> float:
 	var total_duration = dungeon_data.get("duration_minutes", 60) * 60.0
 	var elapsed = get_elapsed_time(game_time_node)
 	return max(0.0, total_duration - elapsed + time_lost_to_wipes)
+
+func _grant_knowledge(amount: float) -> void:
+	"""Augmente la familiarité de chaque membre avec ce donjon (0-100)."""
+	for member in group_members:
+		var k: float = float(member.connaissance_donjons.get(dungeon_id, 0.0))
+		member.connaissance_donjons[dungeon_id] = minf(100.0, k + amount)
+
+func _pick_loot_winner(item: Item) -> SimulatedPlayer:
+	"""Attribue le loot au membre éligible (upgrade) le moins équipé ; à défaut au plus bas iLvl."""
+	if group_members.is_empty():
+		return null
+	var upgraders: Array = []
+	for m in group_members:
+		if m.would_be_upgrade(item):
+			upgraders.append(m)
+	var pool: Array = upgraders if not upgraders.is_empty() else group_members
+	var best = pool[0]
+	for m in pool:
+		if m.get_total_ilvl() < best.get_total_ilvl():
+			best = m
+	return best

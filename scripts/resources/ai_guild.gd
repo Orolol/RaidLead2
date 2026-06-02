@@ -70,12 +70,13 @@ const STRATEGY_CONFIG = {
 	}
 }
 
-func _init(guild_name: String = "", strategy: Strategy = Strategy.BALANCED):
+func _init(guild_name: String = "", strategy: Strategy = Strategy.BALANCED, initialize_members: bool = true):
 	super._init()
 	if guild_name != "":
 		name = guild_name
 	ai_strategy = strategy
-	_initialize_ai_guild()
+	if initialize_members:
+		_initialize_ai_guild()
 
 func _initialize_ai_guild():
 	"""Initialise la guilde IA avec des membres de départ"""
@@ -94,7 +95,7 @@ func _initialize_ai_guild():
 	# XP initiale selon la réputation
 	xp = int(reputation * 10) + randi_range(0, 200)
 	
-	print("Guilde IA '%s' créée - Stratégie: %s, Réputation: %.1f" % [name, Strategy.keys()[ai_strategy], reputation])
+	GameLog.d("Guilde IA '%s' créée - Stratégie: %s, Réputation: %.1f" % [name, Strategy.keys()[ai_strategy], reputation])
 
 func _generate_initial_members(count: int):
 	"""Génère des membres initiaux pour la guilde IA"""
@@ -219,14 +220,24 @@ func simulate_monthly_progress():
 	
 	# Mise à jour du focus
 	_update_current_focus()
-	
-	print("Progression mensuelle simulée pour %s - Membres: %d, Réputation: %.1f" % [name, members.size(), reputation])
+
+	# Progression de niveau crédible : XP mensuel adossé à la réputation/stratégie, pour que
+	# le score de niveau (20% du classement) reste disputé face au joueur.
+	var monthly_xp: int = int(120 + reputation * 4.0 + config.raid_focus * 200.0)
+	gain_xp(monthly_xp, "Progression mensuelle")
+
+	GameLog.d("Progression mensuelle simulée pour %s - Membres: %d, Réputation: %.1f" % [name, members.size(), reputation])
 
 func _simulate_pve_progression():
 	"""Simule la progression PvE de la guilde"""
 	var config = STRATEGY_CONFIG[ai_strategy]
 	var success_chance = success_rate * config.raid_focus
-	
+
+	# Équilibrage adaptatif : rubber-band — les IA progressent plus vite si le joueur domine (US 6.4)
+	var balance_manager = Singletons.get_autoload("BalanceManager")
+	if balance_manager:
+		success_chance *= balance_manager.get_ai_progression_mult()
+
 	# Tentatives de progression selon le focus actuel
 	var progression_attempts = 1
 	if current_focus == "raids":
@@ -313,7 +324,7 @@ func _attempt_recruitment():
 		}
 		
 		members.append(new_member)
-		print("Guilde IA %s a recruté %s" % [name, new_member.name])
+		GameLog.d("Guilde IA %s a recruté %s" % [name, new_member.name])
 
 func _simulate_member_turnover():
 	"""Simule les départs de membres"""
@@ -340,7 +351,7 @@ func _simulate_member_turnover():
 	members_to_remove.reverse()
 	for index in members_to_remove:
 		var leaving_member = members[index]
-		print("Membre %s quitte la guilde %s" % [leaving_member.name, name])
+		GameLog.d("Membre %s quitte la guilde %s" % [leaving_member.name, name])
 		members.remove_at(index)
 	
 	# Calculer le taux de turnover
@@ -531,25 +542,21 @@ func get_guild_data_for_ranking() -> Dictionary:
 	}
 
 func _get_cleared_content_ids() -> Array:
-	"""Retourne les IDs du contenu cleared"""
-	var cleared = []
+	"""Retourne les IDs UNIQUES du contenu cleared (dédupliqués, comme côté joueur)."""
+	var cleared: Dictionary = {}
 	for achievement in recent_achievements:
 		if achievement.type == "pve_clear":
-			cleared.append(achievement.content.id)
-	return cleared
+			cleared[achievement.content.id] = true
+	return cleared.keys()
 
 func _get_recent_clears() -> Array:
-	"""Retourne les clears des 7 derniers jours"""
-	var recent = []
-	var current_date = _get_current_date()
-	
-	for achievement in recent_achievements:
+	"""Retourne les IDs uniques des clears récents (5 derniers achievements, dédupliqués)."""
+	var recent: Dictionary = {}
+	for i in range(maxi(0, recent_achievements.size() - 5), recent_achievements.size()):
+		var achievement = recent_achievements[i]
 		if achievement.type == "pve_clear":
-			# Simplification : considérer les 5 derniers achievements comme récents
-			if recent_achievements.find(achievement) >= recent_achievements.size() - 5:
-				recent.append(achievement.content.id)
-	
-	return recent
+			recent[achievement.content.id] = true
+	return recent.keys()
 
 # Méthodes utilitaires
 

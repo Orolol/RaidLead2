@@ -7,19 +7,25 @@ const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
 const EventPopupWindow = preload("res://scripts/ui/windows/event_popup.gd")
 const PlayerControlPanelScript = preload("res://scripts/ui/components/player_control_panel.gd")
 # const FastForwardDialog = preload("res://scripts/ui/windows/fast_forward_dialog.gd")  # Supprimé - système simplifié
+const NO_SAVE_AUTOLOAD_ARG: String = "--no-save-autoload"
 
 var window_manager: Node
 var menu_bar: Control
 
 var chat_panel: ChatPanel = null
 var event_popup: EventPopupWindow = null
+var _pending_event_queue: Array = []  # événements en attente derrière un autre popup modal
+var _loot_dialog_active: bool = false
 
 # Système joueur
 var player_control_panel: PlayerControlPanelScript = null
 var player_character = null  # Référence au personnage joueur
+var is_in_forced_rest: bool = false  # Verrou pendant un repos (forcé ou volontaire)
+var _auto_paused_for_idle: bool = false  # Le temps a été mis en pause car le joueur attend un ordre
+var _activity_prompt: CanvasLayer = null  # Overlay thémé de choix d'activité (pause-si-oisif)
 # var fast_forward_manager: Node = null  # Supprimé - système simplifié
 
-func _ready():
+func _ready() -> void:
 	# Applique le thème global cohérent à toute l'UI (fenêtres, popups, notifications)
 	get_tree().root.theme = UITheme.build()
 
@@ -30,24 +36,28 @@ func _ready():
 	_setup_background()
 	_setup_time_display()
 	_setup_chat_panel()
-	_setup_debug_menu()
+	_connect_phase_notifications()
+	if _is_debug_ui_enabled():
+		_setup_debug_menu()
 	_connect_menu_signals()
 	_register_windows()
 	_connect_window_signals()
 	_connect_event_system()
 	_connect_loot_conflict_system()
 	_connect_national_systems()
+	_connect_esport_systems()
+	_connect_culture_systems()
 	_setup_player_systems()
 
 	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
 	get_tree().create_timer(0.2).timeout.connect(func():
-		if SaveManager.has_save():
+		if _should_auto_load_save() and SaveManager.has_save():
 			SaveManager.load_game()
 	)
 	
 
 
-func _setup_background():
+func _setup_background() -> void:
 	var bg_texture: Texture2D = AssetLoader.get_background()
 	if bg_texture:
 		var background = TextureRect.new()
@@ -66,7 +76,7 @@ func _setup_background():
 		add_child(background)
 		move_child(background, 0)
 
-func _setup_time_display():
+func _setup_time_display() -> void:
 	var time_display_scene = load("res://scenes/TimeDisplay.tscn")
 	var time_display = time_display_scene.instantiate()
 	add_child(time_display)
@@ -77,7 +87,7 @@ func _setup_time_display():
 	time_display.offset_right = time_display.custom_minimum_size.x / 2
 	time_display.offset_bottom = 10 + time_display.custom_minimum_size.y
 
-func _setup_chat_panel():
+func _setup_chat_panel() -> void:
 	var chat_scene = load("res://scenes/ChatPanel.tscn")
 	chat_panel = chat_scene.instantiate()
 	add_child(chat_panel)
@@ -86,12 +96,25 @@ func _setup_chat_panel():
 	chat_panel.custom_minimum_size = Vector2(400, 230)
 	chat_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	chat_panel.offset_left = -420
-	chat_panel.offset_top = -250
+	# Remonté de 70px pour dégager la barre de menu (80px de haut) qui le chevauchait.
+	chat_panel.offset_top = -320
 	chat_panel.offset_right = -20
-	chat_panel.offset_bottom = -20
+	chat_panel.offset_bottom = -90
 	chat_panel.z_index = 10  # Au-dessus du background mais sous les fenêtres
 
-func _setup_debug_menu():
+func _connect_phase_notifications() -> void:
+	if PhaseManager and PhaseManager.has_signal("phase_changed") and not PhaseManager.phase_changed.is_connected(_on_phase_changed_for_chat):
+		PhaseManager.phase_changed.connect(_on_phase_changed_for_chat)
+
+func _on_phase_changed_for_chat(new_phase: Variant, _old_phase: Variant) -> void:
+	if not chat_panel or not chat_panel.has_method("add_phase_notification"):
+		return
+	var phase_name: String = str(new_phase)
+	if PhaseManager and PhaseManager.has_method("get_phase_name"):
+		phase_name = PhaseManager.get_phase_name(new_phase)
+	chat_panel.add_phase_notification(phase_name)
+
+func _setup_debug_menu() -> void:
 	# Créer un conteneur pour le menu debug
 	var debug_container = PanelContainer.new()
 	debug_container.custom_minimum_size = Vector2(150, 30)
@@ -136,38 +159,64 @@ func _setup_debug_menu():
 	
 	add_child(debug_container)
 
-func _connect_menu_signals():
+func _is_debug_ui_enabled() -> bool:
+	return OS.is_debug_build()
+
+func _should_auto_load_save() -> bool:
+	var args: PackedStringArray = OS.get_cmdline_args()
+	var user_args: PackedStringArray = OS.get_cmdline_user_args()
+	return not args.has(NO_SAVE_AUTOLOAD_ARG) and not user_args.has(NO_SAVE_AUTOLOAD_ARG)
+
+func _connect_menu_signals() -> void:
 	menu_bar.personnage_button_pressed.connect(_on_personnage_button_pressed)
 	menu_bar.guilde_button_pressed.connect(_on_guilde_button_pressed)
 	menu_bar.monde_button_pressed.connect(_on_monde_button_pressed)
 	menu_bar.organisation_button_pressed.connect(_on_organisation_button_pressed)
 	menu_bar.national_button_pressed.connect(_on_national_button_pressed)
+	menu_bar.esport_button_pressed.connect(_on_esport_button_pressed)
+	menu_bar.cohesion_button_pressed.connect(_on_cohesion_button_pressed)
+	menu_bar.conseils_button_pressed.connect(_on_conseils_button_pressed)
 
-func _on_personnage_button_pressed():
+func _on_personnage_button_pressed() -> void:
 	window_manager.show_window("personnage")
 
-func _on_guilde_button_pressed():
+func _on_guilde_button_pressed() -> void:
 	window_manager.show_window("guilde")
 
-func _on_monde_button_pressed():
+func _on_monde_button_pressed() -> void:
 	window_manager.show_window("monde")
 
-func _on_organisation_button_pressed():
+func _on_organisation_button_pressed() -> void:
 	window_manager.show_window("organisation")
 
-func _on_national_button_pressed():
+func _on_national_button_pressed() -> void:
 	window_manager.show_window("national")
 
-func _register_windows():
+func _on_esport_button_pressed() -> void:
+	window_manager.show_window("esport")
+
+func _on_cohesion_button_pressed() -> void:
+	window_manager.show_window("cohesion")
+
+func _on_conseils_button_pressed() -> void:
+	window_manager.show_window("conseils")
+
+func _register_windows() -> void:
 	window_manager.register_window("personnage", "res://scenes/Fenetre_Personnage.tscn")
 	window_manager.register_window("guilde", "res://scenes/Fenetre_Guilde.tscn")
 	window_manager.register_window("monde", "res://scenes/Fenetre_Monde.tscn")
 	window_manager.register_window("organisation", "res://scenes/Fenetre_OrganisationGroupe.tscn")
 	window_manager.register_window("national", "res://scenes/Fenetre_National.tscn")
+	window_manager.register_window("esport", "res://scenes/Fenetre_Esport.tscn")
+	window_manager.register_window("cohesion", "res://scenes/Fenetre_Social.tscn")
+	window_manager.register_window("conseils", "res://scenes/Fenetre_Conseils.tscn")
 
-func _connect_window_signals():
+func _connect_window_signals() -> void:
 	# Écouter l'ouverture des fenêtres pour connecter leurs signaux
 	window_manager.window_opened.connect(_on_window_opened)
+
+	# Surligner le bouton de menu de la fenêtre active
+	window_manager.window_focused.connect(func(wname: String): menu_bar.set_active_window(wname))
 
 	# Ouvrir la fenêtre Personnage par défaut après que le tree soit stabilisé
 	get_tree().create_timer(0.1).timeout.connect(func():
@@ -176,7 +225,7 @@ func _connect_window_signals():
 
 func _on_window_opened(window_name: String) -> void:
 	# Connecter les signaux spécifiques quand une fenêtre est ouverte
-	var instance: Control = window_manager._get_existing_instance(window_name)
+	var instance: Control = window_manager.get_window_instance(window_name)
 	if not instance:
 		return
 
@@ -194,114 +243,114 @@ func _on_player_recruited(player: SimulatedPlayer) -> void:
 	if guild_manager_node:
 		guild_manager_node.add_member(player)
 		# Rafraîchir les fenêtres ouvertes via leurs instances dans le WindowManager
-		var guilde_inst: Control = window_manager._get_existing_instance("guilde")
+		var guilde_inst: Control = window_manager.get_window_instance("guilde")
 		if guilde_inst:
 			guilde_inst._refresh_member_list()
-		var org_inst: Control = window_manager._get_existing_instance("organisation")
+		var org_inst: Control = window_manager.get_window_instance("organisation")
 		if org_inst:
 			org_inst.set_guild_members(guild_manager_node.guild_members)
 
-func _on_debug_menu_pressed(id: int):
-	print("Debug menu pressed - Option ID: %d" % id)
+func _on_debug_menu_pressed(id: int) -> void:
+	GameLog.d("Debug menu pressed - Option ID: %d" % id)
 	var guild_manager = GuildManager
 	if not guild_manager:
-		print("ERREUR: GuildManager non trouvé")
+		GameLog.d("ERREUR: GuildManager non trouvé")
 		return
 		
 	match id:
 		0: # Ajouter 100 XP à la guilde
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(100, "Debug: +100 XP")
-				print("Debug: +100 XP à la guilde")
+				GameLog.d("Debug: +100 XP à la guilde")
 				
 		1: # Ajouter 1000 XP à la guilde
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(1000, "Debug: +1000 XP")
-				print("Debug: +1000 XP à la guilde")
+				GameLog.d("Debug: +1000 XP à la guilde")
 				
 		2: # Level up un membre aléatoire
 			if guild_manager.guild_members.size() > 0:
 				var member = guild_manager.guild_members[randi() % guild_manager.guild_members.size()]
 				member.gain_experience(member.personnage_niveau * member.personnage_niveau * 100)
-				print("Debug: Level up de %s" % member.nom)
+				GameLog.d("Debug: Level up de %s" % member.nom)
 				
 		3: # Level up tous les membres
 			for member in guild_manager.guild_members:
 				member.gain_experience(member.personnage_niveau * member.personnage_niveau * 100)
-			print("Debug: Level up de tous les membres")
+			GameLog.d("Debug: Level up de tous les membres")
 			
 		4: # Ajouter 1000 or à la guilde
 			if guild_manager.guild:
 				guild_manager.guild.add_gold(1000)
-				print("Debug: +1000 or à la guilde")
+				GameLog.d("Debug: +1000 or à la guilde")
 				
 		5: # Donner équipement aux membres
 			for member in guild_manager.guild_members:
 				# TODO: Avec le nouveau système, donner des objets spécifiques
 				# member.personnage_equipement += 10
 				pass
-			print("Debug: +10 équipement à tous les membres")
+			GameLog.d("Debug: +10 équipement à tous les membres")
 			
 		6: # Forcer mise à jour serveur
 			var server_version = ServerVersion
 			if server_version:
 				server_version._check_version_update()
-				print("Debug: Vérification de mise à jour serveur forcée")
+				GameLog.d("Debug: Vérification de mise à jour serveur forcée")
 				
 		7: # Compléter un donjon (succès)
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(100, "Debug: Donjon complété")
-				print("Debug: Simulation de donjon complété (+100 XP)")
+				GameLog.d("Debug: Simulation de donjon complété (+100 XP)")
 		
 		8: # Déclencher événement test
 			var event_manager = EventManager
 			if event_manager:
 				event_manager.force_event("member_dispute")
-				print("Debug: Événement 'dispute entre membres' forcé")
+				GameLog.d("Debug: Événement 'dispute entre membres' forcé")
 		
 		9: # Afficher stats événements
 			var event_manager = EventManager
 			if event_manager:
 				var stats = event_manager.get_event_stats()
-				print("=== STATS ÉVÉNEMENTS ===")
-				print("Événements aujourd'hui: %d" % stats.events_today)
-				print("Événement en attente: %s" % ("Oui" if stats.pending_event else "Non"))
-				print("Chaînes actives: %s" % str(stats.active_chains))
-				print("Total événements: %d" % stats.total_events)
-				print("========================")
+				GameLog.d("=== STATS ÉVÉNEMENTS ===")
+				GameLog.d("Événements aujourd'hui: %d" % stats.events_today)
+				GameLog.d("Événement en attente: %s" % ("Oui" if stats.pending_event else "Non"))
+				GameLog.d("Chaînes actives: %s" % str(stats.active_chains))
+				GameLog.d("Total événements: %d" % stats.total_events)
+				GameLog.d("========================")
 				
 		10: # Test notification INFO
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_info("Ceci est un test de notification info", "Test Info")
-				print("Debug: Test notification INFO")
+				GameLog.d("Debug: Test notification INFO")
 				
 		11: # Test notification SUCCESS
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_success("Ceci est un test de notification succès", "Test Success")
-				print("Debug: Test notification SUCCESS")
+				GameLog.d("Debug: Test notification SUCCESS")
 				
 		12: # Test notification WARNING
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_warning("Ceci est un test de notification avertissement", "Test Warning")
-				print("Debug: Test notification WARNING")
+				GameLog.d("Debug: Test notification WARNING")
 				
 		13: # Test notification ERROR
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_error("Ceci est un test de notification erreur", "Test Error")
-				print("Debug: Test notification ERROR")
+				GameLog.d("Debug: Test notification ERROR")
 				
 		14: # Test notification ACHIEVEMENT
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_achievement("Ceci est un test de notification achievement", "Test Achievement")
-				print("Debug: Test notification ACHIEVEMENT")
+				GameLog.d("Debug: Test notification ACHIEVEMENT")
 	
 	# Rafraîchir la fenêtre guilde si elle est ouverte
-	var guilde_inst: Control = window_manager._get_existing_instance("guilde")
+	var guilde_inst: Control = window_manager.get_window_instance("guilde")
 	if guilde_inst and guilde_inst.visible:
 		guilde_inst._refresh_member_list()
 		guilde_inst._update_guild_info()
@@ -331,6 +380,15 @@ func _input(event: InputEvent) -> void:
 			KEY_N:  # N pour National
 				if Input.is_key_pressed(KEY_CTRL):
 					menu_bar._on_national_pressed()
+			KEY_E:  # E pour Esport
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_esport_pressed()
+			KEY_K:  # K pour Cohésion
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_cohesion_pressed()
+			KEY_A:  # A pour Conseils (conseiller / aide)
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_conseils_pressed()
 			KEY_SPACE:  # Espace pour pause
 				var game_time_node = GameTime
 				if game_time_node:
@@ -338,65 +396,78 @@ func _input(event: InputEvent) -> void:
 			KEY_ESCAPE:  # Échap pour fermer la fenêtre active
 				window_manager.close_active_window()
 			KEY_F1:  # F1 pour déclencher un événement test
-				print("F1 pressed - Tentative de déclencher un événement")
-				_on_debug_menu_pressed(8)  # ID 8 = Déclencher événement test
+				if _is_debug_ui_enabled():
+					GameLog.d("F1 pressed - Tentative de déclencher un événement")
+					_on_debug_menu_pressed(8)  # ID 8 = Déclencher événement test
 			KEY_F2:  # F2 pour afficher les stats
-				print("F2 pressed - Affichage des stats")
-				_on_debug_menu_pressed(9)  # ID 9 = Afficher stats événements
+				if _is_debug_ui_enabled():
+					GameLog.d("F2 pressed - Affichage des stats")
+					_on_debug_menu_pressed(9)  # ID 9 = Afficher stats événements
 			KEY_F5:  # F5 pour sauvegarder
 				SaveManager.save_game()
 
-func _connect_event_system():
-	print("Main: Connexion du système d'événements")
+func _connect_event_system() -> void:
+	GameLog.d("Main: Connexion du système d'événements")
 	var event_manager = EventManager
 	if event_manager:
 		event_manager.event_triggered.connect(_on_event_triggered)
-		print("Main: Signal event_triggered connecté")
+		GameLog.d("Main: Signal event_triggered connecté")
 	else:
-		print("Main: ERREUR - EventManager non trouvé!")
+		GameLog.d("Main: ERREUR - EventManager non trouvé!")
 
-func _on_event_triggered(event: RandomEventResource):
-	print("Main: Signal event_triggered reçu pour: %s" % event.title)
+func _on_event_triggered(event: RandomEventResource) -> void:
+	GameLog.d("Main: Signal event_triggered reçu pour: %s" % event.title)
 	show_event_popup(event)
 
-func show_event_popup(event: RandomEventResource):
-	print("Main: show_event_popup appelé pour l'événement: %s" % event.title)
+func show_event_popup(event: RandomEventResource) -> void:
+	GameLog.d("Main: show_event_popup appelé pour l'événement: %s" % event.title)
 	
-	if event_popup:
-		print("Main: Nettoyage de l'ancienne popup")
-		event_popup.queue_free()
+	# File d'attente : ne pas empiler sur un autre popup modal (loot, drama, ou un événement déjà affiché)
+	if event_popup != null or _drama_popup_active or _loot_dialog_active:
+		_pending_event_queue.append(event)
+		return
 	
-	print("Main: Chargement de la scène EventPopup.tscn")
+	GameLog.d("Main: Chargement de la scène EventPopup.tscn")
 	var event_popup_scene = load("res://scenes/EventPopup.tscn")
 	event_popup = event_popup_scene.instantiate()
 	add_child(event_popup)
 	
-	print("Main: Popup ajoutée comme enfant")
+	GameLog.d("Main: Popup ajoutée comme enfant")
 	
 	# Connecter les signaux
 	event_popup.choice_selected.connect(_on_event_choice_selected)
 	event_popup.popup_closed.connect(_on_event_popup_closed)
 	
-	print("Main: Signaux connectés, affichage de l'événement")
+	GameLog.d("Main: Signaux connectés, affichage de l'événement")
 	# Afficher l'événement
 	event_popup.show_event(event)
 
-func _on_event_choice_selected(choice: EventChoiceResource):
+func _on_event_choice_selected(choice: EventChoiceResource) -> void:
 	var event_manager = EventManager
 	if event_manager and event_manager.pending_event:
 		event_manager.resolve_event(event_manager.pending_event, choice)
 	
 	event_popup = null
+	_show_next_pending_event.call_deferred()
 
-func _on_event_popup_closed():
+func _on_event_popup_closed() -> void:
 	event_popup = null
+	_show_next_pending_event.call_deferred()
 
-func _connect_loot_conflict_system():
+func _show_next_pending_event() -> void:
+	"""Affiche le prochain événement en file, si plus aucun popup modal n'est ouvert."""
+	if _pending_event_queue.is_empty():
+		return
+	if event_popup != null or _drama_popup_active or _loot_dialog_active:
+		return
+	show_event_popup(_pending_event_queue.pop_front())
+
+func _connect_loot_conflict_system() -> void:
 	var gm: Node = GuildManager
 	if gm:
 		gm.loot_conflict_occurred.connect(_on_loot_conflict)
 
-func _on_loot_conflict(conflict: Dictionary):
+func _on_loot_conflict(conflict: Dictionary) -> void:
 	"""Affiche un popup pour résoudre un conflit de loot"""
 	var item: Item = conflict.get("item", null)
 	var candidates: Array = conflict.get("candidates", [])
@@ -463,16 +534,19 @@ func _on_loot_conflict(conflict: Dictionary):
 			# Reprendre le jeu
 			if game_time_node and not was_paused:
 				game_time_node.toggle_pause()
+			_loot_dialog_active = false
+			_show_next_pending_event.call_deferred()
 		)
 		vbox.add_child(btn)
 
+	_loot_dialog_active = true
 	add_child(dialog)
 	dialog.popup_centered(Vector2(500, 300))
 
-func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Array, dungeon_name: String, boss_name: String):
+func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Array, dungeon_name: String, boss_name: String) -> void:
 	"""Résout un conflit de loot en attribuant l'item au gagnant"""
-	# Équiper l'item au gagnant
-	winner.try_auto_equip(item)
+	# Équiper l'item au gagnant (sinon dépose en banque de guilde plutôt que jeter)
+	GuildManager.route_loot(winner, item)
 
 	# Ajouter à l'historique
 	GuildManager.add_loot_entry(item, winner.nom, dungeon_name, boss_name)
@@ -484,7 +558,7 @@ func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Arr
 			candidate.trigger_loot_conflict()
 
 	# Notification
-	var notification_manager: Node = get_node_or_null("/root/NotificationManager")
+	var notification_manager: Node = NotificationManager
 	if notification_manager:
 		notification_manager.show_info(
 			"%s a reçu %s" % [winner.nom, item.name],
@@ -613,6 +687,7 @@ func _show_drama_popup(drama) -> void:
 				game_time_node.toggle_pause()
 			_drama_popup_active = false
 			_process_next_drama()
+			_show_next_pending_event.call_deferred()
 		)
 		vbox.add_child(btn)
 
@@ -633,7 +708,72 @@ func _process_next_drama() -> void:
 			_show_drama_popup(next)
 			return
 
-func _setup_player_systems():
+# === SYSTÈMES ESPORT (Milestone 4 : staff, tournois, transferts, legacy) ===
+
+func _connect_esport_systems() -> void:
+	"""Connecte les notifications des systèmes de la phase Esport."""
+	if TournamentManager:
+		TournamentManager.tournament_completed.connect(_on_tournament_completed)
+	if StaffManager:
+		StaffManager.staff_hired.connect(_on_staff_hired)
+	if TransferManager:
+		TransferManager.transfer_completed.connect(_on_transfer_completed)
+		TransferManager.transfer_window_opened.connect(_on_transfer_window_opened)
+	if LegacyManager:
+		LegacyManager.title_unlocked.connect(_on_legacy_title_unlocked)
+
+func _on_tournament_completed(_tournament, _stage_reached: int, is_champion: bool, results: Dictionary) -> void:
+	if chat_panel:
+		if is_champion:
+			chat_panel.add_message("[Esport] Victoire au %s ! (+%d or)" % [results.get("tournament", ""), results.get("gold", 0)], "loot")
+		else:
+			chat_panel.add_message("[Esport] Éliminé : %s (tour %d/%d)" % [results.get("tournament", ""), results.get("stage_reached", 0), results.get("rounds", 0)], "info")
+	if NotificationManager:
+		if is_champion:
+			NotificationManager.show_achievement("Champion : %s" % results.get("tournament", ""), "Tournoi")
+		else:
+			NotificationManager.show_info("Tournoi terminé (tour %d/%d)" % [results.get("stage_reached", 0), results.get("rounds", 0)], "Esport")
+
+func _on_staff_hired(staff) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Staff] %s rejoint le staff (%s)" % [staff.staff_name, staff.get_role_name()], "activity")
+
+func _on_transfer_completed(player) -> void:
+	if NotificationManager:
+		NotificationManager.show_success("%s rejoint la guilde (transfert international)" % player.nom, "Transfert")
+	if chat_panel:
+		chat_panel.add_message("[Transfert] %s arrive de %s" % [player.nom, player.get_meta("region", "?")], "loot")
+
+func _on_transfer_window_opened() -> void:
+	if NotificationManager:
+		NotificationManager.show_info("La fenêtre de transfert internationale est ouverte", "Transferts")
+
+func _on_legacy_title_unlocked(title) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Legacy] Nouveau titre débloqué : %s" % title, "loot")
+
+# === SYSTÈME DE COHÉSION (Milestone 5 : moral, social, team-building, traditions, conflits) ===
+
+func _connect_culture_systems() -> void:
+	"""Connecte les notifications du système de cohésion de guilde."""
+	if GuildCultureManager:
+		GuildCultureManager.tension_detected.connect(_on_tension_detected)
+		GuildCultureManager.team_building_done.connect(_on_team_building_done)
+		GuildCultureManager.tradition_established.connect(_on_tradition_established)
+
+func _on_tension_detected(player1_name: String, player2_name: String, reason: String) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Cohésion] Tension entre %s et %s (%s)" % [player1_name, player2_name, reason], "warning")
+
+func _on_team_building_done(activity_name: String, _morale_gain: float) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Cohésion] Team-building : %s" % activity_name, "activity")
+
+func _on_tradition_established(tradition_name: String) -> void:
+	if chat_panel:
+		chat_panel.add_message("[Cohésion] Nouvelle tradition établie : %s" % tradition_name, "loot")
+
+func _setup_player_systems() -> void:
 	"""Configure les systèmes spécifiques au joueur"""
 	# Attendre que le GuildManager soit prêt
 	await get_tree().process_frame
@@ -641,7 +781,7 @@ func _setup_player_systems():
 	
 	var guild_manager = GuildManager
 	if not guild_manager:
-		print("ERREUR: GuildManager non trouvé pour _setup_player_systems")
+		GameLog.d("ERREUR: GuildManager non trouvé pour _setup_player_systems")
 		return
 	
 	# Créer le panneau de contrôle du joueur
@@ -653,7 +793,7 @@ func _setup_player_systems():
 	# Configurer les connexions
 	_connect_player_systems()
 
-func _setup_player_control_panel():
+func _setup_player_control_panel() -> void:
 	"""Configure le panneau de contrôle du joueur"""
 	var control_panel_scene = load("res://scenes/PlayerControlPanel.tscn")
 	player_control_panel = control_panel_scene.instantiate()
@@ -673,101 +813,266 @@ func _setup_player_control_panel():
 
 # func _setup_fast_forward_manager():  # Supprimé - système simplifié
 
-func _connect_player_systems():
+func _connect_player_systems() -> void:
 	"""Connecte les signaux des systèmes joueur"""
 	if player_control_panel:
 		player_control_panel.disconnect_requested.connect(_on_player_disconnect_requested)
 		player_control_panel.activity_changed.connect(_on_player_activity_changed)
+		if player_control_panel.has_signal("organize_requested"):
+			player_control_panel.organize_requested.connect(_on_player_organize_requested)
 	
 	# Connecter le signal de déconnexion forcée du joueur
 	var guild_manager = GuildManager
 	if guild_manager and guild_manager.get_player_character():
 		player_character = guild_manager.get_player_character()
 		player_character.forced_disconnect_requested.connect(_on_player_forced_disconnect)
-	
-	print("Systèmes joueur configurés")
+		# Suivi temps réel de l'état joueur (énergie/activité) pour la pause-si-oisif
+		if player_character.has_signal("player_state_changed"):
+			player_character.player_state_changed.connect(_on_player_state_changed)
 
-func _on_player_disconnect_requested(return_hour: int, return_minute: int):
-	"""Gère la demande de déconnexion manuelle du joueur"""
-	print("Joueur demande déconnexion manuelle")
-	# TODO: Implémenter déconnexion manuelle simple si nécessaire
-	print("Déconnexion manuelle temporairement désactivée")
+	if OS.is_debug_build():
+		GameLog.d("Systèmes joueur configurés")
 
-func _on_player_forced_disconnect(recovery_hours: int):
-	"""Gère la déconnexion forcée du joueur (épuisement)"""
-	print("Joueur déconnecté automatiquement - repos forcé de %d heures" % recovery_hours)
-	execute_forced_rest()
+	# Au démarrage, si le joueur n'a aucune activité, on bloque le temps et on
+	# demande un ordre (sauf en mode test sans save autoload).
+	call_deferred("_on_player_state_changed")
 
-func execute_forced_rest():
-	"""Execute le repos forcé de 12h avec système robuste"""
-	print("Démarrage du repos forcé - BLOCAGE TOTAL")
-	
-	# 1. PAUSE GLOBALE - Bloque tout sauf les dialogs avec PROCESS_MODE_ALWAYS
+func _on_player_disconnect_requested(_return_hour: int, _return_minute: int) -> void:
+	"""Bouton « Se reposer » : repos volontaire avec reprise auto de l'activité."""
+	_perform_rest(8, false)
+
+func _on_player_forced_disconnect(recovery_hours: int) -> void:
+	"""Déconnexion forcée du joueur (épuisement total)."""
+	_perform_rest(recovery_hours, true)
+
+func _perform_rest(recovery_hours: int, forced: bool) -> void:
+	"""Repos unifié (forcé ou volontaire) : pause → confirmation → avance le temps
+	instantanément → récupère l'énergie → reconnecte → reprend la dernière activité."""
+	if is_in_forced_rest:
+		return
+	is_in_forced_rest = true
+
+	# Fermer un éventuel prompt d'oisiveté (il est remplacé par le repos)
+	if is_instance_valid(_activity_prompt):
+		_activity_prompt.queue_free()
+		_activity_prompt = null
+
+	# Déconnecter le joueur s'il est encore en ligne (cas du repos volontaire)
+	if player_character and player_character.is_online:
+		player_character.disconnect_player("Repos")
+
+	# Bloque tout (sauf le dialog en PROCESS_MODE_ALWAYS) pendant la confirmation
 	get_tree().paused = true
-	
-	# 2. Créer dialog simple et robuste
-	var dialog = AcceptDialog.new()
-	dialog.title = "ÉPUISEMENT TOTAL"
-	dialog.dialog_text = "Votre personnage est complètement épuisé !\n\nUn repos de 12 heures est OBLIGATOIRE.\n\nPendant ce temps :\n• Récupération de 100% d'énergie\n• Aucune action possible\n• Le temps passera à vitesse maximale"
-	dialog.get_ok_button().text = "COMMENCER LE REPOS"
+
+	var dialog := AcceptDialog.new()
+	if forced:
+		dialog.title = "Épuisement total"
+		dialog.dialog_text = "Votre personnage est complètement épuisé !\n\nUn repos de %dh est nécessaire.\n• Récupération complète de l'énergie\n• Vous reprendrez automatiquement votre activité" % recovery_hours
+		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
+	else:
+		dialog.title = "Repos"
+		dialog.dialog_text = "Votre personnage va se reposer %dh.\n• Récupération complète de l'énergie\n• Reprise automatique de l'activité au réveil" % recovery_hours
+		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
 	dialog.process_mode = Node.PROCESS_MODE_ALWAYS  # Reste actif pendant la pause
-	dialog.exclusive = true  # Modal exclusif
-	
+	dialog.exclusive = true
+	# Fermer via la croix doit aussi valider le repos, sinon le verrou de repos
+	# resterait actif et figerait le jeu.
+	dialog.close_requested.connect(func(): dialog.emit_signal("confirmed"))
 	get_tree().root.add_child(dialog)
-	dialog.popup_centered(Vector2(600, 400))
-	
-	# 3. Attendre la confirmation de l'utilisateur
+	dialog.popup_centered(Vector2(460, 220))
+
 	await dialog.confirmed
-	print("Utilisateur a confirmé le repos - démarrage fast-forward")
-	
-	# 4. REPRENDRE LE JEU pour permettre le fast-forward
+	if is_instance_valid(dialog):
+		dialog.queue_free()
+
+	# Reprendre l'arbre, puis avancer le temps de jeu instantanément
 	get_tree().paused = false
-	print("Jeu repris pour le fast-forward")
-	
-	# 5. Fast-forward direct sans FastForwardManager
-	var game_time = GameTime
-	if game_time:
-		game_time.set_time_speed(2400.0)  # Vitesse maximum
-		print("Vitesse mise au maximum (2400x)")
-	
-	# 6. Calculer combien de temps réel pour 12h de jeu
-	var real_time_for_12h = (12.0 * 3600.0) / 2400.0  # 12h de jeu / vitesse = temps réel en secondes
-	print("Fast-forward de 12h en %.1f secondes réelles" % real_time_for_12h)
-	
-	# 7. Timer pour attendre la fin du fast-forward
-	var timer = Timer.new()
-	timer.wait_time = real_time_for_12h
-	timer.one_shot = true
-	timer.process_mode = Node.PROCESS_MODE_ALWAYS  # Continue pendant la pause
-	add_child(timer)
-	timer.start()
-	
-	# 8. Attendre la fin du fast-forward
-	await timer.timeout
-	print("Fast-forward terminé - restauration")
-	
-	# 9. Restaurer l'énergie directement
+	if GameTime:
+		GameTime.fast_forward_hours(recovery_hours)
+
+	# Récupération complète + reconnexion
 	if player_character:
 		player_character.player_energy_pool = player_character.max_energy_pool
-		print("Énergie restaurée : %.1f/%.1f" % [player_character.player_energy_pool, player_character.max_energy_pool])
-		
-		# Reconnecter le joueur
+		player_character.energy = 100.0
 		player_character.reconnect_player()
-	
-	# 10. Retour à la normale
-	if game_time:
-		game_time.set_time_speed(60.0)  # Vitesse normale
-	
-	# 11. Nettoyer
-	dialog.queue_free()
-	timer.queue_free()
-	
-	print("Repos forcé terminé - retour à la normale")
 
-func _on_player_activity_changed(activity_type: String):
-	"""Gère le changement d'activité du joueur"""
-	print("Joueur a changé d'activité: %s" % activity_type)
-	
-	# Actualiser le panneau de contrôle
+	is_in_forced_rest = false
+
+	# Reprise automatique de la dernière activité (sinon, demander un ordre)
+	if player_character and not player_character.resume_last_activity():
+		_auto_paused_for_idle = false
+		_on_player_state_changed()
+	else:
+		_exit_idle_prompt()
+
 	if player_control_panel:
 		player_control_panel.refresh_display()
+
+func _on_player_activity_changed(_activity_type: String) -> void:
+	"""Le joueur a changé d'activité depuis le panneau : rafraîchit l'affichage."""
+	if player_control_panel:
+		player_control_panel.refresh_display()
+
+# --- Pause-si-oisif : le temps se bloque tant que le joueur n'a pas d'ordre ---
+
+func _on_player_state_changed() -> void:
+	"""Réagit aux changements d'état du joueur (énergie/activité/connexion)."""
+	if is_in_forced_rest:
+		return
+	if not player_character:
+		return
+	if player_character.needs_activity_choice():
+		_enter_idle_prompt()
+	else:
+		_exit_idle_prompt()
+	if player_control_panel:
+		player_control_panel.refresh_display()
+
+func _enter_idle_prompt() -> void:
+	"""Bloque le temps et demande une activité au joueur."""
+	if _auto_paused_for_idle:
+		return
+	_auto_paused_for_idle = true
+	if GameTime:
+		GameTime.pause()
+	_show_activity_prompt()
+
+func _exit_idle_prompt() -> void:
+	"""Ferme le prompt et reprend le temps si on l'avait mis en pause pour oisiveté."""
+	if is_instance_valid(_activity_prompt):
+		_activity_prompt.queue_free()
+		_activity_prompt = null
+	if not _auto_paused_for_idle:
+		return
+	_auto_paused_for_idle = false
+	if GameTime:
+		GameTime.resume()
+
+func _show_activity_prompt() -> void:
+	"""Overlay thémé de choix d'activité (style Football Manager : « donnez un ordre »).
+	Construit en jeu (CanvasLayer + PanelContainer) pour hériter du thème global et
+	assombrir l'arrière-plan plutôt qu'un AcceptDialog brut."""
+	if is_instance_valid(_activity_prompt):
+		return
+	var p = player_character
+	if not p:
+		return
+
+	var overlay := CanvasLayer.new()
+	overlay.layer = 200  # au-dessus des fenêtres et du chat
+
+	# Fond assombri qui capture les clics (empêche d'agir derrière)
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.72)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
+
+	# Panneau thémé avec bordure accent pour bien ressortir sur le fond assombri
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(440, 0)
+	var pstyle := StyleBoxFlat.new()
+	pstyle.bg_color = UITheme.BG_PANEL
+	pstyle.set_corner_radius_all(8)
+	pstyle.set_border_width_all(2)
+	pstyle.border_color = UITheme.ACCENT_DIM
+	pstyle.set_content_margin_all(0)
+	panel.add_theme_stylebox_override("panel", pstyle)
+	center.add_child(panel)
+
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 20)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "⏸️  Jeu en pause"
+	title.add_theme_font_size_override("font_size", UITheme.FONT_NORMAL + 6)
+	title.add_theme_color_override("font_color", UITheme.ACCENT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var info := Label.new()
+	info.text = "Que fait %s ?" % p.nom
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(info)
+
+	var energy := Label.new()
+	energy.text = "⚡ Énergie : %.0f / %.0f" % [p.player_energy_pool, p.max_energy_pool]
+	energy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	energy.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	vbox.add_child(energy)
+
+	vbox.add_child(HSeparator.new())
+
+	var choices := [
+		{"key": "LEVELING", "label": "🗡️  Leveling", "desc": "Gagner de l'XP"},
+		{"key": "FARMING", "label": "💰  Farming", "desc": "Récolter de l'or"},
+		{"key": "FUN", "label": "🎮  Détente", "desc": "Récupérer du moral"},
+	]
+	for c in choices:
+		var b := Button.new()
+		b.text = "%s — %s" % [c["label"], c["desc"]]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(0, 44)
+		b.disabled = not p.can_perform_activity(c["key"])
+		b.pressed.connect(_on_prompt_activity_chosen.bind(c["key"]))
+		vbox.add_child(b)
+
+	# Contenu de groupe : route vers la fenêtre d'organisation (vrai flow PvE)
+	var org_btn := Button.new()
+	org_btn.text = "⚔️  Donjon / Raid — organiser un groupe"
+	org_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	org_btn.tooltip_text = "Ouvre l'organisation de groupe pour composer et lancer un donjon ou un raid"
+	org_btn.custom_minimum_size = Vector2(0, 44)
+	org_btn.pressed.connect(_on_prompt_organize_chosen.bind("dungeon"))
+	vbox.add_child(org_btn)
+
+	vbox.add_child(HSeparator.new())
+
+	var rest_btn := Button.new()
+	rest_btn.text = "😴  Se reposer (8h)"
+	rest_btn.tooltip_text = "Récupère toute l'énergie puis reprend l'activité précédente"
+	rest_btn.custom_minimum_size = Vector2(0, 40)
+	rest_btn.pressed.connect(_on_prompt_rest_chosen)
+	vbox.add_child(rest_btn)
+
+	add_child(overlay)
+	_activity_prompt = overlay
+
+func _on_prompt_activity_chosen(activity_type: String) -> void:
+	"""Choix d'activité depuis le prompt : démarre l'activité (le temps reprend via le signal)."""
+	if not player_character:
+		return
+	player_character.choose_activity(activity_type)
+	# choose_activity émet player_state_changed → _exit_idle_prompt (ferme + reprend le temps)
+
+func _on_prompt_rest_chosen() -> void:
+	"""Bouton « Se reposer » du prompt d'oisiveté."""
+	_perform_rest(8, false)
+
+func _on_prompt_organize_chosen(kind: String) -> void:
+	"""Donjon/Raid : ferme le prompt, relance le temps et ouvre l'organisation de groupe."""
+	_exit_idle_prompt()
+	_open_organization(kind)
+
+func _open_organization(kind: String) -> void:
+	"""Ouvre la fenêtre d'organisation de groupe présélectionnée sur Donjon/Raid."""
+	if not window_manager:
+		return
+	window_manager.show_window("organisation")
+	var inst: Control = window_manager.get_window_instance("organisation")
+	if inst and inst.has_method("preselect_activity"):
+		inst.call_deferred("preselect_activity", kind)
+
+func _on_player_organize_requested(kind: String) -> void:
+	"""Bouton « Donjon/Raid » du panneau de contrôle joueur."""
+	_open_organization(kind)

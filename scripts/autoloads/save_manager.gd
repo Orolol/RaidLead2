@@ -4,10 +4,48 @@ extends Node
 ## Sauvegarde en JSON dans user://savegame.json.
 
 const SAVE_PATH := "user://savegame.json"
-const SAVE_VERSION := 1
+const BACKUP_PATH := "user://savegame_backup.json"
+## Version du format de sauvegarde écrite par ce build. À incrémenter à chaque
+## changement de format, en ajoutant la migration correspondante dans _build_migrations().
+const CURRENT_SAVE_VERSION := 3
+const AUTOSAVE_WEEK_INTERVAL := 4  # auto-sauvegarde périodique (toutes les 4 semaines de jeu)
+
+## Blocs systèmes (clés de save) — utilisés par les migrations pour normaliser
+## les anciennes sauvegardes qui précèdent l'ajout d'un système.
+const _DICT_SYSTEM_BLOCKS := [
+	"game_time", "server_version", "phase", "ranking", "ai_guilds", "guild",
+	"media", "sponsors", "dramas", "staff", "tournaments", "transfers",
+	"legacy", "culture", "balance", "events", "social",
+]
+const _ARRAY_SYSTEM_BLOCKS := ["members", "loot_history"]
 
 signal save_completed(success: bool)
 signal load_completed(success: bool)
+
+func _ready() -> void:
+	# Connexion différée : garantit que PhaseManager et GameTime existent (ordre des autoloads).
+	call_deferred("_setup_autosave")
+
+func _setup_autosave() -> void:
+	"""Auto-sauvegarde aux moments critiques (changement de phase) et périodiquement (US 6.3)."""
+	if PhaseManager and PhaseManager.has_signal("phase_changed") \
+			and not PhaseManager.phase_changed.is_connected(_on_phase_changed_autosave):
+		PhaseManager.phase_changed.connect(_on_phase_changed_autosave)
+	if GameTime and GameTime.has_signal("week_changed") \
+			and not GameTime.week_changed.is_connected(_on_week_changed_autosave):
+		GameTime.week_changed.connect(_on_week_changed_autosave)
+
+func _on_phase_changed_autosave(_new_phase, _old_phase) -> void:
+	"""Moment critique : on sauvegarde et on le signale au joueur."""
+	if save_game():
+		var nm: Node = NotificationManager
+		if nm:
+			nm.show_success("Progression sauvegardée (nouvelle phase)", "Sauvegarde auto")
+
+func _on_week_changed_autosave(week: int, _year: int) -> void:
+	"""Sauvegarde périodique silencieuse."""
+	if week % AUTOSAVE_WEEK_INTERVAL == 0:
+		save_game()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -16,7 +54,7 @@ func _notification(what: int) -> void:
 func save_game() -> bool:
 	"""Sauvegarde l'ensemble de la progression dans un fichier JSON."""
 	var data: Dictionary = {
-		"save_version": SAVE_VERSION,
+		"save_version": CURRENT_SAVE_VERSION,
 		"timestamp": Time.get_unix_time_from_system(),
 		"game_time": GameTime.save_time_data(),
 		"server_version": ServerVersion.save_server_data(),
@@ -29,9 +67,21 @@ func save_game() -> bool:
 		"media": MediaManager.serialize(),
 		"sponsors": SponsorshipManager.serialize(),
 		"dramas": DramaManager.serialize(),
+		"staff": StaffManager.serialize(),
+		"tournaments": TournamentManager.serialize(),
+		"transfers": TransferManager.serialize(),
+		"legacy": LegacyManager.serialize(),
+		"culture": GuildCultureManager.serialize(),
+		"balance": BalanceManager.serialize(),
+		"events": EventManager.serialize(),
+		"social": _serialize_social(),
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
+
+	# Backup de la sauvegarde précédente avant écrasement (filet de sécurité).
+	_backup_existing_save()
+
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if not file:
 		push_error("SaveManager: impossible d'ouvrir %s en écriture" % SAVE_PATH)
@@ -40,39 +90,118 @@ func save_game() -> bool:
 
 	file.store_string(json_string)
 	file.close()
-	print("SaveManager: sauvegarde réussie (%d octets)" % json_string.length())
+	GameLog.d("SaveManager: sauvegarde réussie (%d octets)" % json_string.length())
 	save_completed.emit(true)
 	return true
 
-func load_game() -> bool:
-	"""Charge la progression depuis le fichier JSON."""
+func _backup_existing_save() -> void:
+	"""Copie la sauvegarde existante vers le fichier de backup avant de l'écraser."""
 	if not FileAccess.file_exists(SAVE_PATH):
-		print("SaveManager: pas de sauvegarde trouvée, nouvelle partie")
-		load_completed.emit(false)
-		return false
+		return
+	var src := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if not src:
+		return
+	var content: String = src.get_as_text()
+	src.close()
+	var dst := FileAccess.open(BACKUP_PATH, FileAccess.WRITE)
+	if dst:
+		dst.store_string(content)
+		dst.close()
 
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+func load_game() -> bool:
+	"""Charge la progression, avec repli sur le backup si la sauvegarde principale est illisible."""
+	if _try_load(SAVE_PATH):
+		return true
+	if FileAccess.file_exists(BACKUP_PATH):
+		push_warning("SaveManager: sauvegarde principale illisible, tentative de restauration du backup")
+		if _try_load(BACKUP_PATH):
+			return true
+	GameLog.d("SaveManager: pas de sauvegarde valide, nouvelle partie")
+	load_completed.emit(false)
+	return false
+
+func _try_load(path: String) -> bool:
+	"""Tente de charger une sauvegarde depuis un chemin. Retourne false si absente/corrompue."""
+	if not FileAccess.file_exists(path):
+		return false
+	var file := FileAccess.open(path, FileAccess.READ)
 	if not file:
-		push_error("SaveManager: impossible d'ouvrir %s en lecture" % SAVE_PATH)
-		load_completed.emit(false)
 		return false
 
 	var json_string: String = file.get_as_text()
 	file.close()
 
 	var json := JSON.new()
-	var error: int = json.parse(json_string)
-	if error != OK:
-		push_error("SaveManager: erreur de parsing JSON ligne %d" % json.get_error_line())
-		load_completed.emit(false)
+	if json.parse(json_string) != OK:
+		push_error("SaveManager: erreur de parsing JSON (%s) ligne %d" % [path, json.get_error_line()])
 		return false
 
-	var data: Dictionary = json.data
-	if not data.has("save_version"):
-		push_error("SaveManager: format de sauvegarde invalide")
-		load_completed.emit(false)
+	var data = json.data
+	if not (data is Dictionary) or not data.has("save_version"):
+		push_error("SaveManager: format de sauvegarde invalide (%s)" % path)
 		return false
 
+	var loaded_version: int = int(data.save_version)
+	data = _migrate_save_data(data)
+	_apply_save_data(data)
+	GameLog.d("SaveManager: chargement réussi (format v%d -> v%d) depuis %s" % [loaded_version, CURRENT_SAVE_VERSION, path])
+	load_completed.emit(true)
+	return true
+
+# --- Migrations de format ---
+
+func _build_migrations() -> Dictionary:
+	"""Registre des migrations séquentielles : clé = version source N,
+	valeur = Callable(data) -> data qui fait passer le format de N à N+1.
+	Pour ajouter un futur format : incrémenter CURRENT_SAVE_VERSION et enregistrer
+	une migration `version_courante: _migrate_vX_to_vY`."""
+	return {
+		1: _migrate_v1_to_v2,
+		2: _migrate_v2_to_v3,
+	}
+
+func _migrate_save_data(data: Dictionary) -> Dictionary:
+	"""Fait migrer une sauvegarde de sa version stockée vers CURRENT_SAVE_VERSION."""
+	var from_version: int = int(data.get("save_version", 1))
+
+	if from_version > CURRENT_SAVE_VERSION:
+		# Sauvegarde issue d'un build plus récent : on tente un chargement best-effort
+		# (les blocs inconnus sont ignorés, les manquants prennent leurs défauts).
+		push_warning("SaveManager: sauvegarde v%d plus récente que le build (v%d), chargement best-effort" % [from_version, CURRENT_SAVE_VERSION])
+		return data
+
+	var migrations: Dictionary = _build_migrations()
+	var version: int = from_version
+	while version < CURRENT_SAVE_VERSION:
+		if migrations.has(version):
+			data = migrations[version].call(data)
+			GameLog.d("SaveManager: migration de sauvegarde v%d -> v%d" % [version, version + 1])
+		version += 1
+		data["save_version"] = version
+	return data
+
+func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
+	"""v1 -> v2 : normalise la présence des blocs systèmes. Les sauvegardes antérieures
+	à l'ajout des systèmes National/Esport/Balance n'avaient pas ces clés ; on les
+	matérialise en blocs vides pour que la désérialisation reparte sur des défauts
+	propres (tous les deserialize() tolèrent un dictionnaire vide). Non destructif :
+	les blocs déjà présents et bien typés sont laissés intacts."""
+	for key in _DICT_SYSTEM_BLOCKS:
+		if not data.has(key) or not (data[key] is Dictionary):
+			data[key] = {}
+	for key in _ARRAY_SYSTEM_BLOCKS:
+		if not data.has(key) or not (data[key] is Array):
+			data[key] = []
+	return data
+
+func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
+	"""v2 -> v3 : ajoute la persistance des événements (cooldowns/one-time) et du graphe social."""
+	for key in ["events", "social"]:
+		if not data.has(key) or not (data[key] is Dictionary):
+			data[key] = {}
+	return data
+
+func _apply_save_data(data: Dictionary) -> void:
 	# Charger chaque système
 	if data.has("game_time"):
 		GameTime.load_time_data(data.game_time)
@@ -97,10 +226,24 @@ func load_game() -> bool:
 		SponsorshipManager.deserialize(data.sponsors)
 	if data.has("dramas"):
 		DramaManager.deserialize(data.dramas)
-
-	print("SaveManager: chargement réussi (version %d)" % data.save_version)
-	load_completed.emit(true)
-	return true
+	# Systemes Esport (Milestone 4)
+	if data.has("staff"):
+		StaffManager.deserialize(data.staff)
+	if data.has("tournaments"):
+		TournamentManager.deserialize(data.tournaments)
+	if data.has("transfers"):
+		TransferManager.deserialize(data.transfers)
+	if data.has("legacy"):
+		LegacyManager.deserialize(data.legacy)
+	if data.has("culture"):
+		GuildCultureManager.deserialize(data.culture)
+	if data.has("balance"):
+		BalanceManager.deserialize(data.balance)
+	# Événements et graphe social (après les membres, dont ils dépendent).
+	if data.has("events"):
+		EventManager.deserialize(data.events)
+	if data.has("social"):
+		_deserialize_social(data.social)
 
 func has_save() -> bool:
 	"""Vérifie si une sauvegarde existe."""
@@ -110,7 +253,23 @@ func delete_save() -> void:
 	"""Supprime la sauvegarde."""
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH)
-		print("SaveManager: sauvegarde supprimée")
+		GameLog.d("SaveManager: sauvegarde supprimée")
+
+# --- Sérialisation du graphe social (via behavior_system.social_dynamics) ---
+
+func _get_social_dynamics():
+	if GuildManager and GuildManager.behavior_system:
+		return GuildManager.behavior_system.social_dynamics
+	return null
+
+func _serialize_social() -> Dictionary:
+	var sd = _get_social_dynamics()
+	return sd.serialize() if sd and sd.has_method("serialize") else {}
+
+func _deserialize_social(data: Dictionary) -> void:
+	var sd = _get_social_dynamics()
+	if sd and sd.has_method("deserialize"):
+		sd.deserialize(data)
 
 # --- Sérialisation Guild ---
 
@@ -124,6 +283,7 @@ func _serialize_guild() -> Dictionary:
 		"gold": g.gold,
 		"reputation": g.reputation,
 		"reputation_history": g.reputation_history,
+		"bank": _serialize_bank(g.bank_items),
 	}
 
 func _deserialize_guild(data: Dictionary) -> void:
@@ -135,6 +295,17 @@ func _deserialize_guild(data: Dictionary) -> void:
 	g.gold = data.get("gold", 0)
 	g.reputation = data.get("reputation", 50.0)
 	g.reputation_history = data.get("reputation_history", [])
+	g.bank_items = []
+	for entry in data.get("bank", []):
+		if entry is Dictionary:
+			g.bank_items.append(_deserialize_item(entry))
+
+func _serialize_bank(items: Array) -> Array:
+	var out: Array = []
+	for item in items:
+		if item:
+			out.append(_serialize_item(item))
+	return out
 
 # --- Sérialisation Membres ---
 
@@ -163,9 +334,18 @@ func _deserialize_members(data: Array) -> void:
 		_deserialize_player(member, member_data)
 		GuildManager.guild_members.append(member)
 
+	# Avancer le compteur d'id stable au-delà des id chargés (anti-collision avec les futures recrues).
+	var max_id: int = SimulatedPlayer._id_counter
+	for m in GuildManager.guild_members:
+		if m.player_id.begins_with("p"):
+			max_id = maxi(max_id, m.player_id.substr(1).to_int())
+	SimulatedPlayer._id_counter = max_id
+
 func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 	var data: Dictionary = {
 		"nom": player.nom,
+		"player_id": player.player_id,
+		"behavior_profile": player.behavior_profile.serialize() if player.behavior_profile else {},
 		"is_player": player.get_meta("is_player", false),
 		"personnage_classe": player.personnage_classe,
 		"personnage_role": player.personnage_role,
@@ -198,6 +378,10 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		"salary_demand": player.salary_demand,
 		"salary": player.get_meta("salary", 0),
 		"is_national": player.get_meta("is_national", false),
+		"stress_level": player.stress_level,
+		"is_international": player.get_meta("is_international", false),
+		"region": player.get_meta("region", ""),
+		"adaptation_weeks": player.get_meta("adaptation_weeks", 0),
 		"equipment": _serialize_equipment(player.equipment),
 	}
 
@@ -208,11 +392,15 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		data["max_energy_pool"] = pc.get("max_energy_pool") if pc.get("max_energy_pool") != null else 100.0
 		data["session_xp_gained"] = pc.get("session_xp_gained") if pc.get("session_xp_gained") != null else 0
 		data["session_gold_gained"] = pc.get("session_gold_gained") if pc.get("session_gold_gained") != null else 0
+		data["last_activity_choice"] = pc.get("last_activity_choice") if pc.get("last_activity_choice") != null else ""
 
 	return data
 
 func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 	player.nom = data.get("nom", "")
+	player.player_id = data.get("player_id", player.player_id)
+	if data.has("behavior_profile") and player.behavior_profile and player.behavior_profile.has_method("deserialize"):
+		player.behavior_profile.deserialize(data.get("behavior_profile", {}))
 	player.personnage_classe = data.get("personnage_classe", "")
 	player.personnage_role = data.get("personnage_role", "")
 	player.personnage_niveau = data.get("personnage_niveau", 1)
@@ -246,6 +434,13 @@ func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 		player.set_meta("salary", data.get("salary", 0))
 	if data.get("is_national", false):
 		player.set_meta("is_national", true)
+	player.stress_level = data.get("stress_level", 0.0)
+	if data.get("is_international", false):
+		player.set_meta("is_international", true)
+	if data.get("region", "") != "":
+		player.set_meta("region", data.get("region", ""))
+	if data.get("adaptation_weeks", 0) > 0:
+		player.set_meta("adaptation_weeks", data.get("adaptation_weeks", 0))
 
 	# Équipement
 	if data.has("equipment"):
@@ -257,6 +452,7 @@ func _deserialize_player_character(player, data: Dictionary) -> void:
 	player.max_energy_pool = data.get("max_energy_pool", 100.0)
 	player.session_xp_gained = data.get("session_xp_gained", 0)
 	player.session_gold_gained = data.get("session_gold_gained", 0)
+	player.last_activity_choice = data.get("last_activity_choice", "")
 	player.is_player_controlled = true
 	player.manual_control_enabled = true
 

@@ -1,0 +1,542 @@
+extends PanelContainer
+
+## Fenêtre Conseils & Statistiques (Milestone 6, US 6.1 + 6.2).
+## - Onglet Conseils : recommandations adaptatives priorisées (AdvisorManager).
+## - Onglet Statistiques : tableau de bord guilde + table détaillée par membre.
+
+const ACCENT := Color(0.30, 0.64, 0.96)
+const DIM := Color(0.62, 0.65, 0.71)
+const GOLD := Color(1.0, 0.82, 0.30)
+const GREEN := Color(0.55, 0.82, 0.55)
+const RED := Color(0.88, 0.45, 0.45)
+const STRUGGLE_HINT := 0.3  # seuil d'affichage "sous pression"
+
+var advanced_tabs: AdvancedTabs
+var _drag_active: bool = false
+
+var _weekly_box: VBoxContainer
+var _advice_box: VBoxContainer
+var _stats_box: VBoxContainer
+var _balance_box: VBoxContainer
+
+func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	custom_minimum_size = Vector2(900, 640)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(vbox)
+
+	_setup_header(vbox)
+
+	advanced_tabs = AdvancedTabs.create_simple_tabs(vbox)
+	advanced_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	advanced_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	_weekly_box = _add_scroll_tab("Cette semaine")
+	_advice_box = _add_scroll_tab("Conseils")
+	_stats_box = _add_scroll_tab("Statistiques")
+	_balance_box = _add_scroll_tab("Équilibrage")
+
+	_connect_signals()
+	_refresh_all()
+	hide()
+
+func _setup_header(parent: VBoxContainer) -> void:
+	var header := HBoxContainer.new()
+	parent.add_child(header)
+
+	var title := Label.new()
+	title.text = "Conseiller de Guilde"
+	title.add_theme_font_size_override("font_size", 20)
+	title.mouse_filter = Control.MOUSE_FILTER_STOP
+	title.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title.gui_input.connect(_on_header_drag)
+	header.add_child(title)
+
+	header.add_spacer(false)
+
+	var refresh_btn := Button.new()
+	refresh_btn.text = "Actualiser"
+	refresh_btn.pressed.connect(_refresh_all)
+	header.add_child(refresh_btn)
+
+	var close_btn := Button.new()
+	close_btn.text = "X"
+	close_btn.custom_minimum_size = Vector2(34, 30)
+	close_btn.pressed.connect(func(): hide())
+	header.add_child(close_btn)
+
+func _on_header_drag(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
+
+func _add_scroll_tab(tab_title: String) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 8)
+	scroll.add_child(box)
+	advanced_tabs.add_tab(tab_title, scroll, false)
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return box
+
+func _connect_signals() -> void:
+	# Rafraîchir au fil du temps de jeu et aux changements de phase.
+	if GameTime and GameTime.has_signal("week_changed"):
+		GameTime.week_changed.connect(func(_w, _y): _on_changed())
+	if PhaseManager and PhaseManager.has_signal("phase_changed"):
+		PhaseManager.phase_changed.connect(func(_n, _o): _on_changed())
+	if BalanceManager and BalanceManager.has_signal("difficulty_changed"):
+		BalanceManager.difficulty_changed.connect(func(_d): _on_changed())
+
+func _on_changed() -> void:
+	if visible:
+		_refresh_all()
+
+# Appelée par le WindowManager à l'affichage de la fenêtre.
+func refresh_window() -> void:
+	_refresh_all()
+
+func _refresh_all() -> void:
+	_build_weekly()
+	_build_advice()
+	_build_stats()
+	_build_balance()
+
+# --- Helpers UI partagés ---
+
+func _clear(box: VBoxContainer) -> void:
+	for child in box.get_children():
+		child.queue_free()
+
+func _section(box: VBoxContainer, text: String, color: Color = Color.WHITE) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 16)
+	label.modulate = color
+	box.add_child(label)
+
+func _empty_hint(box: VBoxContainer, text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.modulate = DIM
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(label)
+
+func _card(parent: VBoxContainer) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	parent.add_child(panel)
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	panel.add_child(inner)
+	return inner
+
+func _kv(box: VBoxContainer, key: String, value: String, value_color: Color = Color.WHITE) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	box.add_child(row)
+	var k := Label.new()
+	k.text = key
+	k.custom_minimum_size = Vector2(220, 0)
+	k.modulate = DIM
+	row.add_child(k)
+	var v := Label.new()
+	v.text = value
+	v.modulate = value_color
+	row.add_child(v)
+
+func _fmt_int(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	var count := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		count += 1
+		if count % 3 == 0 and i > 0:
+			out = " " + out
+	return out
+
+# --- Onglet Cette semaine (audit Priorité 9) ---
+
+func _build_weekly() -> void:
+	_clear(_weekly_box)
+	if not AdvisorManager or not AdvisorManager.has_method("get_weekly_summary"):
+		_empty_hint(_weekly_box, "Synthèse hebdomadaire indisponible.")
+		return
+	if not GuildManager or not GuildManager.guild:
+		_empty_hint(_weekly_box, "Données de guilde indisponibles.")
+		return
+
+	_section(_weekly_box, "Cette semaine", GOLD)
+	if PhaseManager and GameTime:
+		var sub := Label.new()
+		sub.text = "%s — Semaine %d, Année %d" % [
+			PhaseManager.get_phase_name(PhaseManager.get_current_phase()),
+			GameTime.current_week, GameTime.current_year]
+		sub.modulate = DIM
+		_weekly_box.add_child(sub)
+	_weekly_box.add_child(HSeparator.new())
+
+	var summary: Dictionary = AdvisorManager.get_weekly_summary()
+
+	# Objectifs accessibles (les plus avancés en premier).
+	_section(_weekly_box, "Objectifs à portée", ACCENT)
+	var objectives: Array = summary.get("objectives", [])
+	if objectives.is_empty():
+		_empty_hint(_weekly_box, "Tous les objectifs de la phase sont remplis — la progression se déclenchera bientôt.")
+	else:
+		var obj_card := _card(_weekly_box)
+		for o in objectives.slice(0, mini(4, objectives.size())):
+			var pct: int = int(o.get("percent", 0.0))
+			_kv(obj_card, o.get("label", "?").capitalize(), "%d%%" % pct, _pct_color(float(pct)))
+
+	# Membres à risque.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Membres à surveiller", ACCENT)
+	var at_risk: Array = summary.get("members_at_risk", [])
+	if at_risk.is_empty():
+		_empty_hint(_weekly_box, "Aucun membre en difficulté particulière. Bon climat d'équipe.")
+	else:
+		var risk_card := _card(_weekly_box)
+		for entry in at_risk.slice(0, mini(6, at_risk.size())):
+			var reasons: Array = entry.get("reasons", [])
+			_kv(risk_card, entry.get("name", "?"), ", ".join(reasons), RED)
+		if at_risk.size() > 6:
+			_empty_hint(_weekly_box, "… et %d autre(s) membre(s) à surveiller." % (at_risk.size() - 6))
+
+	# Recrutement.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Recrutement", ACCENT)
+	var rec: Dictionary = summary.get("recruitment", {})
+	var rec_card := _card(_weekly_box)
+	var free_slots: int = int(rec.get("free_slots", 0))
+	_kv(rec_card, "Places libres", str(free_slots), GREEN if free_slots > 0 else DIM)
+	_kv(rec_card, "Candidats disponibles", str(int(rec.get("pool_size", 0))))
+	if free_slots > 0 and rec.get("can_recruit", false):
+		_empty_hint(_weekly_box, "Des recrues sont disponibles dans la fenêtre Monde pour combler vos rangs.")
+
+	# Contenu conseillé.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Contenu conseillé", ACCENT)
+	var content: Array = summary.get("recommended_content", [])
+	if content.is_empty():
+		_empty_hint(_weekly_box, "Aucun contenu adapté au niveau moyen actuel.")
+	else:
+		var content_card := _card(_weekly_box)
+		for c in content:
+			var status: String = "déjà clear" if c.get("cleared", false) else "à tenter"
+			var col: Color = DIM if c.get("cleared", false) else GREEN
+			_kv(content_card, "%s (niv. %d)" % [c.get("name", "?"), int(c.get("level", 0))], status, col)
+
+	# Activités en cours.
+	_weekly_box.add_child(HSeparator.new())
+	_section(_weekly_box, "Activités en cours", ACCENT)
+	var act: Dictionary = summary.get("activities", {})
+	var act_card := _card(_weekly_box)
+	_kv(act_card, "Membres en ligne", str(int(act.get("online", 0))), GREEN if int(act.get("online", 0)) > 0 else DIM)
+	var by_type: Dictionary = act.get("by_type", {})
+	for label in by_type:
+		_kv(act_card, label, str(int(by_type[label])))
+
+# --- Onglet Conseils ---
+
+func _build_advice() -> void:
+	_clear(_advice_box)
+	_section(_advice_box, "Recommandations du conseiller", GOLD)
+	_empty_hint(_advice_box, "Analyse en direct de votre guilde : alertes, points de vigilance, astuces et opportunités, classés par priorité.")
+	_advice_box.add_child(HSeparator.new())
+
+	if not AdvisorManager:
+		_empty_hint(_advice_box, "Conseiller indisponible.")
+		return
+
+	var advice: Array = AdvisorManager.get_advice()
+	if advice.is_empty():
+		_advice_box.add_child(_good_news_card())
+		return
+
+	for a in advice:
+		_advice_box.add_child(_advice_card(a))
+
+func _good_news_card() -> Control:
+	var panel := PanelContainer.new()
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	panel.add_child(inner)
+	var title := Label.new()
+	title.text = "Tout va bien"
+	title.add_theme_font_size_override("font_size", 15)
+	title.modulate = GREEN
+	inner.add_child(title)
+	var desc := Label.new()
+	desc.text = "Aucune alerte particulière. Votre guilde est sur de bons rails — continuez votre progression."
+	desc.add_theme_font_size_override("font_size", 12)
+	desc.modulate = DIM
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inner.add_child(desc)
+	return panel
+
+func _advice_card(advice: Dictionary) -> Control:
+	var severity: int = advice.get("severity", AdvisorManager.Severity.TIP)
+	var panel := PanelContainer.new()
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	panel.add_child(inner)
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 10)
+	inner.add_child(top)
+
+	top.add_child(_severity_chip(severity))
+
+	var title := Label.new()
+	title.text = advice.get("title", "")
+	title.add_theme_font_size_override("font_size", 15)
+	title.modulate = AdvisorManager.get_severity_color(severity)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(title)
+
+	var desc := Label.new()
+	desc.text = advice.get("text", "")
+	desc.add_theme_font_size_override("font_size", 12)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inner.add_child(desc)
+	return panel
+
+func _severity_chip(severity: int) -> Control:
+	"""Pastille colorée auto-dimensionnée (PanelContainer = pas de débordement, contrairement au composant Badge)."""
+	var pill := PanelContainer.new()
+	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var c: Color = AdvisorManager.get_severity_color(severity)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(c.r, c.g, c.b, 0.22)
+	style.set_corner_radius_all(9)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 3
+	style.content_margin_bottom = 3
+	style.set_border_width_all(1)
+	style.border_color = c
+	pill.add_theme_stylebox_override("panel", style)
+	var lbl := Label.new()
+	lbl.text = AdvisorManager.get_severity_label(severity)
+	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_color_override("font_color", c.lightened(0.35))
+	pill.add_child(lbl)
+	return pill
+
+# --- Onglet Statistiques ---
+
+func _build_stats() -> void:
+	_clear(_stats_box)
+	if not GuildManager or not GuildManager.guild:
+		_empty_hint(_stats_box, "Données de guilde indisponibles.")
+		return
+
+	_section(_stats_box, "Vue d'ensemble", ACCENT)
+	var overview := _card(_stats_box)
+	var guild = GuildManager.guild
+	var members: Array = GuildManager.guild_members
+
+	if PhaseManager:
+		_kv(overview, "Phase actuelle", PhaseManager.get_phase_name(PhaseManager.get_current_phase()), GOLD)
+	_kv(overview, "Niveau de guilde", str(guild.get_level()))
+	_kv(overview, "Trésorerie", "%s or" % _fmt_int(guild.gold), GOLD)
+	_kv(overview, "Réputation", "%d (%s)" % [int(guild.reputation), guild.get_reputation_tier()], _rep_color(guild.reputation))
+
+	var gcm: Node = GuildCultureManager
+	if gcm and gcm.has_method("get_guild_morale"):
+		var morale: float = gcm.get_guild_morale()
+		_kv(overview, "Moral de guilde", "%d (%s)" % [int(morale), gcm.get_morale_tier()], _morale_color(morale))
+
+	var salaries: int = GuildManager.get_total_weekly_salaries()
+	if salaries > 0:
+		_kv(overview, "Masse salariale", "%s or / semaine" % _fmt_int(salaries), GOLD)
+
+	_stats_box.add_child(HSeparator.new())
+	_section(_stats_box, "Effectif", ACCENT)
+	var roster := _card(_stats_box)
+	var online: int = GuildManager.get_online_members().size()
+	_kv(roster, "Membres", "%d / %d" % [members.size(), guild.get_max_members()])
+	_kv(roster, "En ligne", str(online), GREEN if online > 0 else DIM)
+	if not members.is_empty():
+		_kv(roster, "Niveau moyen", "%.1f" % _avg(members, "personnage_niveau"))
+		_kv(roster, "Skill moyen", "%.0f" % _avg(members, "skill"))
+		_kv(roster, "Intégration moyenne", "%.0f%%" % _avg(members, "integration"))
+		_kv(roster, "Moral moyen", "%.0f" % _avg(members, "mood"))
+		_kv(roster, "Stress moyen", "%.0f" % _avg(members, "stress_level"))
+
+	_stats_box.add_child(HSeparator.new())
+	_section(_stats_box, "Détail par membre", ACCENT)
+	if members.is_empty():
+		_empty_hint(_stats_box, "Aucun membre.")
+		return
+	_stats_box.add_child(_member_header())
+	var sorted: Array = members.duplicate()
+	sorted.sort_custom(func(a, b): return a.personnage_niveau > b.personnage_niveau)
+	for m in sorted:
+		_stats_box.add_child(_member_row(m))
+
+func _member_header() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.add_child(_cell("Membre", 160, DIM))
+	row.add_child(_cell("Classe", 90, DIM))
+	row.add_child(_cell("Niv", 40, DIM))
+	row.add_child(_cell("Skill", 50, DIM))
+	row.add_child(_cell("Moral", 55, DIM))
+	row.add_child(_cell("Énergie", 60, DIM))
+	row.add_child(_cell("Stress", 55, DIM))
+	row.add_child(_cell("Intég.", 55, DIM))
+	return row
+
+func _member_row(m) -> Control:
+	var panel := PanelContainer.new()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	panel.add_child(row)
+
+	var name_color: Color = GOLD if m.get_meta("is_player", false) else Color.WHITE
+	row.add_child(_cell(m.nom, 160, name_color))
+	row.add_child(_cell(m.personnage_classe, 90, DIM))
+	row.add_child(_cell(str(m.personnage_niveau), 40))
+	row.add_child(_cell(str(m.skill), 50))
+	row.add_child(_cell("%d" % int(m.mood), 55, _pct_color(m.mood)))
+	row.add_child(_cell("%d" % int(m.energy), 60, _pct_color(m.energy)))
+	row.add_child(_cell("%d" % int(m.stress_level), 55, _stress_color(m.stress_level)))
+	row.add_child(_cell("%d" % int(m.integration), 55, _pct_color(m.integration)))
+	return panel
+
+func _cell(text: String, width: int, color: Color = Color.WHITE) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(width, 0)
+	label.clip_text = true
+	label.modulate = color
+	return label
+
+# --- Onglet Équilibrage (US 6.4) ---
+
+func _build_balance() -> void:
+	_clear(_balance_box)
+	if not BalanceManager:
+		_empty_hint(_balance_box, "Système d'équilibrage indisponible.")
+		return
+
+	_section(_balance_box, "Difficulté", ACCENT)
+	var current: int = BalanceManager.get_difficulty()
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+	_balance_box.add_child(btn_row)
+	for d in [BalanceManager.Difficulty.RELAXED, BalanceManager.Difficulty.NORMAL, BalanceManager.Difficulty.HARD]:
+		var preset: Dictionary = BalanceManager.DIFFICULTY_PRESETS[d]
+		var btn := Button.new()
+		btn.text = preset.get("name", "?")
+		btn.toggle_mode = true
+		btn.button_pressed = (d == current)
+		btn.custom_minimum_size = Vector2(130, 34)
+		var dref: int = d
+		btn.pressed.connect(func():
+			BalanceManager.set_difficulty(dref)
+			_build_balance()
+		)
+		btn_row.add_child(btn)
+
+	var desc := Label.new()
+	desc.text = BalanceManager.get_difficulty_desc()
+	desc.modulate = DIM
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_balance_box.add_child(desc)
+
+	_balance_box.add_child(HSeparator.new())
+	_section(_balance_box, "Adaptation en cours", ACCENT)
+	var st: Dictionary = BalanceManager.get_status()
+	var card := _card(_balance_box)
+	_kv(card, "Classement actuel", _ordinal(st.get("rank", 0)))
+	_kv(card, "Situation", _standing_label(st), _standing_color(st))
+	_kv(card, "Bonus de recrutement", "x%.2f" % st.get("recruit_mult", 1.0), _mult_color(st.get("recruit_mult", 1.0), true))
+	_kv(card, "Progression des IA", "x%.2f" % st.get("ai_progression_mult", 1.0), _mult_color(st.get("ai_progression_mult", 1.0), false))
+	if st.get("weeks_dominating", 0) > 0:
+		_kv(card, "Domination", "%d semaine(s) en tête" % st.weeks_dominating, GOLD)
+	if st.get("total_catchup_gold", 0) > 0:
+		_kv(card, "Aide catch-up cumulée", "%s or" % _fmt_int(st.total_catchup_gold), GREEN)
+
+	_empty_hint(_balance_box, "Le catch-up vous aide (or, moral, recrutement) quand vous décrochez. Le rubber-band rend les IA plus tenaces quand vous dominez durablement.")
+
+func _ordinal(rank: int) -> String:
+	if rank <= 0:
+		return "Non classé"
+	return "%d%s" % [rank, "er" if rank == 1 else "e"]
+
+func _standing_label(st: Dictionary) -> String:
+	var struggle: float = st.get("struggle", 0.0)
+	var dominance: float = st.get("dominance", 0.0)
+	if struggle >= 0.5:
+		return "En difficulté — catch-up actif"
+	elif struggle >= STRUGGLE_HINT:
+		return "Sous pression"
+	elif dominance >= 0.5:
+		return "En domination"
+	return "Équilibré"
+
+func _standing_color(st: Dictionary) -> Color:
+	var struggle: float = st.get("struggle", 0.0)
+	if struggle >= 0.5:
+		return RED
+	elif struggle >= STRUGGLE_HINT:
+		return GOLD
+	elif st.get("dominance", 0.0) >= 0.5:
+		return GOLD
+	return GREEN
+
+func _mult_color(m: float, higher_is_good: bool) -> Color:
+	if absf(m - 1.0) < 0.02:
+		return DIM
+	var good: bool = (m > 1.0) == higher_is_good
+	return GREEN if good else GOLD
+
+# --- Couleurs ---
+
+func _avg(members: Array, prop: String) -> float:
+	if members.is_empty():
+		return 0.0
+	var total: float = 0.0
+	for m in members:
+		total += float(m.get(prop))
+	return total / float(members.size())
+
+func _pct_color(v: float) -> Color:
+	if v >= 66.0:
+		return GREEN
+	elif v >= 33.0:
+		return GOLD
+	return RED
+
+func _stress_color(v: float) -> Color:
+	if v >= 60.0:
+		return RED
+	elif v >= 35.0:
+		return GOLD
+	return GREEN
+
+func _rep_color(v: float) -> Color:
+	if v >= 60.0:
+		return GREEN
+	elif v >= 40.0:
+		return GOLD
+	return RED
+
+func _morale_color(v: float) -> Color:
+	if v >= 70.0:
+		return GREEN
+	elif v >= 50.0:
+		return GOLD
+	return RED

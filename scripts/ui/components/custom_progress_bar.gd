@@ -51,10 +51,10 @@ func _setup_ui():
 		text_label.add_theme_color_override("font_color", Color.WHITE)
 		add_child(text_label)
 		
-		# Positionner le label
-		text_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-		text_label.size.y = 16
-		text_label.position.y = bar_height + 2
+		# Positionner le label sans modifier directement la taille d'un Control ancré.
+		text_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+		text_label.offset_top = bar_height + 2
+		text_label.offset_bottom = bar_height + 18
 
 func _draw():
 	"""Dessine la barre de progression"""

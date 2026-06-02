@@ -1,84 +1,37 @@
 extends Node
 class_name WindowManager
 
-# Système de gestion avancé des fenêtres avec support multi-fenêtres,
-# z-order, minimisation, sauvegarde layout, animations
+# Gestionnaire de fenêtres en mode MONO-FENÊTRE : la navigation par menu
+# (show_window) affiche une fenêtre à la fois et cache les autres. Conserve
+# l'ouverture/fermeture, le z-order (focus au clic), la mémorisation des
+# positions/tailles sur disque et les animations d'ouverture/fermeture.
+# Le multi-fenêtres simultané (Alt+Tab, cascade/tuiles, minimisation/taskbar)
+# a été retiré car non fonctionnel avec la navigation exclusive.
 
 # Configuration
 const SAVE_FILE_PATH = "user://window_layouts.save"
 const ANIMATION_DURATION = 0.3
-const CASCADE_OFFSET = Vector2(30, 30)
-const MIN_WINDOW_SIZE = Vector2(400, 300)
 
 # Données des fenêtres
 var windows = {}  # nom -> config de base
 var open_windows = {}  # nom -> instances ouvertes
 var window_z_order = []  # ordre des fenêtres (Z-index)
-var minimized_windows = []  # fenêtres minimisées
-var window_positions = {}  # sauvegarde des positions
+var window_positions = {}  # sauvegarde des positions/tailles par fenêtre
 
 # État du gestionnaire
 var active_window = null
 var max_z_index = 100
 var use_animations = true
-var taskbar_instance = null
-var layouts = {}  # layouts sauvegardés
-var current_layout = "default"
 
 # Signaux
 signal window_opened(window_name)
 signal window_closed(window_name)
-signal window_minimized(window_name)
-signal window_restored(window_name)
 signal window_focused(window_name)
-signal layout_saved(layout_name)
-signal layout_loaded(layout_name)
 
 func _ready():
-	# Charger les layouts sauvegardés
+	# Charger les positions de fenêtres sauvegardées
 	_load_layouts()
-	
-	# Connecter les raccourcis clavier
-	_setup_keyboard_shortcuts()
-	
-	# Créer la taskbar si nécessaire
-	_setup_taskbar()
-	
-	print("WindowManager avancé initialisé")
-
-func _setup_keyboard_shortcuts():
-	"""Configure les raccourcis clavier pour la navigation"""
-	# Les raccourcis seront gérés dans _input()
-	pass
-
-func _setup_taskbar():
-	"""Crée et configure la taskbar pour les fenêtres minimisées"""
-	# La taskbar sera créée comme composant séparé plus tard
-	pass
-
-func _input(event):
-	"""Gère les raccourcis clavier globaux"""
-	if event is InputEventKey and event.pressed:
-		# Alt+Tab pour cycler entre les fenêtres
-		if event.alt_pressed and event.keycode == KEY_TAB:
-			cycle_windows()
-			get_viewport().set_input_as_handled()
-			
-		# Ctrl+M pour minimiser la fenêtre active
-		elif event.ctrl_pressed and event.keycode == KEY_M:
-			if active_window:
-				minimize_window(active_window)
-			get_viewport().set_input_as_handled()
-			
-		# Ctrl+Shift+C pour arranger en cascade
-		elif event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_C:
-			arrange_cascade()
-			get_viewport().set_input_as_handled()
-			
-		# Ctrl+Shift+T pour arranger en tuiles
-		elif event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_T:
-			arrange_tile()
-			get_viewport().set_input_as_handled()
+	GameLog.d("WindowManager initialisé (mode mono-fenêtre)")
 
 # ==================== GESTION DE BASE DES FENÊTRES ====================
 
@@ -151,8 +104,28 @@ func open_window(window_name: String, force_new: bool = false) -> Control:
 	return instance
 
 func show_window(window_name: String):
-	"""Méthode de compatibilité avec l'ancien système"""
-	open_window(window_name)
+	"""Navigation par menu : affiche cette fenêtre seule (cache les autres ouvertes)
+	puis rafraîchit son contenu. Le multi-fenêtres reste possible via open_window()."""
+	# Navigation exclusive : cacher les autres fenêtres pour éviter l'empilement
+	for other_name in open_windows.keys():
+		if other_name == window_name:
+			continue
+		for inst_data in open_windows[other_name]:
+			if is_instance_valid(inst_data.instance):
+				inst_data.instance.hide()
+	var instance: Control = open_window(window_name)
+	# Rafraîchir le contenu une fois la fenêtre affichée et dimensionnée
+	_refresh_window_content.call_deferred(instance)
+	return instance
+
+func _refresh_window_content(instance) -> void:
+	"""Appelle la méthode de rafraîchissement d'une fenêtre si elle en expose une."""
+	if not is_instance_valid(instance):
+		return
+	for method_name in ["refresh_window", "_refresh_all", "refresh_display"]:
+		if instance.has_method(method_name):
+			instance.call(method_name)
+			return
 
 func close_window(window_name: String, instance_id: String = ""):
 	"""Ferme une fenêtre ou instance spécifique"""
@@ -177,9 +150,10 @@ func close_window(window_name: String, instance_id: String = ""):
 
 func _finalize_window_close(window_name: String, inst_data: Dictionary):
 	"""Finalise la fermeture d'une fenêtre"""
-	# Sauvegarder la position si nécessaire
+	# Mémoriser la position/taille puis la persister sur disque (restaurée au boot)
 	_save_window_position(window_name, inst_data.instance)
-	
+	_save_layouts()
+
 	# Supprimer de toutes les listes
 	open_windows[window_name].erase(inst_data)
 	if open_windows[window_name].is_empty():
@@ -187,8 +161,7 @@ func _finalize_window_close(window_name: String, inst_data: Dictionary):
 	
 	windows[window_name].instances.erase(inst_data.instance)
 	_remove_from_z_order(window_name, inst_data.id)
-	minimized_windows.erase(inst_data)
-	
+
 	# Supprimer l'instance
 	if is_instance_valid(inst_data.instance):
 		inst_data.instance.queue_free()
@@ -227,37 +200,10 @@ func bring_to_front(window_name: String, instance_id: String = ""):
 	
 	# Afficher si cachée
 	instance_data.instance.show()
-	instance_data.is_minimized = false
-	
-	# Retirer de la liste des minimisées si présent
-	minimized_windows.erase(instance_data)
-	
+
 	# Mettre comme active
 	active_window = window_name
 	window_focused.emit(window_name)
-
-func cycle_windows():
-	"""Cycle entre les fenêtres ouvertes (Alt+Tab)"""
-	if window_z_order.size() <= 1:
-		return
-	
-	# Prendre la fenêtre suivante dans l'ordre
-	var current_index = 0
-	var current_key = window_z_order[0] if window_z_order.size() > 0 else ""
-	
-	# Trouver l'index actuel
-	for i in range(window_z_order.size()):
-		if window_z_order[i].begins_with(active_window if active_window else ""):
-			current_index = i
-			break
-	
-	# Aller à la suivante
-	var next_index = (current_index + 1) % window_z_order.size()
-	var next_key = window_z_order[next_index]
-	var window_name = next_key.split(":")[0]
-	var instance_id = next_key.split(":")[1] if ":" in next_key else ""
-	
-	bring_to_front(window_name, instance_id)
 
 func get_open_windows() -> Array:
 	"""Retourne la liste des fenêtres ouvertes"""
@@ -267,161 +213,13 @@ func is_window_open(window_name: String) -> bool:
 	"""Vérifie si une fenêtre est ouverte"""
 	return open_windows.has(window_name) and not open_windows[window_name].is_empty()
 
-# ==================== MINIMISATION ET TASKBAR ====================
+func get_window_instance(window_name: String) -> Control:
+	return _get_existing_instance(window_name)
 
-func minimize_window(window_name: String, instance_id: String = ""):
-	"""Minimise une fenêtre dans la taskbar"""
-	var instance_data = _find_instance(window_name, instance_id)
-	if not instance_data or instance_data.is_minimized:
-		return
-	
-	# Marquer comme minimisée
-	instance_data.is_minimized = true
-	minimized_windows.append(instance_data)
-	
-	# Cacher la fenêtre avec animation
-	if use_animations:
-		_animate_window_minimize(instance_data.instance)
-	else:
-		instance_data.instance.hide()
-	
-	# Mettre à jour la fenêtre active
-	if active_window == window_name:
-		_update_active_window()
-	
-	window_minimized.emit(window_name)
-
-func restore_window(window_name: String, instance_id: String = ""):
-	"""Restaure une fenêtre minimisée"""
-	var instance_data = _find_instance(window_name, instance_id)
-	if not instance_data or not instance_data.is_minimized:
-		return
-	
-	# Marquer comme restaurée
-	instance_data.is_minimized = false
-	minimized_windows.erase(instance_data)
-	
-	# Afficher la fenêtre avec animation
-	if use_animations:
-		_animate_window_restore(instance_data.instance)
-	else:
-		instance_data.instance.show()
-	
-	# Amener au premier plan
-	bring_to_front(window_name, instance_data.id)
-	
-	window_restored.emit(window_name)
-
-func get_minimized_windows() -> Array:
-	"""Retourne la liste des fenêtres minimisées"""
-	return minimized_windows.duplicate()
+func refresh_window(window_name: String) -> void:
+	_refresh_window_content(get_window_instance(window_name))
 
 # ==================== LAYOUTS ET SAUVEGARDE ====================
-
-func save_layout(layout_name: String = ""):
-	"""Sauvegarde le layout actuel"""
-	if layout_name == "":
-		layout_name = current_layout
-	
-	var layout_data = {}
-	
-	for window_name in open_windows:
-		var instances_data = []
-		for inst_data in open_windows[window_name]:
-			var instance = inst_data.instance
-			instances_data.append({
-				"position": instance.position,
-				"size": instance.size,
-				"is_minimized": inst_data.is_minimized,
-				"z_index": instance.z_index
-			})
-		layout_data[window_name] = instances_data
-	
-	layouts[layout_name] = layout_data
-	current_layout = layout_name
-	
-	_save_layouts()
-	layout_saved.emit(layout_name)
-
-func load_layout(layout_name: String):
-	"""Charge un layout sauvegardé"""
-	if not layouts.has(layout_name):
-		push_warning("Layout not found: " + layout_name)
-		return
-	
-	# Fermer toutes les fenêtres ouvertes
-	for window_name in open_windows.keys().duplicate():
-		close_all_instances(window_name)
-	
-	# Ouvrir les fenêtres selon le layout
-	var layout_data = layouts[layout_name]
-	for window_name in layout_data:
-		var instances_data = layout_data[window_name]
-		for inst_data in instances_data:
-			var instance = open_window(window_name, true)
-			if instance:
-				instance.position = inst_data.position
-				instance.size = inst_data.size
-				
-				if inst_data.is_minimized:
-					minimize_window(window_name, _get_instance_id(window_name, instance))
-	
-	current_layout = layout_name
-	layout_loaded.emit(layout_name)
-
-func get_available_layouts() -> Array:
-	"""Retourne la liste des layouts disponibles"""
-	return layouts.keys()
-
-# ==================== ARRANGEMENT DES FENÊTRES ====================
-
-func arrange_cascade():
-	"""Arrange les fenêtres en cascade"""
-	var offset = Vector2(0, 0)
-	var viewport_size = get_viewport().get_visible_rect().size
-	
-	for window_name in window_z_order:
-		var parts = window_name.split(":")
-		var name = parts[0]
-		var instance_id = parts[1] if parts.size() > 1 else ""
-		
-		var instance_data = _find_instance(name, instance_id)
-		if instance_data and not instance_data.is_minimized:
-			var instance = instance_data.instance
-			instance.position = offset
-			
-			# S'assurer que la fenêtre reste dans l'écran
-			var max_pos = viewport_size - instance.size
-			if offset.x > max_pos.x or offset.y > max_pos.y:
-				offset = Vector2(0, 0)
-			else:
-				offset += CASCADE_OFFSET
-
-func arrange_tile():
-	"""Arrange les fenêtres en tuiles"""
-	var visible_windows = []
-	for window_name in open_windows:
-		for inst_data in open_windows[window_name]:
-			if not inst_data.is_minimized:
-				visible_windows.append(inst_data.instance)
-	
-	if visible_windows.is_empty():
-		return
-	
-	var viewport_size = get_viewport().get_visible_rect().size
-	var count = visible_windows.size()
-	var cols = int(ceil(sqrt(count)))
-	var rows = int(ceil(float(count) / cols))
-	
-	var window_size = Vector2(viewport_size.x / cols, viewport_size.y / rows)
-	
-	for i in range(count):
-		var window = visible_windows[i]
-		var row = i / cols
-		var col = i % cols
-		
-		window.position = Vector2(col * window_size.x, row * window_size.y)
-		window.size = window_size
 
 func close_all_instances(window_name: String):
 	"""Ferme toutes les instances d'une fenêtre"""
@@ -491,9 +289,17 @@ func _connect_window_signals(instance: Control, window_name: String, instance_id
 		)
 
 func _center_window(window: Control):
-	"""Centre une fenêtre sur l'écran"""
-	var viewport_size = get_viewport().get_visible_rect().size
-	window.position = (viewport_size - window.size) / 2
+	"""Centre une fenêtre dans la zone sûre (au-dessus de la barre de menu, sur l'écran)."""
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var menu_bar_h: float = 90.0
+	var margin: float = 16.0
+	var pos: Vector2 = (viewport_size - window.size) / 2.0
+	# Rester au-dessus de la barre de menu et dans l'écran
+	var max_y: float = maxf(margin, viewport_size.y - menu_bar_h - window.size.y)
+	var max_x: float = maxf(margin, viewport_size.x - margin - window.size.x)
+	pos.x = clampf(pos.x, margin, max_x)
+	pos.y = clampf(pos.y, margin, max_y)
+	window.position = pos
 
 func _generate_instance_id(window_name: String) -> String:
 	"""Génère un ID unique pour une instance"""
@@ -576,36 +382,34 @@ func _save_window_position(window_name: String, instance: Control):
 	}
 
 func _save_layouts():
-	"""Sauvegarde les layouts sur disque"""
+	"""Sauvegarde les positions/tailles des fenêtres sur disque."""
 	var save_data = {
-		"layouts": layouts,
-		"window_positions": window_positions,
-		"current_layout": current_layout
+		"window_positions": window_positions
 	}
-	
+
 	var file = FileAccess.open(SAVE_FILE_PATH, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(save_data))
 		file.close()
 
 func _load_layouts():
-	"""Charge les layouts depuis le disque"""
+	"""Charge les positions/tailles des fenêtres depuis le disque."""
 	if not FileAccess.file_exists(SAVE_FILE_PATH):
 		return
-	
+
 	var file = FileAccess.open(SAVE_FILE_PATH, FileAccess.READ)
 	if file:
 		var json_text = file.get_as_text()
 		file.close()
-		
+
 		var json = JSON.new()
 		var result = json.parse(json_text)
-		
-		if result == OK:
-			var save_data = json.data
-			layouts = save_data.get("layouts", {})
-			window_positions = save_data.get("window_positions", {})
-			current_layout = save_data.get("current_layout", "default")
+
+		if result == OK and json.data is Dictionary:
+			var save_data: Dictionary = json.data
+			var positions = save_data.get("window_positions", {})
+			if positions is Dictionary:
+				window_positions = positions
 
 # ==================== ANIMATIONS ====================
 
@@ -627,19 +431,6 @@ func _animate_window_close(window: Control, callback: Callable):
 	tween.tween_property(window, "size", Vector2.ZERO, ANIMATION_DURATION).set_ease(Tween.EASE_IN)
 	tween.tween_property(window, "modulate:a", 0.0, ANIMATION_DURATION).set_ease(Tween.EASE_IN)
 	tween.finished.connect(callback)
-
-func _animate_window_minimize(window: Control):
-	"""Animation de minimisation"""
-	var tween = create_tween()
-	tween.tween_property(window, "scale", Vector2(0.1, 0.1), ANIMATION_DURATION).set_ease(Tween.EASE_IN)
-	tween.finished.connect(func(): window.hide())
-
-func _animate_window_restore(window: Control):
-	"""Animation de restauration"""
-	window.show()
-	window.scale = Vector2(0.1, 0.1)
-	var tween = create_tween()
-	tween.tween_property(window, "scale", Vector2.ONE, ANIMATION_DURATION).set_ease(Tween.EASE_OUT)
 
 # ==================== MÉTHODES DE COMPATIBILITÉ ====================
 

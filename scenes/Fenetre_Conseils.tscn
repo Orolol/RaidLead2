@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://ccnsl0window01"]
+
+[ext_resource type="Script" path="res://scripts/ui/windows/fenetre_conseils.gd" id="1_cns"]
+
+[node name="root" type="PanelContainer"]
+script = ExtResource("1_cns")

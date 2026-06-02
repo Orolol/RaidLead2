@@ -3,12 +3,17 @@ class_name PlayerCharacter
 # Singletons hérité de SimulatedPlayer
 
 signal forced_disconnect_requested(recovery_hours: int)
+## Émis dès que l'énergie, l'activité ou l'état de connexion change : permet à l'UI
+## de se rafraîchir en temps réel sans polling, et au coordinateur (main) de gérer
+## la pause-si-oisif.
+signal player_state_changed()
 
 # Propriétés spécifiques au joueur
 @export var is_player_controlled: bool = true
 @export var player_energy_pool: float = 100.0  # Énergie totale disponible pour la session
 @export var max_energy_pool: float = 100.0
 @export var current_activity_choice: String = ""  # Activité choisie par le joueur
+@export var last_activity_choice: String = ""  # Dernière activité choisie (persiste à la déconnexion, pour reprise auto)
 @export var scheduled_return_time: Dictionary = {}  # Heure de retour programmée
 @export var session_start_time: Dictionary = {}
 @export var manual_control_enabled: bool = true
@@ -84,8 +89,9 @@ func _initialize_session():
 	session_gold_gained = 0
 	session_duration_minutes = 0
 	consecutive_hours = 0.0
-	
-	print("Session de jeu initialisée pour %s" % nom)
+
+	if OS.is_debug_build():
+		print("Session de jeu initialisée pour %s" % nom)
 
 func choose_activity(activity_type: String) -> bool:
 	"""Permet au joueur de choisir manuellement son activité"""
@@ -95,20 +101,36 @@ func choose_activity(activity_type: String) -> bool:
 	# Vérifier si on a assez d'énergie
 	var drain_rate = energy_drain_rates.get(activity_type, 10.0)
 	if player_energy_pool < drain_rate * 0.5:  # Au moins 30 minutes d'activité
-		print("Pas assez d'énergie pour %s" % activity_type)
+		if OS.is_debug_build():
+			print("Pas assez d'énergie pour %s" % activity_type)
 		return false
 	
 	current_activity_choice = activity_type
-	
+
 	# Démarrer l'activité via l'ActivityManager
 	var activity_manager = _get_activity_manager()
 	if activity_manager:
 		var activity_type_enum = _convert_activity_string_to_enum(activity_type)
 		if activity_type_enum != null:
 			activity_manager.start_activity(self, activity_type_enum)
+			# Mémorise l'activité pour pouvoir la reprendre après un repos
+			last_activity_choice = activity_type
+			player_state_changed.emit()
 			return true
-	
+
 	return false
+
+func resume_last_activity() -> bool:
+	"""Reprend automatiquement la dernière activité choisie (après un repos)."""
+	if last_activity_choice == "":
+		return false
+	if not can_perform_activity(last_activity_choice):
+		return false
+	return choose_activity(last_activity_choice)
+
+func needs_activity_choice() -> bool:
+	"""Le joueur est connecté, disponible, mais sans activité : il attend un ordre."""
+	return is_online and manual_control_enabled and current_activity == null
 
 func _convert_activity_string_to_enum(activity_string: String):
 	"""Convertit une string d'activité en enum ActivityType"""
@@ -144,7 +166,10 @@ func update_player_energy(delta_minutes: float):
 	
 	# Accumuler les heures consécutives
 	consecutive_hours += delta_minutes / 60.0
-	
+
+	# Notifie l'UI (jauge d'énergie temps réel)
+	player_state_changed.emit()
+
 	# Vérifier si on doit forcer une déconnexion
 	if player_energy_pool <= 0:
 		force_disconnect("Épuisement - énergie insuffisante")
@@ -183,18 +208,21 @@ func disconnect_player(reason: String = "Déconnexion manuelle"):
 	# Calculer les gains de session
 	_calculate_session_gains()
 	
-	# Passer en mode offline
+	# Passer en mode offline (on conserve last_activity_choice pour la reprise auto)
 	go_offline()
 	current_activity_choice = ""
 	manual_control_enabled = false
-	
-	print("Joueur déconnecté: %s" % reason)
-	print("Session terminée - XP: +%d, Or: +%d, Durée: %d min" % [session_xp_gained, session_gold_gained, session_duration_minutes])
+	player_state_changed.emit()
+
+	if OS.is_debug_build():
+		print("Joueur déconnecté: %s" % reason)
+		print("Session terminée - XP: +%d, Or: +%d, Durée: %d min" % [session_xp_gained, session_gold_gained, session_duration_minutes])
 
 func force_disconnect(reason: String):
 	"""Force une déconnexion (épuisement, etc.)"""
-	print("PlayerCharacter: Force disconnect - %s" % reason)
-	
+	if OS.is_debug_build():
+		print("PlayerCharacter: Force disconnect - %s" % reason)
+
 	# Déconnecter le joueur
 	disconnect_player(reason)
 	
@@ -247,8 +275,10 @@ func reconnect_player() -> bool:
 	
 	# Initialiser une nouvelle session
 	_initialize_session()
-	
-	print("Joueur reconnecté! Énergie: %.1f/%.1f" % [player_energy_pool, max_energy_pool])
+	player_state_changed.emit()
+
+	if OS.is_debug_build():
+		print("Joueur reconnecté! Énergie: %.1f/%.1f" % [player_energy_pool, max_energy_pool])
 	return true
 
 func _calculate_offline_duration() -> float:
@@ -342,10 +372,7 @@ func _get_game_time() -> Node:
 
 func _get_activity_manager() -> Node:
 	"""Récupère l'ActivityManager"""
-	var tree = Engine.get_main_loop()
-	if tree and tree.root:
-		return tree.root.get_node_or_null("/root/ActivityManager")
-	return null
+	return ActivityManager
 
 func get_energy_percentage() -> float:
 	"""Retourne le pourcentage d'énergie restante"""

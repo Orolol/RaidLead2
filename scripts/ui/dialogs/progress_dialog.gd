@@ -46,7 +46,7 @@ func _setup_progress_dialog():
 	"""Configure le dialogue de progression"""
 	
 	# Taille et propriétés
-	dialog_size = Vector2(450, show_details ? 350 : 180)
+	dialog_size = Vector2(450, 350 if show_details else 180)
 	set_dialog_size(dialog_size)
 	
 	# Pas redimensionnable par défaut

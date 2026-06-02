@@ -92,7 +92,10 @@ func _setup_ui():
 	message_label.add_theme_font_size_override("font_size", 12)
 	message_label.add_theme_color_override("font_color", Color.WHITE.darkened(0.1))
 	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	message_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Largeur de wrap fixe : sans ça, la taille minimale d'un Label autowrap suppose un
+	# retour à la ligne au mot le plus étroit -> hauteur géante (toast plein écran).
+	message_label.custom_minimum_size = Vector2(250, 0)
+	message_label.size_flags_horizontal = Control.SIZE_FILL
 	vbox.add_child(message_label)
 	
 	# Barre de progression du timer (en bas)

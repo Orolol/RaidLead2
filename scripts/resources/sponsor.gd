@@ -14,7 +14,7 @@ class_name Sponsor
 @export var min_reputation: float = 60.0
 @export var min_members: int = 10
 @export var min_audience: int = 0  # audience totale des streamers
-@export var no_scandal_weeks: int = 4  # semaines sans scandale requises
+@export var no_scandal_weeks: int = 2  # semaines sans scandale requises (assoupli : était 4)
 
 var active: bool = true
 
@@ -33,9 +33,9 @@ func tick_week(requirements_met: bool) -> void:
 	"""Mise a jour hebdomadaire du contrat."""
 	weeks_remaining -= 1
 	if requirements_met:
-		satisfaction = minf(100.0, satisfaction + 2.0)
+		satisfaction = minf(100.0, satisfaction + 4.0)   # récupération plus rapide
 	else:
-		satisfaction -= 10.0
+		satisfaction -= 6.0                              # pénalité adoucie (était -10), un scandale reste rattrapable
 
 	if weeks_remaining <= 0 or satisfaction <= 0.0:
 		active = false
@@ -72,6 +72,6 @@ static func deserialize(data: Dictionary) -> Sponsor:
 	s.min_reputation = data.get("min_reputation", 60.0)
 	s.min_members = data.get("min_members", 10)
 	s.min_audience = data.get("min_audience", 0)
-	s.no_scandal_weeks = data.get("no_scandal_weeks", 4)
+	s.no_scandal_weeks = data.get("no_scandal_weeks", 2)
 	s.active = data.get("active", true)
 	return s

@@ -19,15 +19,15 @@ func _ready() -> void:
 	if GameTime.has_signal("year_changed"):
 		GameTime.year_changed.connect(_on_year_changed)
 
-	# Connecter aux incidents media
-	if has_node("/root/MediaManager"):
-		var media: Node = get_node("/root/MediaManager")
-		if media.has_signal("media_incident"):
-			media.media_incident.connect(_on_media_incident)
+	# Connecter aux incidents media (MediaManager est un autoload toujours présent)
+	if MediaManager and MediaManager.has_signal("media_incident"):
+		MediaManager.media_incident.connect(_on_media_incident)
 
 func _on_week_changed(_week: int, _year: int) -> void:
-	_tick_dramas()
-	_check_drama_triggers()
+	_tick_dramas()  # résout les dramas actifs (y compris ceux de loot, valides en toute phase)
+	# Les dramas médiatiques aléatoires ne se déclenchent qu'à partir de la phase Nationale.
+	if PhaseManager and PhaseManager.get_current_phase() >= PhaseManager.GamePhase.NATIONAL:
+		_check_drama_triggers()
 
 func _tick_dramas() -> void:
 	"""Met a jour les dramas actifs."""
@@ -60,7 +60,7 @@ func _check_drama_triggers() -> void:
 			return
 
 		# Drama queens
-		if _has_tag(member, "drama_queen") and randf() < 0.10:
+		if _has_revealed_tag(member, "drama_queen") and randf() < 0.10:
 			_create_drama(Drama.DramaType.INTERNAL_CONFLICT, Drama.Severity.LOW, member.nom,
 				"%s cree des tensions au sein de la guilde" % member.nom)
 			return
@@ -68,7 +68,7 @@ func _check_drama_triggers() -> void:
 	# Conflit entre 2 drama queens
 	var drama_queens: Array = []
 	for member in GuildManager.guild_members:
-		if _has_tag(member, "drama_queen"):
+		if _has_revealed_tag(member, "drama_queen"):
 			drama_queens.append(member)
 	if drama_queens.size() >= 2 and randf() < 0.10:
 		var m1 = drama_queens[0]
@@ -95,9 +95,9 @@ func _create_drama(type: Drama.DramaType, severity: Drama.Severity, source: Stri
 		GuildManager.guild.lose_reputation(absf(drama.get_reputation_impact()),
 			"Drama: %s" % drama.get_type_name())
 
-	# Notifier les sponsors
-	if has_node("/root/SponsorshipManager"):
-		get_node("/root/SponsorshipManager").on_scandal()
+	# Notifier les sponsors (SponsorshipManager est un autoload toujours présent)
+	if SponsorshipManager:
+		SponsorshipManager.on_scandal()
 
 	return drama
 
@@ -149,6 +149,13 @@ func _on_media_incident(member_name: String, incident_type: String, _description
 		"strategy_leak":
 			_create_drama(Drama.DramaType.PUBLIC_CONTROVERSY, Drama.Severity.LOW, member_name,
 				"%s a divulgue des strategies en stream" % member_name)
+
+func _has_revealed_tag(member, tag_name: String) -> bool:
+	"""Ne considère que les tags RÉVÉLÉS (visibles) — un trait caché ne doit pas agir
+	avant que le joueur ne l'ait découvert (respecte la révélation progressive)."""
+	if "tags_comportement" in member:
+		return tag_name in member.tags_comportement
+	return false
 
 func _has_tag(member, tag_name: String) -> bool:
 	if member.has_method("has_tag"):

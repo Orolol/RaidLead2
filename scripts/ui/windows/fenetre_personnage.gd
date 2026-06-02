@@ -4,6 +4,7 @@ var close_button: Button
 var title_label: Label
 var content_container: VBoxContainer
 var advanced_tabs: AdvancedTabs
+var _drag_active: bool = false
 
 var classe_label: Label
 var niveau_label: Label
@@ -14,6 +15,8 @@ var current_phase_label: Label
 var phase_progress_list: ItemList
 var requirements_container: VBoxContainer
 var achievements_list: ItemList
+var pve_best_clear_label: Label
+var pve_run_history_list: ItemList
 
 # Éléments de réputation
 var reputation_value_label: Label
@@ -24,9 +27,11 @@ var reputation_bonus_label: Label
 # Éléments du joueur
 var xp_progress_bar: ProgressBar
 var xp_label: Label
+var activity_label: Label
 var energy_label: Label
 var mood_label: Label
 var session_label: Label
+var _state_signal_connected: bool = false
 
 # Timer pour mise à jour automatique
 var update_timer: Timer
@@ -76,6 +81,10 @@ func _setup_header(parent: VBoxContainer):
 	title_label = Label.new()
 	title_label.text = "Informations du Personnage"
 	title_label.add_theme_font_size_override("font_size", 20)
+	title_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	title_label.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title_label.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title_label.gui_input.connect(_on_header_drag)
 	header.add_child(title_label)
 	
 	header.add_spacer(false)
@@ -85,6 +94,13 @@ func _setup_header(parent: VBoxContainer):
 	close_button.custom_minimum_size = Vector2(30, 30)
 	close_button.pressed.connect(_on_close_pressed)
 	header.add_child(close_button)
+
+func _on_header_drag(event: InputEvent) -> void:
+	"""Permet de déplacer la fenêtre en glissant sur la barre de titre."""
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
 
 func _setup_content(parent: VBoxContainer):
 	# Utiliser AdvancedTabs pour organiser les informations
@@ -107,15 +123,29 @@ func _setup_character_info_tab():
 	advanced_tabs.add_tab("Personnage", info_tab, false)
 	
 	var info_panel = PanelContainer.new()
+	info_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_tab.add_child(info_panel)
-	
+
+	# Disposition en deux colonnes : identité (gauche) / état (droite)
+	var columns = HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 24)
+	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_panel.add_child(columns)
+
 	var info_vbox = VBoxContainer.new()
 	info_vbox.add_theme_constant_override("separation", 10)
-	info_panel.add_child(info_vbox)
-	
-	# Header avec portrait
+	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(info_vbox)
+
+	columns.add_child(VSeparator.new())
+
+	var right_vbox = VBoxContainer.new()
+	right_vbox.add_theme_constant_override("separation", 12)
+	right_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(right_vbox)
+
+	# Header avec portrait (colonne gauche)
 	var header_hbox = HBoxContainer.new()
-	header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	header_hbox.add_theme_constant_override("separation", 15)
 	info_vbox.add_child(header_hbox)
 
@@ -151,15 +181,30 @@ func _setup_character_info_tab():
 	equipement_label.add_theme_font_size_override("font_size", 16)
 	info_vbox.add_child(equipement_label)
 	
-	info_vbox.add_child(HSeparator.new())
-	
-	# Progression XP
-	_setup_xp_display(info_vbox)
-	
-	info_vbox.add_child(HSeparator.new())
-	
-	# Stats du joueur
-	_setup_player_stats(info_vbox)
+	# Colonne droite : progression XP + état actuel
+	_setup_xp_display(right_vbox)
+	right_vbox.add_child(HSeparator.new())
+	_setup_player_stats(right_vbox)
+
+	# Aperçu de la phase actuelle (sous les deux colonnes)
+	var phase_panel = PanelContainer.new()
+	info_tab.add_child(phase_panel)
+	var phase_vbox = VBoxContainer.new()
+	phase_vbox.add_theme_constant_override("separation", 4)
+	phase_panel.add_child(phase_vbox)
+	var ph_title = Label.new()
+	ph_title.text = "Phase actuelle"
+	ph_title.add_theme_font_size_override("font_size", 14)
+	ph_title.modulate = Color(1.0, 0.82, 0.3)
+	phase_vbox.add_child(ph_title)
+	var ph_name = Label.new()
+	if PhaseManager:
+		var cur_phase = PhaseManager.get_current_phase()
+		ph_name.text = "%s — %s" % [PhaseManager.get_phase_name(cur_phase), PhaseManager.get_phase_description(cur_phase)]
+	ph_name.add_theme_font_size_override("font_size", 12)
+	ph_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ph_name.modulate = Color(0.72, 0.74, 0.80)
+	phase_vbox.add_child(ph_name)
 
 func _setup_xp_display(parent: VBoxContainer):
 	"""Configure l'affichage de progression XP"""
@@ -194,7 +239,12 @@ func _setup_player_stats(parent: VBoxContainer):
 	stats_title.text = "⚡ État Actuel"
 	stats_title.add_theme_font_size_override("font_size", 14)
 	stats_container.add_child(stats_title)
-	
+
+	activity_label = Label.new()
+	activity_label.text = "Activité: En attente"
+	activity_label.add_theme_font_size_override("font_size", 12)
+	stats_container.add_child(activity_label)
+
 	energy_label = Label.new()
 	energy_label.text = "Énergie: 100/100"
 	energy_label.add_theme_font_size_override("font_size", 12)
@@ -213,13 +263,16 @@ func _setup_player_stats(parent: VBoxContainer):
 
 func _setup_phase_progression_tab():
 	"""Configure l'onglet de progression de phase"""
-	var progress_tab = VBoxContainer.new()
+	var progress_tab: VBoxContainer = VBoxContainer.new()
 	progress_tab.name = "Progression"
 	progress_tab.add_theme_constant_override("separation", 15)
+	progress_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress_tab.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	advanced_tabs.add_tab("Progression", progress_tab, false)
 	
 	# Header avec phase actuelle
-	var phase_header = HBoxContainer.new()
+	var phase_header: HBoxContainer = HBoxContainer.new()
+	phase_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	progress_tab.add_child(phase_header)
 	
 	current_phase_label = Label.new()
@@ -238,8 +291,10 @@ func _setup_phase_progression_tab():
 	progress_tab.add_child(HSeparator.new())
 	
 	# Container pour le contenu de progression
-	var progress_content = HSplitContainer.new()
+	var progress_content: HSplitContainer = HSplitContainer.new()
 	progress_content.split_offset = 400
+	progress_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	progress_tab.add_child(progress_content)
 	
 	# Côté gauche : Requirements
@@ -250,7 +305,11 @@ func _setup_phase_progression_tab():
 
 func _setup_requirements_section(parent: HSplitContainer):
 	"""Configure la section des requirements"""
-	var requirements_panel = VBoxContainer.new()
+	var requirements_panel: VBoxContainer = VBoxContainer.new()
+	requirements_panel.custom_minimum_size = Vector2(420, 0)
+	requirements_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	requirements_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	requirements_panel.add_theme_constant_override("separation", 8)
 	parent.add_child(requirements_panel)
 	
 	var req_title = Label.new()
@@ -258,13 +317,23 @@ func _setup_requirements_section(parent: HSplitContainer):
 	req_title.add_theme_font_size_override("font_size", 16)
 	requirements_panel.add_child(req_title)
 	
+	var requirements_scroll: ScrollContainer = ScrollContainer.new()
+	requirements_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	requirements_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	requirements_panel.add_child(requirements_scroll)
+	
 	requirements_container = VBoxContainer.new()
-	requirements_container.add_theme_constant_override("separation", 5)
-	requirements_panel.add_child(requirements_container)
+	requirements_container.add_theme_constant_override("separation", 8)
+	requirements_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	requirements_scroll.add_child(requirements_container)
 
 func _setup_achievements_section(parent: HSplitContainer):
 	"""Configure la section des achievements"""
-	var achievements_panel = VBoxContainer.new()
+	var achievements_panel: VBoxContainer = VBoxContainer.new()
+	achievements_panel.custom_minimum_size = Vector2(260, 0)
+	achievements_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	achievements_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	achievements_panel.add_theme_constant_override("separation", 8)
 	parent.add_child(achievements_panel)
 	
 	var ach_title = Label.new()
@@ -273,8 +342,30 @@ func _setup_achievements_section(parent: HSplitContainer):
 	achievements_panel.add_child(ach_title)
 	
 	achievements_list = ItemList.new()
-	achievements_list.custom_minimum_size = Vector2(300, 200)
+	achievements_list.custom_minimum_size = Vector2(260, 200)
+	achievements_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	achievements_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	achievements_panel.add_child(achievements_list)
+	
+	achievements_panel.add_child(HSeparator.new())
+	
+	var runs_title = Label.new()
+	runs_title.text = "⚔️ Derniers runs PvE"
+	runs_title.add_theme_font_size_override("font_size", 16)
+	achievements_panel.add_child(runs_title)
+	
+	pve_best_clear_label = Label.new()
+	pve_best_clear_label.text = "Meilleur clear: aucun run enregistre."
+	pve_best_clear_label.add_theme_font_size_override("font_size", 12)
+	pve_best_clear_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pve_best_clear_label.modulate = Color(0.78, 0.82, 0.92)
+	achievements_panel.add_child(pve_best_clear_label)
+	
+	pve_run_history_list = ItemList.new()
+	pve_run_history_list.custom_minimum_size = Vector2(260, 160)
+	pve_run_history_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pve_run_history_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	achievements_panel.add_child(pve_run_history_list)
 
 func _on_close_pressed():
 	hide()
@@ -291,14 +382,32 @@ func _notification(what: int):
 
 func update_character_info():
 	"""Met à jour les informations du personnage joueur"""
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager:
 		return
 	
 	var player = guild_manager.get_player_character()
 	if not player:
 		return
-	
+
+	# Rafraîchissement temps réel piloté par le signal d'état du joueur (énergie/activité)
+	if not _state_signal_connected and player.has_signal("player_state_changed"):
+		player.player_state_changed.connect(update_character_info)
+		_state_signal_connected = true
+
+	# Activité courante
+	if activity_label:
+		if not player.is_online:
+			activity_label.text = "Activité: 😴 Hors ligne (repos)"
+			activity_label.modulate = Color(0.7, 0.7, 0.7)
+		elif player.current_activity:
+			var act_name: String = player.get_activity_display_name(player.current_activity.get_type_string().to_upper())
+			activity_label.text = "Activité: 🎯 " + act_name
+			activity_label.modulate = Color(0.6, 1.0, 0.6)
+		else:
+			activity_label.text = "Activité: ⏸️ En attente d'un ordre"
+			activity_label.modulate = Color(1.0, 0.9, 0.4)
+
 	# Informations de base
 	classe_label.text = "Classe: " + player.personnage_classe
 	niveau_label.text = "Niveau: " + str(player.personnage_niveau)
@@ -368,6 +477,9 @@ func _refresh_phase_progression():
 	
 	# Mettre à jour les achievements
 	_update_achievements_display()
+	
+	# Mettre à jour l'historique PvE
+	_update_pve_run_history_display()
 
 func _update_requirements_display():
 	"""Met à jour l'affichage des requirements"""
@@ -378,11 +490,10 @@ func _update_requirements_display():
 	if not PhaseManager:
 		return
 	
-	var requirements = PhaseManager.get_current_requirements()
-	var current_phase = PhaseManager.get_current_phase()
+	var requirements: Dictionary = PhaseManager.get_current_requirements()
 	
 	# Vérifier si on est déjà en phase finale
-	var phase_config = PhaseManager.get_current_phase_config()
+	var phase_config: Dictionary = PhaseManager.get_current_phase_config()
 	if not phase_config.has("next_phase") or phase_config.next_phase == null:
 		var final_label = Label.new()
 		final_label.text = "🎉 Vous avez atteint la phase finale !"
@@ -391,10 +502,10 @@ func _update_requirements_display():
 		requirements_container.add_child(final_label)
 		return
 	
-	# Forcer une vérification de progression pour avoir les données à jour
-	PhaseManager.check_phase_progression()
-	var progress_info = PhaseManager.get_current_progress_info()
-	var progress_data = progress_info.get("requirements_progress", {})
+	# Lecture sans effet de bord : check_phase_progression() émet phase_requirements_met,
+	# qui rappelle _on_requirements_met -> _refresh_phase_progression -> récursion infinie.
+	# get_requirements_progress() calcule la progression sans émettre de signal.
+	var progress_data: Dictionary = PhaseManager.get_requirements_progress(PhaseManager.get_current_phase())
 	
 	if requirements.is_empty():
 		var no_req_label = Label.new()
@@ -404,33 +515,47 @@ func _update_requirements_display():
 		return
 	
 	for req_name in requirements:
-		var req_container = HBoxContainer.new()
-		requirements_container.add_child(req_container)
+		var requirement_card: PanelContainer = PanelContainer.new()
+		requirement_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirements_container.add_child(requirement_card)
+		
+		var requirement_box: VBoxContainer = VBoxContainer.new()
+		requirement_box.add_theme_constant_override("separation", 5)
+		requirement_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirement_card.add_child(requirement_box)
+		
+		var req_container: HBoxContainer = HBoxContainer.new()
+		req_container.add_theme_constant_override("separation", 8)
+		req_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirement_box.add_child(req_container)
 		
 		# Statut (✓ ou ✗)
-		var status_label = Label.new()
-		var progress_item = progress_data.get(req_name, {})
-		var is_met = progress_item.get("met", false)
-		var current_value = progress_item.get("current", 0)
-		var required_value = progress_item.get("required", 0)
-		var progress_percent = progress_item.get("progress_percent", 0.0)
+		var status_label: Label = Label.new()
+		var progress_item: Dictionary = progress_data.get(req_name, {})
+		var is_met: bool = bool(progress_item.get("met", false))
+		var current_value: Variant = progress_item.get("current", 0)
+		var required_value: Variant = progress_item.get("required", 0)
+		var progress_percent: float = float(progress_item.get("progress_percent", 0.0))
 		
 		status_label.text = "✓" if is_met else "✗"
 		status_label.modulate = Color.GREEN if is_met else Color.RED
-		status_label.custom_minimum_size = Vector2(20, 0)
+		status_label.custom_minimum_size = Vector2(24, 0)
+		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		req_container.add_child(status_label)
 		
 		# Description du requirement
-		var desc_label = Label.new()
-		desc_label.text = _get_requirement_description(req_name, required_value)
+		var desc_label: Label = Label.new()
+		desc_label.text = _get_requirement_description(str(req_name), required_value)
 		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_label.custom_minimum_size = Vector2(220, 0)
+		desc_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		req_container.add_child(desc_label)
 		
-		req_container.add_spacer(false)
-		
 		# Progression
-		var progress_label = Label.new()
+		var progress_label: Label = Label.new()
 		progress_label.text = "%.0f%%" % progress_percent
+		progress_label.custom_minimum_size = Vector2(56, 0)
+		progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if is_met:
 			progress_label.modulate = Color.GREEN
 		elif progress_percent > 50:
@@ -440,20 +565,22 @@ func _update_requirements_display():
 		req_container.add_child(progress_label)
 		
 		# Barre de progression
-		var progress_bar = ProgressBar.new()
+		var progress_bar: ProgressBar = ProgressBar.new()
 		progress_bar.min_value = 0
 		progress_bar.max_value = 100
 		progress_bar.value = progress_percent
-		progress_bar.custom_minimum_size = Vector2(100, 20)
-		requirements_container.add_child(progress_bar)
+		progress_bar.custom_minimum_size = Vector2(0, 18)
+		progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		requirement_box.add_child(progress_bar)
 		
 		# Détails numériques
 		if not is_met:
-			var detail_label = Label.new()
-			detail_label.text = "   → Actuel: %s / Requis: %s" % [str(current_value), str(required_value)]
+			var detail_label: Label = Label.new()
+			detail_label.text = "Actuel: %s / Requis: %s" % [str(current_value), str(required_value)]
 			detail_label.add_theme_font_size_override("font_size", 12)
 			detail_label.modulate = Color(0.8, 0.8, 0.8)
-			requirements_container.add_child(detail_label)
+			detail_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			requirement_box.add_child(detail_label)
 
 func _get_requirement_description(req_name: String, required_value) -> String:
 	"""Retourne une description lisible du requirement"""
@@ -527,6 +654,103 @@ func _update_achievements_display():
 				achievements_list.set_item_custom_bg_color(item_index, Color(0.5, 0.3, 0.2, 0.3))
 			PhaseManager.GamePhase.ESPORT:
 				achievements_list.set_item_custom_bg_color(item_index, Color(0.5, 0.5, 0.2, 0.3))
+
+func _update_pve_run_history_display() -> void:
+	"""Met à jour l'affichage des derniers runs PvE de la guilde."""
+	pve_run_history_list.clear()
+	
+	if not GuildRanking or not GuildRanking.has_method("get_player_run_history"):
+		pve_best_clear_label.text = "Meilleur clear: indisponible."
+		pve_run_history_list.add_item("Historique PvE indisponible.")
+		return
+	
+	var runs: Array = GuildRanking.get_player_run_history(5)
+	if runs.is_empty():
+		pve_best_clear_label.text = "Meilleur clear: aucun run enregistre."
+		pve_run_history_list.add_item("Aucun run enregistré pour le moment.")
+		return
+	
+	_update_pve_best_clear_display(runs[runs.size() - 1])
+	
+	runs.reverse()
+	for run_data in runs:
+		var item_text: String = _format_pve_run_history_item(run_data)
+		pve_run_history_list.add_item(item_text)
+		
+		var item_index: int = pve_run_history_list.get_item_count() - 1
+		if bool(run_data.get("is_heroic", false)):
+			pve_run_history_list.set_item_custom_bg_color(item_index, Color(0.45, 0.25, 0.08, 0.35))
+		elif int(run_data.get("type", -1)) == DungeonData.InstanceType.RAID:
+			pve_run_history_list.set_item_custom_bg_color(item_index, Color(0.35, 0.18, 0.45, 0.35))
+
+func _update_pve_best_clear_display(latest_run: Dictionary) -> void:
+	"""Affiche le meilleur clear connu pour le dernier contenu joue."""
+	if not GuildRanking or not GuildRanking.has_method("get_player_best_clear"):
+		pve_best_clear_label.text = "Meilleur clear: indisponible."
+		return
+	
+	var content_id: String = str(latest_run.get("content_id", ""))
+	if content_id == "":
+		pve_best_clear_label.text = "Meilleur clear: contenu inconnu."
+		return
+	
+	var best_clear: Dictionary = GuildRanking.get_player_best_clear(content_id)
+	if best_clear.is_empty():
+		pve_best_clear_label.text = "Meilleur clear: aucun detail."
+		return
+	
+	var content_name: String = best_clear.get("name", content_id)
+	var duration_text: String = _format_duration_seconds(float(best_clear.get("duration_seconds", 0.0)))
+	var wipes: int = int(best_clear.get("wipes", 0))
+	var gold_reward: int = int(best_clear.get("gold_reward", 0))
+	var date_text: String = _format_date(best_clear.get("date", {}))
+	
+	if duration_text == "":
+		pve_best_clear_label.text = "Meilleur clear %s : %d wipe(s), %d or" % [content_name, wipes, gold_reward]
+	else:
+		pve_best_clear_label.text = "Meilleur clear %s : %s, %d wipe(s), %d or" % [content_name, duration_text, wipes, gold_reward]
+	
+	if date_text != "":
+		pve_best_clear_label.text += " - %s" % date_text
+
+func _format_pve_run_history_item(run_data: Dictionary) -> String:
+	var content_name: String = run_data.get("name", run_data.get("content_id", "Contenu inconnu"))
+	var duration_text: String = _format_duration_seconds(float(run_data.get("duration_seconds", 0.0)))
+	var wipes: int = int(run_data.get("wipes", 0))
+	var gold_reward: int = int(run_data.get("gold_reward", 0))
+	var performance_score: int = int(run_data.get("performance_score", -1))
+	var date_text: String = _format_date(run_data.get("date", {}))
+	var item_text: String = "%s" % content_name
+	
+	if duration_text != "":
+		item_text += "\n   Durée: %s | Wipes: %d | Or: %d" % [duration_text, wipes, gold_reward]
+	else:
+		item_text += "\n   Wipes: %d | Or: %d" % [wipes, gold_reward]
+	
+	if performance_score >= 0:
+		item_text += " | Score: %d" % performance_score
+	
+	if date_text != "":
+		item_text += "\n   %s" % date_text
+	
+	return item_text
+
+func _format_duration_seconds(seconds: float) -> String:
+	if seconds <= 0.0:
+		return ""
+	var total_seconds: int = int(seconds)
+	var minutes: int = int(total_seconds / 60)
+	var remaining_seconds: int = total_seconds % 60
+	return "%02d:%02d" % [minutes, remaining_seconds]
+
+func _format_date(date: Dictionary) -> String:
+	if date.is_empty():
+		return ""
+	return "Année %d, Semaine %d, Jour %d" % [
+		int(date.get("year", 1)),
+		int(date.get("week", 1)),
+		int(date.get("day", 1))
+	]
 
 func _compare_dates(date_a: Dictionary, date_b: Dictionary) -> int:
 	"""Compare deux dates (retourne > 0 si date_a > date_b)"""
@@ -668,7 +892,7 @@ func _setup_reputation_tab():
 
 func _refresh_reputation_display():
 	"""Met à jour l'affichage de la réputation"""
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager or not guild_manager.guild:
 		return
 	
@@ -708,7 +932,7 @@ func _refresh_reputation_history():
 	"""Met à jour l'historique de réputation"""
 	reputation_history_list.clear()
 	
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager or not guild_manager.guild:
 		reputation_history_list.add_item("Aucune donnée de réputation disponible")
 		return

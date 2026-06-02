@@ -1,211 +1,217 @@
-extends AcceptDialog
+extends PanelContainer
+
+## Fenêtre « Banque & Équipement » : gère l'équipement de chaque membre et la
+## banque de guilde par glisser-déposer (drag & drop natif Godot).
+## - Glisser un objet de la banque sur un slot → l'équipe (l'ancien retourne en banque).
+## - Glisser un objet équipé sur la banque → le range.
 
 const ItemScript = preload("res://scripts/resources/item.gd")
+const EquipDragCellScript = preload("res://scripts/ui/components/equip_drag_cell.gd")
 
 var current_member = null
-var equipment_labels: Dictionary = {}
+var _drag_active: bool = false
+
+var member_option: OptionButton
 var total_ilvl_label: Label
 var total_stats_label: Label
+var slots_container: VBoxContainer
+var bank_container: VBoxContainer
+var _slot_cells: Dictionary = {}  # slot:int -> EquipDragCell
 
-func _ready():
-	# AcceptDialog se centre automatiquement
+func _ready() -> void:
+	custom_minimum_size = Vector2(760, 540)
+	z_index = 200
 	_setup_ui()
+	hide()  # affichée et centrée par show_member_equipment()
+	if GuildManager and GuildManager.has_signal("bank_changed"):
+		GuildManager.bank_changed.connect(_refresh)
 
-func _setup_ui():
-	# Container principal
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 15)
-	add_child(vbox)
-	
-	# Titre avec iLvl total
-	total_ilvl_label = Label.new()
-	total_ilvl_label.text = "iLvl Total: 0"
-	total_ilvl_label.add_theme_font_size_override("font_size", 20)
-	total_ilvl_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(total_ilvl_label)
+func _setup_ui() -> void:
+	var root_vbox := VBoxContainer.new()
+	root_vbox.add_theme_constant_override("separation", 10)
+	add_child(root_vbox)
 
-	total_stats_label = Label.new()
-	total_stats_label.text = "Stats: FOR 0 / AGI 0 / INT 0"
-	total_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	total_stats_label.add_theme_font_size_override("font_size", 14)
+	# --- En-tête (titre draggable + fermer) ---
+	var header := HBoxContainer.new()
+	root_vbox.add_child(header)
+	var title := Label.new()
+	title.text = "Banque & Équipement"
+	title.add_theme_font_size_override("font_size", 20)
+	title.mouse_filter = Control.MOUSE_FILTER_STOP
+	title.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title.gui_input.connect(_on_header_drag)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "X"
+	close_button.custom_minimum_size = Vector2(30, 30)
+	close_button.pressed.connect(_on_close_pressed)
+	header.add_child(close_button)
+
+	# --- Sélecteur de membre + totaux ---
+	var sel_row := HBoxContainer.new()
+	sel_row.add_theme_constant_override("separation", 10)
+	root_vbox.add_child(sel_row)
+	sel_row.add_child(_mk_label("Membre :", 14))
+	member_option = OptionButton.new()
+	member_option.custom_minimum_size = Vector2(180, 0)
+	member_option.item_selected.connect(_on_member_selected)
+	sel_row.add_child(member_option)
+	sel_row.add_spacer(false)
+	total_ilvl_label = _mk_label("iLvl Total: 0", 16)
+	sel_row.add_child(total_ilvl_label)
+
+	total_stats_label = _mk_label("Stats: FOR 0 / AGI 0 / INT 0", 12)
 	total_stats_label.modulate = Color(0.85, 0.85, 0.85)
-	vbox.add_child(total_stats_label)
-	
-	vbox.add_child(HSeparator.new())
-	
-	# ScrollContainer pour gérer le contenu si besoin
-	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 280)
-	vbox.add_child(scroll)
-	
-	var equipment_container = VBoxContainer.new()
-	equipment_container.add_theme_constant_override("separation", 10)
-	scroll.add_child(equipment_container)
-	
-	# Créer les slots d'équipement
-	_create_equipment_slots(equipment_container)
+	root_vbox.add_child(total_stats_label)
 
-func _create_equipment_slots(parent: VBoxContainer):
-	var slot_names: Dictionary = {
-		ItemScript.EquipmentSlot.HELMET: "Casque",
-		ItemScript.EquipmentSlot.SHOULDERS: "Épaulières",
-		ItemScript.EquipmentSlot.CHEST: "Armure",
-		ItemScript.EquipmentSlot.WEAPON: "Arme",
-		ItemScript.EquipmentSlot.RING: "Anneau"
-	}
+	root_vbox.add_child(HSeparator.new())
 
-	for slot in slot_names:
-		var slot_container: HBoxContainer = HBoxContainer.new()
-		slot_container.add_theme_constant_override("separation", 10)
-		parent.add_child(slot_container)
+	# --- Deux colonnes : équipement | banque ---
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 16)
+	cols.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root_vbox.add_child(cols)
 
-		var slot_icon: Texture2D = AssetLoader.get_slot_icon(slot)
-		if slot_icon:
-			var icon_rect: TextureRect = TextureRect.new()
-			icon_rect.texture = slot_icon
-			icon_rect.custom_minimum_size = Vector2(36, 36)
-			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			slot_container.add_child(icon_rect)
+	# Colonne gauche : slots d'équipement
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 6)
+	left.custom_minimum_size = Vector2(330, 0)
+	cols.add_child(left)
+	left.add_child(_mk_label("Équipement — glisser un objet de la banque sur un slot", 13))
+	slots_container = VBoxContainer.new()
+	slots_container.add_theme_constant_override("separation", 6)
+	left.add_child(slots_container)
+	for slot in [0, 1, 2, 3, 4]:
+		var cell := EquipDragCellScript.new()
+		cell.configure("slot", slot, null, self)
+		slots_container.add_child(cell)
+		_slot_cells[slot] = cell
 
-		var slot_label: Label = Label.new()
-		slot_label.text = slot_names[slot] + ":"
-		slot_label.custom_minimum_size = Vector2(80, 0)
-		slot_label.add_theme_font_size_override("font_size", 14)
-		slot_container.add_child(slot_label)
+	cols.add_child(VSeparator.new())
 
-		# Panneau pour l'item équipé
-		var item_panel: PanelContainer = PanelContainer.new()
-		item_panel.custom_minimum_size = Vector2(360, 52)
-		slot_container.add_child(item_panel)
+	# Colonne droite : banque (zone de dépôt) + liste scrollable
+	var bank_drop := EquipDragCellScript.new()
+	bank_drop.configure("bank_drop", -1, null, self)
+	bank_drop.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bank_drop.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cols.add_child(bank_drop)
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 6)
+	bank_drop.add_child(right)
+	right.add_child(_mk_label("Banque de guilde — glisser un objet équipé ici pour le ranger", 13))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(330, 360)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right.add_child(scroll)
+	bank_container = VBoxContainer.new()
+	bank_container.add_theme_constant_override("separation", 4)
+	bank_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(bank_container)
 
-		var item_content: VBoxContainer = VBoxContainer.new()
-		item_content.add_theme_constant_override("separation", 2)
-		item_panel.add_child(item_content)
+func _mk_label(text: String, size: int) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	return l
 
-		var item_label: Label = Label.new()
-		item_label.text = "Aucun objet équipé"
-		item_label.modulate = Color(0.6, 0.6, 0.6)
-		item_label.add_theme_font_size_override("font_size", 12)
-		item_content.add_child(item_label)
+# ==================== API PUBLIQUE ====================
 
-		var stats_label: Label = Label.new()
-		stats_label.text = "Statistiques : —"
-		stats_label.modulate = Color(0.65, 0.65, 0.65)
-		stats_label.add_theme_font_size_override("font_size", 11)
-		item_content.add_child(stats_label)
-
-		var delta_label: Label = Label.new()
-		delta_label.text = ""
-		delta_label.add_theme_font_size_override("font_size", 10)
-		item_content.add_child(delta_label)
-
-		# Stocker la référence pour mise à jour
-		equipment_labels[slot] = {
-			"label": item_label,
-			"stats_label": stats_label,
-			"delta_label": delta_label,
-			"panel": item_panel,
-		}
-
-func show_member_equipment(member):
+func show_member_equipment(member) -> void:
 	if not member:
 		return
-		
 	current_member = member
-	
-	# Mettre à jour le titre
-	title = "Équipement de " + member.nom
-	
-	# Mettre à jour l'iLvl total
-	var total_ilvl = member.get_total_ilvl()
-	total_ilvl_label.text = "iLvl Total: %d" % total_ilvl
-	
-	# Mettre à jour les couleurs selon le niveau d'équipement
-	if total_ilvl >= 200:
-		total_ilvl_label.modulate = Color.PURPLE  # Épique
-	elif total_ilvl >= 150:
-		total_ilvl_label.modulate = Color.BLUE    # Rare
-	elif total_ilvl >= 100:
-		total_ilvl_label.modulate = Color.GREEN   # Peu commun
-	else:
-		total_ilvl_label.modulate = Color.WHITE   # Commun
+	_populate_member_options()
+	_refresh()
+	_center()
+	show()
 
-	# Mettre à jour le résumé des statistiques
-	var total_stats = member.get_equipment_stats()
-	var stats_text = "Stats: FOR %d / AGI %d / INT %d" % [
-		total_stats.get("strength", 0),
-		total_stats.get("agility", 0),
-		total_stats.get("intelligence", 0)
-	]
-	total_stats_label.text = stats_text
+func _populate_member_options() -> void:
+	member_option.clear()
+	var members: Array = GuildManager.guild_members if GuildManager else []
+	for i in range(members.size()):
+		member_option.add_item(members[i].nom, i)
+	var idx: int = members.find(current_member)
+	if idx >= 0:
+		member_option.select(idx)
 
-	# Mettre à jour chaque slot
-	_update_equipment_display()
-	
-	# Afficher la fenêtre
-	popup_centered()
+func _on_member_selected(index: int) -> void:
+	var members: Array = GuildManager.guild_members if GuildManager else []
+	if index >= 0 and index < members.size():
+		current_member = members[index]
+		_refresh()
 
-func _update_equipment_display():
-	if not current_member or not current_member.equipment:
+# ==================== RAFRAÎCHISSEMENT ====================
+
+func _refresh() -> void:
+	if not current_member:
 		return
-
 	var equipment = current_member.equipment
+	for slot in _slot_cells:
+		var it = equipment.get_item_in_slot(slot) if equipment else null
+		_slot_cells[slot].configure("slot", slot, it, self)
 
-	for slot in equipment_labels:
-		var slot_data: Dictionary = equipment_labels[slot]
-		var item: Item = equipment.get_item_in_slot(slot)
+	var total_ilvl: int = current_member.get_total_ilvl()
+	total_ilvl_label.text = "iLvl Total: %d" % total_ilvl
+	var avg: int = total_ilvl / 5
+	if avg >= 50:
+		total_ilvl_label.modulate = Color.PURPLE
+	elif avg >= 35:
+		total_ilvl_label.modulate = Color.BLUE
+	elif avg >= 15:
+		total_ilvl_label.modulate = Color.GREEN
+	else:
+		total_ilvl_label.modulate = Color.WHITE
 
-		if item:
-			# Objet équipé
-			slot_data.label.text = "%s (iLvl %d)" % [item.name, item.ilvl]
-			slot_data.label.modulate = item.get_rarity_color()
-			var stat_summary: String = item.get_stat_summary()
-			if stat_summary == "":
-				slot_data.stats_label.text = "Statistiques : —"
-				slot_data.stats_label.modulate = Color(0.8, 0.8, 0.8)
-			else:
-				slot_data.stats_label.text = stat_summary
-				slot_data.stats_label.modulate = Color(0.95, 0.95, 0.95)
+	var stats: Dictionary = current_member.get_equipment_stats()
+	total_stats_label.text = "Stats: FOR %d / AGI %d / INT %d" % [
+		stats.get("strength", 0), stats.get("agility", 0), stats.get("intelligence", 0)
+	]
 
-			# Afficher les deltas de stats (comparaison avec 0 = slot vide)
-			var delta_parts: Array[String] = []
-			if item.strength != 0:
-				var color_tag: String = "green" if item.strength > 0 else "red"
-				delta_parts.append("[color=%s]%+d FOR[/color]" % [color_tag, item.strength])
-			if item.agility != 0:
-				var color_tag: String = "green" if item.agility > 0 else "red"
-				delta_parts.append("[color=%s]%+d AGI[/color]" % [color_tag, item.agility])
-			if item.intelligence != 0:
-				var color_tag: String = "green" if item.intelligence > 0 else "red"
-				delta_parts.append("[color=%s]%+d INT[/color]" % [color_tag, item.intelligence])
+	_refresh_bank()
 
-			if delta_parts.size() > 0:
-				slot_data.delta_label.text = "  ".join(delta_parts)
-			else:
-				slot_data.delta_label.text = ""
+func _refresh_bank() -> void:
+	for child in bank_container.get_children():
+		child.queue_free()
+	var bank: Array = []
+	if GuildManager and GuildManager.guild:
+		bank = GuildManager.guild.get_bank_items()
+	if bank.is_empty():
+		var empty := _mk_label("(banque vide — le loot non équipé arrive ici)", 12)
+		empty.modulate = Color(0.55, 0.57, 0.62)
+		bank_container.add_child(empty)
+		return
+	for it in bank:
+		var cell := EquipDragCellScript.new()
+		cell.configure("bank_item", -1, it, self)
+		bank_container.add_child(cell)
 
-			# Style fond selon la rarete
-			var style: StyleBoxFlat = StyleBoxFlat.new()
-			var bg_color: Color = item.get_rarity_color()
-			bg_color.a = 0.15
-			style.bg_color = bg_color
-			style.border_color = item.get_rarity_color()
-			style.border_color.a = 0.6
-			style.set_border_width_all(1)
-			style.set_corner_radius_all(3)
-			style.content_margin_left = 8
-			style.content_margin_right = 8
-			style.content_margin_top = 4
-			style.content_margin_bottom = 4
-			slot_data.panel.add_theme_stylebox_override("panel", style)
-		else:
-			# Slot vide
-			slot_data.label.text = "Aucun objet équipé"
-			slot_data.label.modulate = Color(0.6, 0.6, 0.6)
-			slot_data.stats_label.text = "Statistiques : —"
-			slot_data.stats_label.modulate = Color(0.65, 0.65, 0.65)
-			slot_data.delta_label.text = ""
+# ==================== CALLBACKS DU DRAG & DROP ====================
 
-			# Réinitialiser le style
-			slot_data.panel.remove_theme_stylebox_override("panel")
+func _on_equip_dropped(item) -> void:
+	if item and current_member and GuildManager:
+		GuildManager.equip_from_bank(current_member, item)
+		_refresh()
+
+func _on_unequip_dropped(slot: int) -> void:
+	if slot >= 0 and current_member and GuildManager:
+		GuildManager.unequip_to_bank(current_member, slot)
+		_refresh()
+
+# ==================== DÉPLACEMENT / FERMETURE ====================
+
+func _on_header_drag(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
+
+func _on_close_pressed() -> void:
+	queue_free()
+
+func _center() -> void:
+	var vp: Vector2 = get_viewport_rect().size
+	position = (vp - custom_minimum_size) * 0.5
+	position.y = maxf(20.0, position.y)

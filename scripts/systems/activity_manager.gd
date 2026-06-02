@@ -25,23 +25,23 @@ var leveling_zones = {
 	"50-60": ["Cratère d'Un'Goro", "Gangrebois", "Steppes Ardentes", "Maleterres"]
 }
 
-func _ready():
+func _ready() -> void:
 	game_time = GameTime
 	if game_time:
 		# Se connecter au signal minute_changed pour une mise à jour plus granulaire
 		game_time.minute_changed.connect(_on_minute_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 
-func _on_minute_changed(_minute: int, _hour: int):
+func _on_minute_changed(_minute: int, _hour: int) -> void:
 	# Mettre à jour les activités toutes les 5 minutes pour un bon équilibre performance/réalisme
 	if _minute % 5 == 0:
 		_update_all_activities()
 
-func _on_hour_changed(_hour: int):
+func _on_hour_changed(_hour: int) -> void:
 	# Garder une mise à jour horaire pour la rétrocompatibilité
 	pass
 
-func start_activity(player, activity_type, params: Dictionary = {}):
+func start_activity(player, activity_type, params: Dictionary = {}) -> void:
 	if active_activities.has(player):
 		interrupt_activity(player, "Nouvelle activité démarrée")
 	
@@ -63,6 +63,20 @@ func start_activity(player, activity_type, params: Dictionary = {}):
 			activity.name = params.get("name", "Duel amical devant Orgrimmar")
 			activity.participants = params.get("participants", [])
 			activity.set_meta("planned_duration", randi_range(15, 45))  # 15-45 minutes
+		
+		ActivityScript.ActivityType.DUNGEON:
+			activity.location = params.get(
+				"location",
+				_get_instance_activity_location(player, DungeonDataScript.InstanceType.DUNGEON)
+			)
+			activity.set_meta("planned_duration", randi_range(45, 120))
+		
+		ActivityScript.ActivityType.RAID:
+			activity.location = params.get(
+				"location",
+				_get_instance_activity_location(player, DungeonDataScript.InstanceType.RAID)
+			)
+			activity.set_meta("planned_duration", randi_range(90, 180))
 	
 	activity.start_time = {
 		"hour": game_time.current_hour,
@@ -77,7 +91,7 @@ func start_activity(player, activity_type, params: Dictionary = {}):
 	
 	activity_started.emit(player, activity)
 
-func interrupt_activity(player, reason: String = "Interruption"):
+func interrupt_activity(player, reason: String = "Interruption") -> void:
 	if not active_activities.has(player):
 		return
 		
@@ -87,7 +101,7 @@ func interrupt_activity(player, reason: String = "Interruption"):
 	
 	activity_interrupted.emit(player, activity, reason)
 
-func _update_all_activities():
+func _update_all_activities() -> void:
 	# Mise à jour par batch pour optimiser les performances
 	var players_to_update = active_activities.keys()
 	var batch_size = 10  # Traiter 10 joueurs à la fois
@@ -97,7 +111,7 @@ func _update_all_activities():
 		for j in range(i, batch_end):
 			_update_player_activity(players_to_update[j])
 
-func _update_player_activity(player):
+func _update_player_activity(player) -> void:
 	if not active_activities.has(player):
 		return
 		
@@ -112,7 +126,8 @@ func _update_player_activity(player):
 	var time_factor = 5.0 / 60.0  # 5 minutes sur 60
 	
 	# Applique les effets de l'activité proportionnellement au temps écoulé
-	player.energy = max(0, player.energy - (activity.energy_cost_per_hour * time_factor))
+	# clamp [0,100] : certaines activités (repos/offline) ont un coût négatif (restaurent l'énergie)
+	player.energy = clampf(player.energy - (activity.energy_cost_per_hour * time_factor), 0.0, 100.0)
 	player.mood = clamp(player.mood + (activity.mood_change_per_hour * time_factor), 0, 100)
 	player.update_integration(activity.integration_gain_per_hour * time_factor)
 	
@@ -177,7 +192,7 @@ func _decide_next_activity(player):
 		return
 	
 	# Obtenir le système de comportement
-	var behavior_system = get_node_or_null("/root/GuildManager/BehaviorSystem")
+	var behavior_system = (GuildManager.behavior_system if GuildManager else null)
 	
 	if player.energy < 20:
 		# Trop fatigué, se déconnecte
@@ -245,10 +260,10 @@ func _decide_next_activity(player):
 						start_activity(player, ActivityScript.ActivityType.LEVELING)
 					"FARMING":
 						start_activity(player, ActivityScript.ActivityType.FARMING)
-					"DUNGEON", "RAID":
-						# Pour l'instant, on fait du farming si donjon/raid sélectionné
-						# (nécessite un groupe pour vraiment faire un donjon/raid)
-						start_activity(player, ActivityScript.ActivityType.FARMING)
+					"DUNGEON":
+						start_activity(player, ActivityScript.ActivityType.DUNGEON)
+					"RAID":
+						start_activity(player, ActivityScript.ActivityType.RAID)
 				
 				# Mettre à jour les préférences selon l'expérience
 				if behavior_system:
@@ -282,6 +297,19 @@ func _get_farming_location(level: int) -> String:
 		return ["Tanaris", "Féralas", "Azshara"].pick_random()
 	else:
 		return ["Maleterres de l'Ouest", "Maleterres de l'Est", "Berceau-de-l'Hiver"].pick_random()
+
+func _get_instance_activity_location(player, instance_type: int) -> String:
+	var level: int = player.personnage_niveau if player else 60
+	var instances: Array = DungeonDataScript.get_instances_for_level(level, instance_type, true)
+	if not instances.is_empty():
+		var picked: Dictionary = instances.pick_random()
+		return picked.get("data", {}).get("name", "Instance inconnue")
+	
+	match instance_type:
+		DungeonDataScript.InstanceType.RAID:
+			return "Préparation raid"
+		_:
+			return "Recherche de groupe donjon"
 
 func _calculate_xp_per_hour(level: int) -> int:
 	# XP/heure avec courbe plus réaliste
@@ -344,7 +372,7 @@ func complete_activity(player) -> void:
 		active_activities.erase(player)
 		
 		# Évaluer l'expérience et mettre à jour les préférences
-		var behavior_system = get_node_or_null("/root/GuildManager/BehaviorSystem")
+		var behavior_system = (GuildManager.behavior_system if GuildManager else null)
 		if behavior_system and player.has_meta("last_activity_choice"):
 			var activity_type = player.get_meta("last_activity_choice")
 			var experience_quality = _evaluate_activity_experience(player, activity)
@@ -362,7 +390,7 @@ func start_dungeon(dungeon_id: String, group_members: Array):
 		if active_activities.has(member):
 			var current_activity = active_activities[member]
 			if current_activity.type == ActivityScript.ActivityType.DUNGEON:
-				print("Erreur: %s est déjà en donjon" % member.nom)
+				GameLog.d("Erreur: %s est déjà en donjon" % member.nom)
 				return null
 	
 	# Créer l'instance de donjon
@@ -415,7 +443,7 @@ func update_dungeons(delta: float) -> void:
 		if dungeon.is_active:
 			dungeon.update(delta, game_time)
 
-func _update_player_controlled_activity(player):
+func _update_player_controlled_activity(player) -> void:
 	"""Met à jour l'activité d'un joueur contrôlé manuellement"""
 	if not active_activities.has(player):
 		return

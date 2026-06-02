@@ -9,6 +9,7 @@ const DIM := Color(0.62, 0.65, 0.71)
 const GOLD := Color(1.0, 0.82, 0.30)
 
 var advanced_tabs: AdvancedTabs
+var _drag_active: bool = false
 
 var _celebrity_box: VBoxContainer
 var _media_box: VBoxContainer
@@ -46,6 +47,10 @@ func _setup_header(parent: VBoxContainer) -> void:
 	var title := Label.new()
 	title.text = "Scène Nationale"
 	title.add_theme_font_size_override("font_size", 20)
+	title.mouse_filter = Control.MOUSE_FILTER_STOP
+	title.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title.gui_input.connect(_on_header_drag)
 	header.add_child(title)
 
 	var phase_label := Label.new()
@@ -67,6 +72,13 @@ func _setup_header(parent: VBoxContainer) -> void:
 	close_btn.custom_minimum_size = Vector2(34, 30)
 	close_btn.pressed.connect(func(): hide())
 	header.add_child(close_btn)
+
+func _on_header_drag(event: InputEvent) -> void:
+	"""Permet de déplacer la fenêtre en glissant sur la barre de titre."""
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
 
 func _add_scroll_tab(tab_title: String) -> VBoxContainer:
 	"""Crée un onglet scrollable et retourne le VBox de contenu."""

@@ -26,9 +26,10 @@ static var PERKS = {
 	},
 	5: {
 		"name": "Extension de la guilde",
-		"description": "Permet d'accueillir plus de membres (limite portée à 20)",
+		"description": "Permet d'accueillir plus de membres (limite portée à 20) et agrandit la trésorerie",
 		"effects": {
-			"max_members": 20
+			"max_members": 20,
+			"gold_storage": 9000
 		}
 	},
 	6: {
@@ -47,9 +48,10 @@ static var PERKS = {
 	},
 	8: {
 		"name": "Site web de guilde",
-		"description": "Augmente la visibilité (+2 candidats dans le pool de recrutement)",
+		"description": "Augmente la visibilité (+2 candidats dans le pool de recrutement) et la trésorerie",
 		"effects": {
-			"recruitment_pool_bonus": 2
+			"recruitment_pool_bonus": 2,
+			"gold_storage": 40000
 		}
 	},
 	9: {
@@ -61,10 +63,11 @@ static var PERKS = {
 	},
 	10: {
 		"name": "Réputation de serveur",
-		"description": "Attire les meilleurs joueurs (+20% qualité du pool de recrutement) et améliore la planification",
+		"description": "Attire les meilleurs joueurs (+20% qualité du pool de recrutement), améliore la planification et débloque une grande trésorerie",
 		"effects": {
 			"recruitment_quality_bonus": 0.2,
-			"availability_bonus": 0.15
+			"availability_bonus": 0.15,
+			"gold_storage": 200000
 		}
 	}
 }

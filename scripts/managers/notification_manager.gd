@@ -76,7 +76,7 @@ func _connect_to_game_events():
 	"""Connecte aux événements du jeu pour afficher automatiquement des notifications"""
 	
 	# Connexion au PhaseManager pour les changements de phase
-	var phase_manager = get_node_or_null("/root/PhaseManager")
+	var phase_manager = PhaseManager
 	if phase_manager:
 		if phase_manager.has_signal("phase_changed"):
 			phase_manager.phase_changed.connect(_on_phase_changed)
@@ -84,7 +84,7 @@ func _connect_to_game_events():
 			phase_manager.progression_updated.connect(_on_progression_updated)
 	
 	# Connexion au GuildManager pour les événements de guilde
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if guild_manager:
 		if guild_manager.has_signal("member_recruited"):
 			guild_manager.member_recruited.connect(_on_member_recruited)
@@ -98,7 +98,7 @@ func _connect_to_game_events():
 			guild_manager.member_disconnected.connect(_on_member_disconnected)
 	
 	# Connexion à l'ActivityManager pour les activités
-	var activity_manager = get_node_or_null("/root/ActivityManager")
+	var activity_manager = ActivityManager
 	if activity_manager:
 		if activity_manager.has_signal("activity_completed"):
 			activity_manager.activity_completed.connect(_on_activity_completed)
@@ -108,13 +108,13 @@ func _connect_to_game_events():
 			activity_manager.dungeon_ended.connect(_on_dungeon_ended)
 	
 	# Connexion au RecruitmentPool pour les événements de recrutement
-	var recruitment_pool = get_node_or_null("/root/RecruitmentPool")
+	var recruitment_pool = RecruitmentPool
 	if recruitment_pool:
 		if recruitment_pool.has_signal("pool_updated"):
 			recruitment_pool.pool_updated.connect(_on_recruitment_pool_updated)
 	
 	# Connexion à l'EventManager pour les événements aléatoires
-	var event_manager = get_node_or_null("/root/EventManager")
+	var event_manager = EventManager
 	if event_manager:
 		if event_manager.has_signal("event_triggered"):
 			event_manager.event_triggered.connect(_on_random_event_triggered)
@@ -336,40 +336,39 @@ func _remove_notification(notification_instance: Dictionary):
 	
 	if notification_instance not in active_notifications:
 		return
-	
+
 	var toast = notification_instance.toast
-	var index = active_notifications.find(notification_instance)
-	
-	# Animation de sortie
+	# Retirer immédiatement de la liste active : évite qu'un autre repositionnement
+	# accède à ce toast pendant son animation de sortie (accès après libération).
+	active_notifications.erase(notification_instance)
+
+	if not is_instance_valid(toast):
+		_reposition_notifications()
+		_process_notification_queue()
+		notification_dismissed.emit(notification_instance.data)
+		return
+
+	# Animation de sortie puis libération
 	_animate_notification_out(toast, func():
-		# Supprimer de la liste
-		active_notifications.erase(notification_instance)
-		
-		# Supprimer l'élément visuel
 		if is_instance_valid(toast):
 			toast.queue_free()
-		
-		# Repositionner les notifications restantes
 		_reposition_notifications()
-		
-		# Afficher une notification de la queue si disponible
 		_process_notification_queue()
-		
-		# Émettre le signal
 		notification_dismissed.emit(notification_instance.data)
 	)
 
 func _reposition_notifications():
-	"""Repositionne toutes les notifications actives"""
+	"""Repositionne toutes les notifications actives (en ignorant les toasts libérés)."""
+	# Purge défensive : retire les notifications dont le toast a déjà été libéré
+	active_notifications = active_notifications.filter(func(n): return is_instance_valid(n.toast))
 	for i in range(active_notifications.size()):
-		var notif = active_notifications[i]
+		var toast = active_notifications[i].toast
 		var target_pos = Vector2(
-			notif.toast.position.x,
+			toast.position.x,
 			NOTIFICATION_MARGIN_TOP + i * (NOTIFICATION_HEIGHT + VERTICAL_SPACING)
 		)
-		
 		var tween = create_tween()
-		tween.tween_property(notif.toast, "position", target_pos, ANIMATION_DURATION * 0.5).set_ease(Tween.EASE_OUT)
+		tween.tween_property(toast, "position", target_pos, ANIMATION_DURATION * 0.5).set_ease(Tween.EASE_OUT)
 
 func _process_notification_queue():
 	"""Traite la queue de notifications en attente"""
@@ -455,15 +454,19 @@ func _on_dungeon_started(dungeon_instance):
 	var group_names = []
 	for member in dungeon_instance.group_members:
 		group_names.append(member.nom)
-	show_info("Donjon %s démarré avec : %s" % [dungeon_instance.instance_data.name, ", ".join(group_names)], "Donjon démarré")
+	# DungeonInstance expose dungeon_data (Dictionary), pas instance_data
+	show_info("Donjon %s démarré avec : %s" % [dungeon_instance.dungeon_data.get("name", "Donjon"), ", ".join(group_names)], "Donjon démarré")
 
 func _on_dungeon_ended(dungeon_instance):
 	"""Quand un donjon se termine"""
-	var success = dungeon_instance.defeated_bosses.size() == dungeon_instance.instance_data.bosses.size()
+	var total: int = dungeon_instance.dungeon_data.get("bosses", []).size()
+	var defeated: int = dungeon_instance.current_boss_index
+	var dname: String = dungeon_instance.dungeon_data.get("name", "Donjon")
+	var success: bool = total > 0 and defeated >= total
 	if success:
-		show_success("Donjon %s terminé avec succès !" % dungeon_instance.instance_data.name, "Victoire!")
+		show_success("Donjon %s terminé avec succès !" % dname, "Victoire!")
 	else:
-		show_warning("Donjon %s échoué (%d/%d boss vaincus)" % [dungeon_instance.instance_data.name, dungeon_instance.defeated_bosses.size(), dungeon_instance.instance_data.bosses.size()], "Défaite")
+		show_warning("Donjon %s échoué (%d/%d boss vaincus)" % [dname, defeated, total], "Défaite")
 
 func _on_recruitment_pool_updated(_pool):
 	"""Quand le pool de recrutement est mis à jour"""

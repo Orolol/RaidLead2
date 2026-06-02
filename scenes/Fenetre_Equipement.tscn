@@ -2,8 +2,5 @@
 
 [ext_resource type="Script" path="res://scripts/ui/windows/fenetre_equipement.gd" id="1_equipment"]
 
-[node name="root" type="AcceptDialog"]
-title = "Équipement de "
-initial_position = 2
-size = Vector2i(500, 400)
+[node name="root" type="PanelContainer"]
 script = ExtResource("1_equipment")

@@ -21,6 +21,9 @@ func _ready() -> void:
 		GameTime.week_changed.connect(_on_week_changed)
 
 func _on_week_changed(_week: int, _year: int) -> void:
+	# Les médias/célébrité ne s'activent qu'à partir de la phase Nationale.
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.NATIONAL:
+		return
 	_update_celebrity()
 	_update_streamers()
 	_check_media_events()
@@ -68,11 +71,13 @@ func _update_streamers() -> void:
 					member.set_meta("audience_size", randi_range(100, 1000))
 					streamer_started.emit(member.nom)
 		else:
-			# Croissance/decroissance audience
+			# Croissance/decroissance audience — PLAFONNÉE par la célébrité pour éviter
+			# une boucle audience↔célébrité→revenus non bornée.
 			var audience: int = member.get_meta("audience_size")
 			if member.is_online:
-				audience += randi_range(0, AUDIENCE_GROWTH_RATE)
-				audience += int(celebrity * 10)  # celebrity boost
+				var growth: int = randi_range(0, AUDIENCE_GROWTH_RATE) + int(celebrity * 10)
+				var max_audience: int = 2000 + int(celebrity * 800)  # plafond fonction de la célébrité
+				audience = mini(audience + growth, max_audience)
 			else:
 				audience = maxi(0, audience - AUDIENCE_DECAY_RATE)
 			member.set_meta("audience_size", audience)

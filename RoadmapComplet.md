@@ -3,7 +3,7 @@
 
 ## Vue d'ensemble du projet
 
-**RaidLead** est un jeu de gestion de guilde MMORPG développé avec **Godot Engine 4.5** et **GDScript**. Le joueur manage une guilde d'élite à travers 4 phases de progression : Leveling (0) → Serveur (1) → National (2) → Esport (3).
+**RaidLead** est un jeu de gestion de guilde MMORPG développé avec **Godot Engine 4.6.2** et **GDScript**. Le joueur manage une guilde d'élite à travers 4 phases de progression : Leveling (0) → Serveur (1) → National (2) → Esport (3).
 
 ### État actuel
 - ✅ **Phase active** : Phase 0 "Leveling" 
@@ -406,118 +406,146 @@
 - ✅ **Scouting** : bouton « Scouter » révèle traits cachés + skill réel (coût -2 réputation, `scout_player`)
 - ✅ **Bonus** : fix d'un bug pré-existant `notification_manager._on_phase_changed` (`.name` sur un int) qui plantait à chaque changement de phase
 
-## 3. Milestone 4 : Phase 3 - Niveau Esport (0%)
+## 3. Milestone 4 : Phase 3 - Niveau Esport (100% ✅)
 **Temps estimé : 7-10 jours**
 
-### US 4.1 : Système de Staff Professionnel
-- 📋 **StaffMember** : nouvelle classe de ressource
-- 📋 **Rôles** : coach stratégique, analyste, psychologue, manager
-- 📋 **Compétences** : impact moral, stratégie, performance
-- 📋 **Salaires** : budgets dédiés staff
-- 📋 **Synergies** : interactions entre types de staff
+> **MàJ 30 mai 2026** — Phase Esport implémentée et validée dans l'éditeur Godot 4.6 (MCP).
+> - ✅ **4 nouveaux autoloads** : `StaffManager`, `TournamentManager`, `TransferManager`, `LegacyManager`.
+> - ✅ **2 nouvelles resources** : `StaffMember` (rôles + bonus), `Tournament` (types + brackets).
+> - ✅ **Fenêtre `Esport`** (`Fenetre_Esport.tscn`, 6 onglets) + bouton menu + raccourci **Ctrl+E**.
+> - ✅ **PhaseManager** : objectifs de maîtrise branchés sur de vraies valeurs (`world_championship_wins`, `professional_staff_count`, `international_reputation`, `team_stability`) + helper public `get_requirements_progress()`.
+> - ✅ **Sauvegarde/chargement** des 4 systèmes + `stress_level` et métadonnées internationales des membres.
+> - ✅ **Validation runtime** : boucle tournoi → récompenses → legacy → notifications → stress vérifiée bout-en-bout, sans erreur.
 
-### US 4.2 : Système de Tournois Internationaux
-- 📋 **TournamentManager** : nouveau système
-- 📋 **Types** : World Championship, Regional Qualifiers, Invitationals
-- 📋 **Format** : phases, brackets, prize pools
-- 📋 **Préparation** : bootcamps, stratégies spéciales
-- 📋 **Récompenses** : prestige et financières significatives
+### US 4.1 : Système de Staff Professionnel ✅
+- ✅ **StaffMember** : resource avec rôle, skill (1-100), salaire, bonus par rôle
+- ✅ **Rôles** : coach stratégique (perf/stratégie), analyste (stratégie), psychologue (relief stress/moral), manager (stabilité/efficacité salariale)
+- ✅ **Compétences** : bonus mis à l'échelle par le skill, agrégés dans `StaffManager`
+- ✅ **Salaires** : frais d'embauche + masse salariale hebdo prélevée sur l'or (départ possible si impayé)
+- ✅ **Synergies** : +5% par rôle distinct présent (max +15%)
 
-### US 4.3 : Gestion du Burnout et Pression
-- 📋 **Propriétés** : `stress_level`, `burnout_risk` pour SimulatedPlayer
-- 📋 **Facteurs** : charge entraînement, pression médiatique, attentes
-- 📋 **Prévention** : rotation, vacances, support psychologique
-- 📋 **Conséquences** : performances dégradées, risque départ
-- 📋 **Staff spécialisé** : gestion bien-être
+### US 4.2 : Système de Tournois Internationaux ✅
+- ✅ **TournamentManager** : pool d'offres rafraîchi, autoload
+- ✅ **Types** : World Championship, Regional Qualifiers, Invitationals (difficulté/prix/prestige différenciés)
+- ✅ **Format** : simulation de bracket (force roster + staff − stress), tours successifs plus difficiles
+- ✅ **Préparation** : bootcamp (coût or, +perf prochain tournoi, +stress équipe)
+- ✅ **Récompenses** : or + prestige (réputation internationale), titres mondiaux comptabilisés
 
-### US 4.4 : Système de Transferts Internationaux
-- 📋 **Pool mondial** : joueurs de tous continents
-- 📋 **Complexités** : visas, adaptation culturelle, barrières linguistiques
-- 📋 **Agents professionnels** : négociations poussées
-- 📋 **Fenêtres transfert** : périodes limitées
-- 📋 **Fair-play financier** : salary cap
+### US 4.3 : Gestion du Burnout et Pression ✅
+- ✅ **Propriétés** : `stress_level` (0-100) + `get_burnout_risk()` sur SimulatedPlayer (combiné à la fatigue existante)
+- ✅ **Facteurs** : tournois, bootcamps, wipes ajoutent du stress ; pression de base hebdo en phase Esport
+- ✅ **Prévention** : action « repos de l'équipe » (cooldown) + psychologue (relief hebdo)
+- ✅ **Conséquences** : `get_esport_performance_factor()` (malus en compétition), baisse de moral, alimente la fatigue/burnout
+- ✅ **Staff spécialisé** : `StaffManager._process_wellbeing()` orchestre le bien-être hebdomadaire
 
-### US 4.5 : Système de Legacy et Recognition
-- 📋 **Hall of Fame** : achievements exceptionnels
-- 📋 **Stratégies innovantes** : copiées par autres guildes
-- 📋 **Mentoring** : formation prochaine génération
-- 📋 **Impact meta-game** : influence sur évolution du jeu
-- 📋 **Unlocks permanents** : cosmétiques, titres
+### US 4.4 : Système de Transferts Internationaux ✅
+- ✅ **Pool mondial** : joueurs d'élite (skill 78-98, niveau 60) par régions
+- ✅ **Complexités** : adaptation culturelle (malus moral/intégration temporaire à l'arrivée)
+- ✅ **Agents professionnels** : négociation (offre / contre-proposition / refus), commission d'agent
+- ✅ **Fenêtres transfert** : 2 périodes/an (semaines 1-4 et 26-29) ; recrutement bloqué hors fenêtre
+- ✅ **Prime de transfert** : 4 semaines de salaire + commission (sink d'or)
+- 📋 **Fair-play financier** (salary cap) : non implémenté (option d'équilibrage future)
 
-## 4. Milestone 5 : Mécaniques Transversales (0%)
+### US 4.5 : Système de Legacy et Recognition ✅
+- ✅ **Hall of Fame** : entrées d'accomplissements (titres de tournois, accession à l'esport) avec points et date
+- ✅ **Titres permanents** : déblocage par paliers de points de legacy (Espoir → Immortel) + titre « Champion du Monde »
+- ✅ **Notifications** : toasts achievement + messages chat à chaque accomplissement
+- 📋 **Stratégies innovantes / Mentoring / Impact meta-game** : non implémentés (extensions futures, recoupent Milestone 5)
+
+## 4. Milestone 5 : Mécaniques Transversales (100% ✅)
 **Temps estimé : 5-7 jours**
 
-### US 5.1 : Système de Dynamiques de Groupe
-- 📋 **GroupDynamics** : nouveau système
-- 📋 **Cliques** : formation sous-groupes dans guilde
-- 📋 **Leaders naturels** : influence sur autres membres
-- 📋 **Conflits personnalité** : basés sur tags incompatibles
-- 📋 **Relations individuelles** : amitié, rivalité, indifférence
+> **MàJ 30 mai 2026** — Implémenté et validé dans l'éditeur Godot 4.6 (MCP).
+> - ✅ **Réveil du système social dormant** : `SocialDynamics` (relations/cliques/conflits) existait mais n'était jamais alimenté ; `GuildCultureManager` forme désormais les relations chaque semaine via les profils comportementaux. Vérifié en jeu : amitiés, rivalités, mentorats et cliques se forment.
+> - ✅ **Nouvel autoload** `GuildCultureManager` (1 fichier, catalogues statiques — pas de nouvelle resource).
+> - ✅ **Fenêtre `Cohésion`** (`Fenetre_Social.tscn`, 6 onglets) + bouton menu + raccourci **Ctrl+K**.
+> - ✅ **Sauvegarde** du moral et des traditions établies.
+> - ✅ **Validation runtime** : team-building (moral +10, coût or, cooldown), médiation d'une rivalité (tension résolue), affichage relations/cliques — tout vérifié par screenshots.
 
-### US 5.2 : Moral Collectif et Ambiance
-- 📋 **guild_morale** : métrique globale
-- 📋 **Contagion émotionnelle** : propagation états d'esprit
-- 📋 **Événements ambiance** : célébrations, défaites, crises
-- 📋 **Actions amélioration** : team building, récompenses
-- 📋 **Impact visible** : performances raid, cohésion
+### US 5.1 : Système de Dynamiques de Groupe ✅
+- ✅ **GroupDynamics** : `GuildCultureManager` pilote le `SocialDynamics` existant (auparavant inerte)
+- ✅ **Cliques** : formation, leader (plus haute influence), cohésion, affichées dans l'onglet Cliques
+- ✅ **Leaders naturels** : influence sociale calculée, leader de clique désigné
+- ✅ **Conflits personnalité** : relations formées selon compatibilité des profils comportementaux
+- ✅ **Relations individuelles** : amitié, rivalité, mentor/élève, inimitié (affichées par membre)
 
-### US 5.3 : Système d'Événements Team-Building  
-- 📋 **Types événements** : sorties virtuelles, challenges, célébrations
-- 📋 **Coût vs bénéfices** : temps et ressources vs cohésion
-- 📋 **Préférences individuelles** : selon personnalités
-- 📋 **Événements saisonniers** : liés aux succès
-- 📋 **Traditions guilde** : culture unique
+### US 5.2 : Moral Collectif et Ambiance ✅
+- ✅ **guild_morale** : métrique globale 0-100 (humeur moyenne + santé sociale + traditions)
+- ✅ **Contagion émotionnelle** : l'humeur dérive chaque semaine vers celle du cercle social (pondérée par la force des liens)
+- ✅ **Actions amélioration** : team-building, traditions
+- ✅ **Impact visible** : santé sociale (amitiés/rivalités/inimitiés) affichée, tiers d'ambiance
+- 📋 **Événements ambiance dédiés** : réutilisent le système d'événements existant (non étendu)
 
-### US 5.4 : Système de Rituels et Traditions
-- 📋 **Rituels pré-raid** : habitudes, porte-bonheur, discours
-- 📋 **Traditions célébration** : pour succès
-- 📋 **Codes internes** : références partagées
-- 📋 **Onboarding** : personnalisé nouveaux membres
-- 📋 **Évolution** : traditions dans le temps
+### US 5.3 : Système d'Événements Team-Building ✅
+- ✅ **Types événements** : soirée détente, challenge interne, sortie virtuelle, célébration
+- ✅ **Coût vs bénéfices** : or + énergie contre moral + humeur + cohésion + nouveaux liens
+- ✅ **Cooldown** : un seul événement à la fois, cooldown par activité
+- 📋 **Préférences individuelles / saisonniers** : non implémentés (extension future)
 
-### US 5.5 : Gestion Avancée des Conflits
-- 📋 **Détection précoce** : tensions (moral, interactions négatives)
-- 📋 **Options résolution** : médiation, sanctions, séparation
-- 📋 **Conflits leadership** : gestion autorité
-- 📋 **Impact décisions** : perception autres membres
-- 📋 **Formation** : gestion conflits via staff
+### US 5.4 : Système de Rituels et Traditions ✅
+- ✅ **Traditions** : discours d'avant-raid, célébration de victoire, mentorat, anniversaire
+- ✅ **Bonus passifs** : moral/cohésion hebdomadaires par tradition établie
+- ✅ **Conditions** : seuils de membres + coût en or (gating vérifié en jeu)
+- ✅ **Persistance** : traditions établies sauvegardées
 
-## 5. Milestone 6 : Polish et Équilibrage (0%)
+### US 5.5 : Gestion Avancée des Conflits ✅
+- ✅ **Détection** : tensions (rivalités/inimitiés) listées dans l'onglet Conflits
+- ✅ **Options résolution** : médiation (un membre ami des deux arbitre) + apaisement direct
+- ✅ **Déclenchement dynamique** : plus le moral est bas, plus des tensions éclatent
+- 📋 **Conflits leadership / formation staff** : non implémentés (recoupent Milestone 4 staff)
+
+## 5. Milestone 6 : Polish et Équilibrage (95% ✅)
 **Temps estimé : 3-5 jours**
 
-### US 6.1 : Système de Conseils et Tutoriels Adaptatifs
-- 📋 **IA conseil** : analyse état actuel + suggestions
-- 📋 **Tutoriels intégrés** : nouvelles mécaniques par phase
-- 📋 **Alertes prédictives** : risques à venir
-- 📋 **Aide désactivable** : pour joueurs expérimentés
+> **MàJ 30 mai 2026** — Polish complet : conseiller adaptatif, dashboard de stats, auto-sauvegarde, équilibrage adaptatif et tests automatisés. Validé en jeu (MCP) et en headless.
+> - ✅ **Nouvel autoload** `AdvisorManager` : analyse l'état réel de la guilde et produit des conseils priorisés (alerte/attention/astuce/opportunité).
+> - ✅ **Nouvel autoload** `BalanceManager` : difficulté réglable + catch-up (joueur à la traîne) + rubber-band (IA quand le joueur domine), branchés sur le recrutement et la progression PvE des IA.
+> - ✅ **Fenêtre `Conseils`** (`Fenetre_Conseils.tscn`, onglets Conseils / Statistiques / Équilibrage) + bouton menu + raccourci **Ctrl+A**.
+> - ✅ **Auto-sauvegarde** (changement de phase + toutes les 4 semaines) avec **backup** de la save précédente et **repli automatique** sur le backup si la sauvegarde principale est corrompue.
+> - ✅ **Tests automatisés** : harnais maison `res://tests/` (57 assertions, 100 % vertes) lançable en headless (`tests/run_tests.ps1`).
+> - ✅ **Validation runtime** : conseil contextuel par phase, dashboard live, équilibrage (catch-up/rubber-band), backup à la sauvegarde — vérifiés par screenshots et tests.
 
-### US 6.2 : Outils d'Analyse et Statistiques
-- 📋 **Dashboard métriques** : détaillées par membre/global
-- 📋 **Graphiques évolution** : performance, moral, progression
-- 📋 **Comparaisons** : moyennes phase, guildes similaires
-- 📋 **Projections** : basées sur tendances
-- 📋 **Export données** : analyse externe
+### US 6.1 : Système de Conseils et Tutoriels Adaptatifs ✅
+- ✅ **IA conseil** : `AdvisorManager` analyse trésorerie/salaires, burnout/stress, moral, tensions, recrutement, équipement et progression de phase → conseils priorisés par sévérité
+- ✅ **Conseils par phase** : guidage contextuel (ex. « compléter un donjon héroïque » en Phase 0, objectifs de maîtrise en Esport)
+- ✅ **Alertes prédictives** : l'alerte la plus critique est poussée en notification chaque semaine (anti-spam)
+- ✅ **Interface dédiée** : onglet Conseils avec pastilles de sévérité colorées
+- 📋 **Tutoriels intégrés pas-à-pas / aide désactivable** : non implémentés (extension future)
 
-### US 6.3 : Système de Sauvegarde de Progression
-- 📋 **Extension SaveLoadManager** : données phases
-- 📋 **Historique achievements** : milestones
-- 📋 **Continuité** : relations, réputation entre phases
-- 📋 **Backup automatique** : moments critiques
-- 📋 **Multiple saves** : expérimentation
+### US 6.2 : Outils d'Analyse et Statistiques ✅
+- ✅ **Dashboard métriques** : vue d'ensemble (phase, niveau, or, réputation, moral) + effectif (moyennes niveau/skill/intégration/moral/stress)
+- ✅ **Détail par membre** : table triée (niveau, skill, moral, énergie, stress, intégration) avec code couleur
+- 📋 **Graphiques d'évolution / projections / export** : non implémentés (extension future)
 
-### US 6.4 : Équilibrage de la Courbe de Difficulté
-- 📋 **Analyse playtest** : ajuster difficultés
-- 📋 **Scaling adaptatif** : basé sur performance joueur
-- 📋 **Catch-up** : joueurs en difficulté
-- 📋 **Défis optionnels** : joueurs avancés
-- 📋 **Feedback loops** : engagement optimal
+### US 6.3 : Système de Sauvegarde de Progression ✅
+- ✅ **Auto-sauvegarde** : aux moments critiques (changement de phase) + périodique (toutes les 4 semaines)
+- ✅ **Backup automatique** : la sauvegarde précédente est copiée avant écrasement
+- ✅ **Repli sur backup** : chargement automatique du backup si la save principale est illisible/corrompue
+- ✅ **Continuité inter-phases** : phases, relations, réputation déjà sauvegardées (SaveManager existant)
+- 📋 **Slots de sauvegarde multiples** : non implémentés (nécessite une UI de gestion des saves)
 
-### US 6.5 : Tests et Validation Finale
-- 📋 **Tests automatisés** : mécaniques principales
-- 📋 **Validation équilibrage** : différents styles
-- 📋 **Tests intégration** : tous systèmes
-- 📋 **Performance** : optimisation sessions longues
-- 📋 **Validation UX** : playtests externes
+### US 6.4 : Équilibrage de la Courbe de Difficulté ✅
+- ✅ **Difficulté réglable** : `BalanceManager` (autoload) avec 3 presets (Détendu / Normal / Difficile) modifiant catch-up, recrutement, progression IA et stipend hebdomadaire
+- ✅ **Scaling adaptatif / catch-up** : aide douce (or + soutien moral) quand le joueur décroche (rang, trésorerie, moral), proportionnelle à la galère et à la difficulté
+- ✅ **Rubber-band IA** : les guildes IA progressent plus vite (`AIGuild._simulate_pve_progression`) quand le joueur domine durablement le classement
+- ✅ **Bonus de recrutement** : `RecruitmentPool.attempt_recruitment` lit le multiplicateur catch-up (joueur uniquement)
+- ✅ **Interface** : onglet Équilibrage (sélecteur de difficulté + statut d'adaptation en direct) ; réglage sauvegardé
+- 📋 **Défis optionnels / analyse de playtest fine** : non implémentés (calibrage à affiner avec des données réelles)
+
+### US 6.5 : Tests et Validation Finale ✅
+- ✅ **Framework de tests automatisés** : harnais léger maison dans `res://tests/` (`test_framework.gd` + `run_tests.gd` + `TestRunner.tscn`), lançable en headless
+- ✅ **Suites** : GameTime, Item/Equipment, SimulatedPlayer (stress/burnout), BalanceManager, AdvisorManager, SaveManager (round-trip), AIGuild, PvE Progression, ActivityManager, PhaseManager — **57 assertions, 100 % vertes**
+- ✅ **Exécution CI-friendly** : `tests/run_tests.ps1` (détecte Godot, code de sortie 0/1) + `tests/README.md`
+- ✅ **Validation runtime via MCP** : chaque milestone validé en jeu (screenshots, scripts d'inspection)
+- ✅ **Playtest interne complet (MCP)** : parcours des 4 phases ; **5 bugs corrigés** dont 1 bloquant critique (voir ci-dessous)
+- 📋 **Playtests externes / optimisation perf sessions longues** : à faire (hors automatisation)
+
+> **Playtest 31 mai 2026 — bugs trouvés & corrigés**
+> - 🔴 **CRITIQUE (corrigé)** : récursion infinie figeant le jeu dès qu'une phase remplit ses objectifs (`check_phase_progression` → `phase_requirements_met` → `fenetre_personnage._on_requirements_met` → `_refresh_phase_progression` → `check_phase_progression`). **Bloquait toute progression de phase.** Fix : la fenêtre lit `get_requirements_progress()` (sans effet de bord).
+> - 🟠 **Donjons héroïques inatteignables (corrigé)** : `get_instance_data` ne résolvait pas les ids `_heroic`, l'UI ne les listait pas, et `DungeonInstance` ne déclenchait pas `complete_heroic_dungeon`. La Phase 0→1 était donc impossible en jeu normal. Fix en 3 points.
+> - 🟠 **Énergie qui explose (corrigé)** : les activités reposantes ajoutaient de l'énergie sans plafond (978, 1009…). Fix : `clampf(0,100)`.
+> - 🟡 **Erreurs de notification de donjon (corrigées)** : `instance_data`/`defeated_bosses` (DungeonRun) lus sur un `DungeonInstance` ; signal `boss_defeated` émis avec 4 args pour 3 déclarés.
+> - **Observations (non corrigées, mineures/équilibrage)** : carte « Phase actuelle » de la fenêtre Personnage non rafraîchie au chargement ; connexions des membres concentrées en soirée (early-game peu peuplé) ; à haute vitesse les événements pausent le jeu en continu (slider de test) ; 99 guildes IA en phase Esport.
 
 ## 6. Améliorations Long Terme (priorité basse)
 
@@ -564,7 +592,7 @@
 ## Métriques de Progression (Révisé)
 
 ### État Actuel
-- **Global** : ~67% terminé *(+Milestone 3 National 100% (recrutement, salaires, progression Phase 2→3), thème UI global, fixes critiques)*
+- **Global** : ~92% terminé *(+Milestone 6 Polish 95% : conseiller adaptatif, dashboard de statistiques, auto-sauvegarde + backup, équilibrage adaptatif, tests automatisés ; validé dans Godot 4.6 et en headless)*
 - **Systèmes Core** : 100% ✅
 - **Phase 0** : 100% ✅  
 - **Milestone 1** : 100% ✅
@@ -573,13 +601,38 @@
 - **Infrastructure UI Phase 2** : 100% ✅ *(Phase 2 - Interactions)*
 - **Refactoring Architecture** : 100% ✅ *(WindowManager, GuildManager, autoloads, positions)*
 - **Système Save/Load** : 100% ✅ *(SaveManager autoload, JSON, F5 manual save)*
-- **Tooling Claude Code** : 100% ✅ *(Godot 4.5, MCP Pro, LSP, godot-docs)*
+- **Tooling Claude Code** : 100% ✅ *(Godot 4.6.2, MCP Pro, LSP, godot-docs)*
 - **Infrastructure UI Phase 3** : 0% 📋 *(Phase 3 - Polish)*
 - **Thème UI global** : 100% ✅ *(UITheme appliqué partout)*
 - **Milestone 3** : 100% ✅ *(National : célébrité, médias, sponsors, dramas, recrutement national + salaires, progression Phase 2→3 branchée)*
-- **Milestone 4** : 0% 📋
-- **Milestone 5** : 0% 📋
-- **Milestone 6** : 0% 📋
+- **Milestone 4** : 100% ✅ *(Esport : staff pro, tournois internationaux, burnout/stress, transferts internationaux, legacy/Hall of Fame)*
+- **Milestone 5** : 100% ✅ *(Transversales : dynamiques de groupe, moral collectif + contagion, team-building, traditions, gestion des conflits)*
+- **Milestone 6** : 95% ✅ *(Polish : conseiller adaptatif, dashboard de stats, auto-sauvegarde + backup, équilibrage adaptatif BalanceManager, harnais de tests automatisés ; calibrage fin et playtests externes restants)*
+
+### Statuts détaillés (Implémenté / Jouable / Validé)
+
+> Grille honnête demandée par l'audit (Priorité 6) pour éviter le faux confort du « 100 % ».
+> **Implémenté** = code présent et branché. **Jouable** = accessible et utile dans l'UI.
+> **Validé** = couvert par un test automatisé ou un scénario E2E.
+> *État au 1er juin 2026 — 98 assertions vertes (Godot 4.6.2 headless).*
+
+| Système | Implémenté | Jouable | Validé | Commentaire |
+|---|---|---|---|---|
+| Boucle de temps (GameTime) | Oui | Oui | Oui | jour absolu + calendrier testés |
+| Recrutement serveur | Oui | Oui | Oui | acceptation/refus + difficulté |
+| Recrutement national (salaires/agents) | Oui | Oui | Oui | commission d'agent prélevée **tous chemins** + solvabilité testées |
+| Progression PvE (clears/historique/meilleur clear) | Oui | Oui | Oui | suite PvE dédiée |
+| Composition de groupe + lancement de run | Oui | Oui | Partiel | logique de compo testée ; aperçu de run avec fatigue/stress |
+| Classement serveur | Oui | Oui | Partiel | branché sur clears réels + réputation |
+| Classement national / mondial | Oui | Partiel | Partiel | calcul branché, multiplicateurs de phase ; équilibrage à affiner |
+| Phases 0→1→2→3 | Oui | Oui | Partiel | 0→1 (héroïque) testé ; transitions supérieures non E2E |
+| Médias / Sponsors / Dramas (National) | Oui | Oui | Partiel | back-ends branchés ; peu de tests dédiés |
+| Staff / Tournois / Transferts / Legacy (Esport) | Oui | Oui | Partiel | boucle validée en éditeur ; tests unitaires partiels |
+| Cohésion / Culture (Milestone 5) | Oui | Oui | Partiel | relations/cliques/traditions ; sérialisation testée |
+| Conseiller + vue « Cette semaine » | Oui | Oui | Oui | conseils priorisés + synthèse hebdo testés (unit + smoke UI) |
+| Équilibrage adaptatif (BalanceManager) | Oui | Oui | Oui | presets + catch-up + rubber-band testés |
+| Sauvegarde + migration + backup | Oui | Oui | Oui | round-trip + migration v1→v2 + repli backup testés |
+| RNG déterministe (GameRandom.seed_rng) | Oui | — | Oui | séquence reproductible testée |
 
 ### Dépendances Critiques (Mises à jour)
 - ✅ Milestone 1 requis avant tous (FAIT)
@@ -606,6 +659,76 @@
 RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les **fondations sont excellentes** avec tous les systèmes core opérationnels, les 2 premières milestones complètes et **l'infrastructure UI moderne** implémentée.
 
 ## Accomplissements Récents ✅
+
+### Banque de guilde + drag&drop d'équipement (2 juin 2026)
+*171 assertions vertes + E2E drag&drop 5/5 (Godot 4.6.2). Dernier lot « reporté » de l'audit livré.*
+- ✅ **Banque de guilde** : `Guild.bank_items` devient une vraie banque d'`Item` (`add_to_bank`/`remove_from_bank`/`get_bank_items`, plafonnée à 60 avec trim par rareté/iLvl). Sérialisée dans `SaveManager` (rétrocompatible).
+- ✅ **Plus de loot perdu** : le loot non auto-équipé **et** les objets remplacés (swap) vont à la banque au lieu d'être jetés (`GuildManager.route_loot` branché dans `DungeonInstance` et la résolution de conflit). Seule la camelote commune est jetée.
+- ✅ **Fenêtre « Banque & Équipement »** réécrite (de l'`AcceptDialog` lecture-seule vers un `PanelContainer` thémé) : sélecteur de membre, 5 slots, banque scrollable. **Drag & drop natif Godot** (`_get_drag_data`/`_can_drop_data`/`_drop_data`) via un composant `EquipDragCell` : glisser un objet de la banque sur un slot l'équipe (l'ancien retourne en banque, validation du type de slot) ; glisser un objet équipé sur la banque le range. `GuildManager.equip_from_bank`/`unequip_to_bank` opèrent sur le modèle, signal `bank_changed` pour le rafraîchissement live.
+- ✅ **Validation** : suite `Banque & équipement` (modèle, swap, route_loot, round-trip de save) + `e2e_equipment.gd` (banque→slot→banque vérifié) + screenshot.
+
+### Reprise des améliorations de l'audit — santé/simulation/UI (2 juin 2026)
+*155 assertions vertes + 2 E2E (Godot 4.6.2). Lots « volontairement reportés » de l'audit repris.*
+- ✅ **Santé du code** : 38 `get_node("/root/X")` remplacés par les identifiants globaux d'autoload ; nouveau `GameLog` (debug gardé par `OS.is_debug_build()`) avec 132 `print()` de boucle migrés. `singletons.gd` laissé intact (résolveur dynamique).
+- ✅ **Profondeur de simulation** : connexion dynamique branchée — fatigue/burnout/humeur/amis en ligne influencent enfin la présence (`_connection_state_modifier` + déconnexion forcée sur épuisement) ; `PersonalEvents` routé via la vraie API (`should_trigger_event`/`get_event_for_player`, ~18 events au lieu de 3 ids en dur dont un inexistant), `player.has(...)` corrigé, effets (humeur/énergie/tous types) réellement appliqués, **temps bonus** (soirée libre/congé) consommé.
+- ✅ **UI — multi-fenêtres mort tranché** : mode **mono-fenêtre** assumé. Retrait du code mort/cassé (Alt+Tab `cycle_windows`, cascade/tuiles, minimisation/taskbar, layouts nommés, signaux et constantes orphelins). Bonus : la **mémorisation des positions** de fenêtres devient réellement persistée (écrite à la fermeture, relue au boot).
+- ✅ **UI — source unique de couleurs** : `UITheme` est la palette canonique ; `UIConstants` en dérive ses couleurs structurelles et `chat_panel.MESSAGE_COLORS` cesse d'être une 3e source (dérive de `UIConstants`). Rendu vérifié par screenshot (aucune régression).
+
+### Prompt d'oisiveté thémé + Donjon/Raid au choix joueur (2 juin 2026)
+*E2E dédiés : flow 8/8 + organisation 4/4, 145/145 assertions vertes (Godot 4.6.2).*
+- ✅ **(b) Prompt d'oisiveté thémé** : l'`AcceptDialog` brut est remplacé par un **overlay in-game** (CanvasLayer + fond assombri à 72 % + `PanelContainer` à bordure accent) qui hérite du thème global `UITheme`. Titre « Jeu en pause », énergie, boutons d'activité avec descriptions, séparateurs — rendu vérifié par screenshot.
+- ✅ **(a) Donjon/Raid comme choix joueur** : nouveau bouton « ⚔️ Donjon / Raid » dans le prompt **et** le panneau de contrôle. Il route vers la **vraie fenêtre d'organisation de groupe** (flow PvE existant : composition → `DungeonInstance`), présélectionnée sur le bon contenu via `Fenetre_OrganisationGroupe.preselect_activity()`. Pas de fausse activité solo : Donjon/Raid restent du contenu de groupe. Choisir « organiser » relance le temps (c'est un ordre donné).
+
+### Refonte de la gestion du personnage joueur (2 juin 2026)
+*Suite de tests : 131 → 145 assertions, 100 % vertes + E2E dédié 8/8 (Godot 4.6.2 headless).*
+- 🔴 **Bug corrigé — l'énergie ne baissait jamais** : le personnage joueur démarrait connecté **sans activité** (`current_activity == null`), or les deux chemins de drain faisaient un *early-return*. Désormais le drain a une **source unique** (tick 5 min de l'`ActivityManager`) — suppression du double-drain horaire dans `GuildManager._update_player_character`.
+- ✅ **Pause-si-oisif (style Football Manager)** : quand le joueur est connecté sans activité, `GameTime` se met en **pause** et un **prompt modal** demande un ordre (Leveling / Farming / Détente / Se reposer). Le temps repart automatiquement dès qu'une activité est choisie (via le prompt **ou** le panneau de contrôle). Déclenché aussi au démarrage de partie.
+- ✅ **Reprise auto après repos** : nouvelle propriété persistante `last_activity_choice` (conservée à la déconnexion) ; après un repos (forcé par épuisement **ou** volontaire), le joueur se **reconnecte et reprend automatiquement** sa dernière activité. Repos unifié et **instantané** (`GameTime.fast_forward_hours`) en remplacement du hack temps-réel à 2400x.
+- ✅ **UI temps réel** : nouveau signal `PlayerCharacter.player_state_changed` ; la jauge d'énergie du panneau et la fenêtre Personnage se rafraîchissent **à l'instant** (plus seulement par polling 3-5 s). La fenêtre Personnage affiche désormais l'**activité courante** (🎯 en cours / ⏸️ en attente / 😴 hors ligne).
+- ✅ **Robustesse** : bouton « Se reposer » fonctionnel (l'ancien était un TODO désactivé) ; fermeture du dialog de repos via la croix routée vers la confirmation (évite un gel du verrou de repos) ; nettoyage des `print()` de debug (gated `OS.is_debug_build()`).
+- ✅ **Persistance** : `last_activity_choice` sauvegardée/chargée (`SaveManager`). Nouveau test `e2e_player_flow.gd` (pause → choix → drain) + suite unitaire `PlayerCharacter (flow)`.
+
+### Implémentation de l'audit AuditAmeliorations.md (1er juin 2026)
+*Suite de tests : 57 → 101 assertions, 100 % vertes (Godot 4.6.2 headless).*
+- **Recrutement national (P5)** : la commission d'agent est désormais prélevée sur l'or dans **tous** les chemins d'acceptation (offre directe ET contre-proposition), avec contrôle de solvabilité, centralisé dans `RecruitmentPool._finalize_national_recruit()` (à l'image de `TransferManager`). UI mise à jour (message de signature + cas « inabordable »).
+- **RNG déterministe (P5)** : `GameRandom.seed_rng()/randomize_rng()/get_seed()/is_seeded()` ; en fixant le générateur global, **toute** la simulation devient reproductible (tests/E2E rejouables).
+- **Sources de vérité (P3)** : suppression du chemin de node mort `/root/root2` dans `EventManager` (la popup passe uniquement par le signal `event_triggered`) ; lookups autoload→autoload (`MediaManager`/`SponsorshipManager`) convertis en références globales ; E2E migrés vers `WindowManager.get_window_instance()`.
+- **Sauvegarde versionnée (P11)** : mécanisme de **migration** (`CURRENT_SAVE_VERSION=2`, registre de migrations séquentielles, garde « save plus récente que le build ») ; migration v1→v2 qui normalise les blocs systèmes manquants des anciennes saves.
+- **Façade d'équilibrage (P12)** : `BalanceManager.BALANCE` + `tunable()/tunable_float()` centralisent les nombres magiques (recrutement, salaires, réputation, PvE, poids de ranking) ; points d'appel clés routés sans changement de comportement.
+- **Conseiller « Cette semaine » (P9)** : `AdvisorManager.get_weekly_summary()` (membres à risque, objectifs accessibles, recrutement, contenu conseillé, activités) + nouvel onglet dans `Fenetre_Conseils`.
+- **Boucle PvE (P1)** : aperçu de run enrichi (énergie/stress moyens, alertes de fatigue/burnout, score ajusté, code couleur) dans `Fenetre_OrganisationGroupe`.
+- **Tests (P10)** : nouvelles suites PvE (composition, run reproductible, phase 0→1), calendrier (salaires, refresh), économie de recrutement, RNG, migration de save, smoke UI.
+- **Typage GDScript (P7)** : types de retour ajoutés aux 6 fichiers centraux (`main`, `guild_manager`, `recruitment_pool`, `activity_manager`, `phase_manager`, `guild_ranking`).
+- **Outillage** : `tests/CheckScripts.tscn` — validateur de syntaxe terminant (alternative à `--check-only` qui peut se suspendre sous Windows) ; docs mises à jour (grille Implémenté/Jouable/Validé, note Windows vs WSL).
+
+### Stabilisation technique (31 mai 2026)
+- **GameTime** : ajout d'un compteur de jours absolus (`get_total_days_elapsed`) pour fiabiliser les systèmes calendaires.
+- **RecruitmentPool** : refresh complet basé sur le jour absolu, corrigé autour des changements de semaine/année.
+- **AIGuildManager/GuildRanking** : suppression du double enregistrement initial des guildes IA.
+- **GuildRanking** : score de réputation branché sur la vraie réputation de la guilde joueur.
+- **WindowManager** : API publique `get_window_instance()` et `refresh_window()` pour éviter les appels externes à `_get_existing_instance()`.
+- **Debug UI** : menu Debug, raccourcis F1/F2 et bouton `Next Version` limités aux builds debug.
+- **Fenetre_Personnage** : onglet Progression stabilisé avec objectifs lisibles, largeur minimale, barre par objectif et scroll vertical.
+- **PhaseManager/Main** : notification de changement de phase relayée par `phase_changed` au lieu d'un chemin direct vers `ChatPanel`.
+- **Main/tests** : flag `--no-save-autoload` pour vérifier `Main.tscn` sans dépendre de la save locale.
+- **Scènes** : UID invalides nettoyés dans `Main.tscn` et `Fenetre_Personnage.tscn`.
+- **CustomProgressBar** : positionnement du label corrigé pour supprimer le warning d'ancrage au lancement.
+- **AIGuild** : restauration de save sans génération temporaire de guildes ni logs `Ma Guilde` parasites.
+- **PvE minimal** : clears joueur enregistrés depuis `DungeonInstance`, sauvegardés dans `GuildRanking`, utilisés par le ranking et `PhaseManager.content_cleared_percent`.
+- **ActivityManager** : préférences automatiques Donjon/Raid converties en activités PvE dédiées plutôt qu'en farming.
+- **Historique PvE** : `GuildRanking` expose l'historique des runs joueur et le meilleur clear connu par contenu.
+- **Fenetre_Personnage** : derniers runs PvE affichés dans l'onglet Progression.
+- **ChatPanel** : fin de donjon enrichie en mini rapport avec durée, boss, wipes et or.
+- **Fenetre_Personnage** : meilleur clear du dernier contenu PvE affiché depuis `GuildRanking.get_player_best_clear(content_id)`.
+- **DungeonInstance** : émission de `boss_defeated` corrigée pendant les conflits de loot pour respecter la signature du signal.
+- **Fenetre_OrganisationGroupe** : aperçu de run ajouté avec score estimé, rôles manquants et moyennes niveau/équipement/skill.
+- **DungeonData** : `calculate_difficulty_score()` protège maintenant les groupes vides.
+- **GuildRanking** : classements National et Mondial branchés sur le calcul existant avec multiplicateurs de phase.
+- **GuildRanking** : score d'activité protégé contre les guildes vides.
+- **Fenetre_Loot/Fenetre_Donjon** : rapport PvE dédié en fin de run avec score de performance, boss, wipes, participants et butin.
+- **PveRunReport** : calcul de score de performance partagé entre rapport, historique et tests.
+- **Fenetre_Personnage** : historique PvE enrichi avec score de performance persisté.
+- **Tests** : suite automatisée étendue à 98 assertions (PvE, calendrier, économie de recrutement, RNG déterministe, migration de save, smoke UI), validée avec Godot 4.6.2.
 
 ### Infrastructure UI Phases 1 & 2 (9 jours)
 - **NotificationManager** : Système toast professionnel avec 5 types et animations

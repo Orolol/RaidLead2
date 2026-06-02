@@ -37,6 +37,9 @@ func _ready() -> void:
 	_refresh_pool()
 
 func _on_week_changed(_week: int, _year: int) -> void:
+	# Les sponsors n'existent qu'à partir de la phase Nationale.
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.NATIONAL:
+		return
 	weeks_since_last_scandal += 1
 	weeks_since_refresh += 1
 
@@ -62,8 +65,8 @@ func _tick_active_sponsors() -> void:
 	var reputation: float = GuildManager.guild.reputation if GuildManager.guild else 50.0
 	var member_count: int = GuildManager.guild_members.size()
 	var total_audience: int = 0
-	if has_node("/root/MediaManager"):
-		total_audience = get_node("/root/MediaManager").get_total_audience()
+	if MediaManager:
+		total_audience = MediaManager.get_total_audience()
 
 	var expired: Array = []
 	for sponsor in active_sponsors:
@@ -76,7 +79,7 @@ func _tick_active_sponsors() -> void:
 			if sponsor.satisfaction <= 0.0:
 				# Perte reputation si sponsor mecontent
 				if GuildManager.guild:
-					GuildManager.guild.lose_reputation(10.0, "Sponsor %s mecontent" % sponsor.sponsor_name)
+					GuildManager.guild.lose_reputation(5.0, "Sponsor %s mecontent" % sponsor.sponsor_name)
 
 	for s in expired:
 		active_sponsors.erase(s)
@@ -104,8 +107,8 @@ func try_sign_sponsor(sponsor: Sponsor) -> bool:
 	var reputation: float = GuildManager.guild.reputation if GuildManager.guild else 50.0
 	var member_count: int = GuildManager.guild_members.size()
 	var total_audience: int = 0
-	if has_node("/root/MediaManager"):
-		total_audience = get_node("/root/MediaManager").get_total_audience()
+	if MediaManager:
+		total_audience = MediaManager.get_total_audience()
 
 	if not sponsor.check_requirements(reputation, member_count, total_audience, weeks_since_last_scandal):
 		return false

@@ -270,6 +270,11 @@ static func get_instance_data(instance_id: String) -> Dictionary:
 		return DUNGEONS[instance_id]
 	elif RAIDS.has(instance_id):
 		return RAIDS[instance_id]
+	elif instance_id.ends_with("_heroic"):
+		# Les variantes héroïques sont générées dynamiquement (pas dans DUNGEONS)
+		var heroics = get_heroic_dungeons()
+		if heroics.has(instance_id):
+			return heroics[instance_id]
 	return {}
 
 static func is_instance_available(instance_id: String) -> bool:
@@ -305,24 +310,27 @@ static func get_group_composition(instance_id: String) -> Dictionary:
 				"DPS": 3
 			}
 		InstanceType.RAID:
+			# Noyau de raid jouable avec un roster de guilde (≤ 20 membres), et non
+			# l'effectif "lore" de 20/40. Le malus de sous-effectif est géré en combat
+			# via _check_group_composition + la difficulté du contenu.
 			if instance.group_size == 20:
+				return {
+					"Tank": 1,
+					"Healer": 3,
+					"DPS": 6
+				}
+			else:  # raids 40 → noyau jouable de 15
 				return {
 					"Tank": 2,
 					"Healer": 4,
-					"DPS": 14
-				}
-			else:  # 40 joueurs
-				return {
-					"Tank": 3,
-					"Healer": 8,
-					"DPS": 29
+					"DPS": 9
 				}
 	
 	return {}
 
 static func calculate_difficulty_score(instance_id: String, group: Array) -> float:
 	var instance = get_instance_data(instance_id)
-	if instance.is_empty():
+	if instance.is_empty() or group.is_empty():
 		return 0.0
 		
 	var score = 1.0

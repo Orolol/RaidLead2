@@ -8,8 +8,6 @@ signal monthly_simulation_completed(guilds_data: Array)
 signal poaching_attempt(target_member, source_guild: AIGuild, success: bool)
 
 var ai_guilds: Array[AIGuild] = []
-var simulation_timer: Timer
-var daily_check_timer: Timer
 
 # Configuration par phase
 const GUILD_COUNT_BY_PHASE = {
@@ -62,29 +60,18 @@ func _ready():
 		GameTime.connect("day_changed", _on_day_changed)
 		GameTime.connect("week_changed", _on_week_changed)
 	
-	# Créer les timers de simulation
-	_setup_simulation_timers()
-	
+	# La simulation IA est pilotée par GameTime (_on_day_changed / _on_week_changed),
+	# synchronisée avec la vitesse de jeu (plus de timers temps-réel désynchronisés).
+
 	# Initialiser les guildes pour la phase actuelle
 	_initialize_guilds_for_current_phase()
 	
-	print("AIGuildManager initialisé avec %d guildes" % ai_guilds.size())
+	GameLog.d("AIGuildManager initialisé avec %d guildes" % ai_guilds.size())
 
-func _setup_simulation_timers():
-	"""Configure les timers de simulation"""
-	# Timer pour simulation mensuelle
-	simulation_timer = Timer.new()
-	simulation_timer.wait_time = 300.0  # 5 minutes = 1 mois de jeu
-	simulation_timer.timeout.connect(_run_monthly_simulation)
-	simulation_timer.autostart = true
-	add_child(simulation_timer)
-	
-	# Timer pour vérifications quotidiennes
-	daily_check_timer = Timer.new()
-	daily_check_timer.wait_time = 10.0  # 10 secondes = 1 jour de jeu
-	daily_check_timer.timeout.connect(_run_daily_checks)
-	daily_check_timer.autostart = true
-	add_child(daily_check_timer)
+func _setup_simulation_timers() -> void:
+	# Obsolète : la simulation IA est désormais pilotée par GameTime
+	# (_on_day_changed / _on_week_changed). Conservée vide pour compat d'appel éventuel.
+	pass
 
 func _initialize_guilds_for_current_phase():
 	"""Initialise les guildes pour la phase actuelle"""
@@ -102,13 +89,9 @@ func _initialize_guilds_for_current_phase():
 		var ai_guild = AIGuild.new(guild_name, strategy)
 		ai_guilds.append(ai_guild)
 		
-		# Enregistrer dans le système de classement
-		if GuildRanking:
-			GuildRanking.register_guild(guild_name, false)
-		
 		ai_guild_created.emit(ai_guild)
 	
-	print("Créé %d guildes IA pour la phase %s" % [guild_count, PhaseManager.get_phase_name(current_phase) if PhaseManager else "Serveur"])
+	GameLog.d("Créé %d guildes IA pour la phase %s" % [guild_count, PhaseManager.get_phase_name(current_phase) if PhaseManager else "Serveur"])
 
 func get_all_guilds() -> Array[AIGuild]:
 	"""Retourne toutes les guildes IA"""
@@ -137,7 +120,7 @@ func get_top_guilds(count: int = 5) -> Array[AIGuild]:
 
 func _run_monthly_simulation():
 	"""Exécute la simulation mensuelle de toutes les guildes"""
-	print("🎯 Début de la simulation mensuelle des guildes IA")
+	GameLog.d("🎯 Début de la simulation mensuelle des guildes IA")
 	
 	var guilds_data = []
 	
@@ -154,7 +137,7 @@ func _run_monthly_simulation():
 		call_deferred("_update_guild_rankings", guilds_data)
 	
 	monthly_simulation_completed.emit(guilds_data)
-	print("✅ Simulation mensuelle terminée")
+	GameLog.d("✅ Simulation mensuelle terminée")
 
 func _simulate_inter_guild_interactions():
 	"""Simule les interactions entre guildes (débauchage, etc.)"""
@@ -212,10 +195,10 @@ func _process_successful_poaching_from_player(result: Dictionary, source_guild: 
 		# Ajouter un membre similaire à la guilde IA
 		_add_recruited_member_to_ai_guild(source_guild, target_member)
 		
-		print("🔄 %s a débauché %s de notre guilde !" % [source_guild.name, target_member.nom])
+		GameLog.d("🔄 %s a débauché %s de notre guilde !" % [source_guild.name, target_member.nom])
 		poaching_attempt.emit(target_member, source_guild, true)
 	else:
-		print("🛡️ %s a tenté de débaucher %s, mais il a refusé" % [source_guild.name, target_member.nom])
+		GameLog.d("🛡️ %s a tenté de débaucher %s, mais il a refusé" % [source_guild.name, target_member.nom])
 		poaching_attempt.emit(target_member, source_guild, false)
 		
 		# Le membre gagne en loyauté après avoir refusé
@@ -243,8 +226,15 @@ func _calculate_member_leave_probability(member, offer: Dictionary) -> float:
 		base_probability += 0.15
 	if offer.get("leadership_role", false):
 		base_probability += 0.1
-	
-	return clamp(base_probability, 0.05, 0.8)
+
+	# La célébrité rend un membre plus convoité : risque de départ accru.
+	if target_member_has_celebrity_risk(member):
+		base_probability += member.get_celebrity_poaching_risk()
+
+	return clamp(base_probability, 0.05, 0.85)
+
+func target_member_has_celebrity_risk(member) -> bool:
+	return member != null and member.has_method("get_celebrity_poaching_risk")
 
 func _add_recruited_member_to_ai_guild(guild: AIGuild, recruited_member):
 	"""Ajoute un membre recruté à une guilde IA"""
@@ -275,7 +265,7 @@ func _process_successful_poaching_between_ai(result: Dictionary, source_guild: A
 	target_member.days_in_guild = 0
 	source_guild.members.append(target_member)
 	
-	print("🔄 %s a débauché %s de %s" % [source_guild.name, target_member.name, target_guild.name])
+	GameLog.d("🔄 %s a débauché %s de %s" % [source_guild.name, target_member.name, target_guild.name])
 
 func _run_daily_checks():
 	"""Exécute des vérifications quotidiennes plus légères"""
@@ -285,14 +275,10 @@ func _run_daily_checks():
 		if not aggressive_guilds.is_empty():
 			_attempt_poaching_by_guild(aggressive_guilds.pick_random())
 
-func _update_guild_rankings(guilds_data: Array):
+func _update_guild_rankings(_guilds_data: Array):
 	"""Met à jour le système de classement avec les données des guildes IA"""
 	if not GuildRanking:
 		return
-	
-	# Enregistrer les données de toutes les guildes IA
-	for guild_data in guilds_data:
-		GuildRanking.register_guild(guild_data.name, false)
 	
 	# Forcer une mise à jour du classement
 	GuildRanking.update_rankings()
@@ -301,22 +287,19 @@ func _update_guild_rankings(guilds_data: Array):
 
 func _on_phase_changed(new_phase, old_phase):
 	"""Réagit aux changements de phase"""
-	print("Changement de phase détecté: adaptation des guildes IA")
+	GameLog.d("Changement de phase détecté: adaptation des guildes IA")
 	
 	# Réinitialiser les guildes pour la nouvelle phase
 	call_deferred("_initialize_guilds_for_current_phase")
 
 func _on_day_changed(day: int, week: int, year: int):
-	"""Réagit aux changements de jour"""
-	# Les vérifications quotidiennes sont gérées par le timer
-	pass
+	"""Vérifications quotidiennes (pilotées par GameTime, synchronisées à la vitesse de jeu)."""
+	_run_daily_checks()
 
 func _on_week_changed(week: int, year: int):
-	"""Réagit aux changements de semaine"""
-	# Simulation plus légère chaque semaine
-	if week % 4 == 0:  # Tous les mois
-		# Le timer mensuel s'en charge déjà
-		pass
+	"""Simulation mensuelle toutes les 4 semaines de jeu."""
+	if week % 4 == 0:
+		_run_monthly_simulation()
 
 # API publique pour interactions
 
@@ -400,7 +383,7 @@ func get_debug_info() -> Dictionary:
 	return {
 		"simulation_stats": get_simulation_stats(),
 		"top_guilds": top_guilds_info,
-		"timers_active": simulation_timer.is_stopped() == false
+		"driven_by": "GameTime"
 	}
 
 # Méthodes de sauvegarde/chargement
@@ -428,8 +411,7 @@ func save_ai_guilds_data() -> Dictionary:
 		guilds_data.append(guild_data)
 	
 	return {
-		"ai_guilds": guilds_data,
-		"simulation_timer_time_left": simulation_timer.time_left if simulation_timer else 0.0
+		"ai_guilds": guilds_data
 	}
 
 func load_ai_guilds_data(data: Dictionary):
@@ -439,9 +421,9 @@ func load_ai_guilds_data(data: Dictionary):
 	var guilds_data = data.get("ai_guilds", [])
 	
 	for guild_data in guilds_data:
-		var ai_guild = AIGuild.new()
-		ai_guild.name = guild_data.get("name", "Guilde IA")
-		ai_guild.ai_strategy = guild_data.get("ai_strategy", AIGuild.Strategy.BALANCED)
+		var guild_name: String = guild_data.get("name", "Guilde IA")
+		var strategy: AIGuild.Strategy = guild_data.get("ai_strategy", AIGuild.Strategy.BALANCED)
+		var ai_guild: AIGuild = AIGuild.new(guild_name, strategy, false)
 		ai_guild.reputation = guild_data.get("reputation", 50.0)
 		ai_guild.success_rate = guild_data.get("success_rate", 0.6)
 		ai_guild.aggressiveness = guild_data.get("aggressiveness", 0.5)
@@ -461,4 +443,4 @@ func load_ai_guilds_data(data: Dictionary):
 			GuildRanking.register_guild(ai_guild.name, false)
 	
 	
-	print("Données des guildes IA chargées: %d guildes" % ai_guilds.size())
+	GameLog.d("Données des guildes IA chargées: %d guildes" % ai_guilds.size())

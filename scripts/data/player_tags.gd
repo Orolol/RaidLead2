@@ -118,6 +118,13 @@ static var TAG_DATABASE = {
 		"reveal_threshold": 1,
 		"visible_chance": 0.1,
 		"description": "Veut toujours plus de loot"
+	},
+	"impatient": {
+		"category": TagCategory.PERSONALITY,
+		"reveal_condition": RevealCondition.WIPE,
+		"reveal_threshold": 1,
+		"visible_chance": 0.2,
+		"description": "Supporte mal l'attente et les échecs répétés (recrutement plus difficile)"
 	}
 }
 

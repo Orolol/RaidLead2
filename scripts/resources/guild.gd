@@ -79,9 +79,23 @@ func get_recruitment_quality_bonus() -> float:
 func add_gold(amount: int) -> void:
 	var max_gold = get_guild_effects()["gold_storage"]
 	if max_gold > 0:
-		gold = min(gold + amount, max_gold)
+		var new_gold: int = gold + amount
+		if new_gold > max_gold:
+			_notify_gold_overflow(new_gold - max_gold, max_gold)
+			gold = max_gold
+		else:
+			gold = new_gold
 	else:
+		# Avant le palier de stockage (bas niveau), trésorerie non plafonnée.
 		gold += amount
+
+func _notify_gold_overflow(lost: int, cap: int) -> void:
+	"""Signale (best-effort) l'or perdu par débordement de la trésorerie."""
+	if lost <= 0:
+		return
+	var nm = Singletons.get_autoload("NotificationManager")
+	if nm and nm.has_method("show_warning"):
+		nm.show_warning("Trésorerie pleine (%d or) : %d or perdus. Montez le niveau de guilde pour agrandir le stockage." % [cap, lost], "Stockage d'or")
 
 func spend_gold(amount: int) -> bool:
 	if gold >= amount:
@@ -89,8 +103,38 @@ func spend_gold(amount: int) -> bool:
 		return true
 	return false
 
-func add_item_to_bank(item: Dictionary) -> void:
+## --- Banque de guilde (objets d'équipement réutilisables) ---
+const BANK_MAX_ITEMS := 60
+
+func add_to_bank(item) -> void:
+	"""Stocke un Item dans la banque de guilde (toujours, même camelote : un
+	dépôt manuel doit être respecté). Le filtrage du loot auto se fait en amont."""
+	if item == null:
+		return
 	bank_items.append(item)
+	if bank_items.size() > BANK_MAX_ITEMS:
+		_trim_bank()
+
+func remove_from_bank(item) -> bool:
+	"""Retire un objet précis de la banque. Vrai si trouvé."""
+	var idx: int = bank_items.find(item)
+	if idx >= 0:
+		bank_items.remove_at(idx)
+		return true
+	return false
+
+func get_bank_items() -> Array:
+	return bank_items
+
+func _trim_bank() -> void:
+	"""Banque pleine : garde les meilleurs objets (rareté puis iLvl), jette le reste."""
+	bank_items.sort_custom(func(a, b):
+		if a.rarity != b.rarity:
+			return a.rarity > b.rarity
+		return a.ilvl > b.ilvl
+	)
+	while bank_items.size() > BANK_MAX_ITEMS:
+		bank_items.pop_back()
 
 # Méthodes pour le système d'effets
 func get_modified_stat(stat_name: String, base_value: float) -> float:
@@ -170,7 +214,7 @@ func gain_reputation(amount: float, reason: String) -> void:
 	_add_reputation_event(amount, reason)
 	reputation_changed.emit(old_reputation, reputation, reason)
 	
-	print("Réputation: +%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
+	GameLog.d("Réputation: +%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
 
 func lose_reputation(amount: float, reason: String) -> void:
 	"""Diminue la réputation de la guilde"""
@@ -180,7 +224,7 @@ func lose_reputation(amount: float, reason: String) -> void:
 	_add_reputation_event(-amount, reason)
 	reputation_changed.emit(old_reputation, reputation, reason)
 	
-	print("Réputation: -%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
+	GameLog.d("Réputation: -%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
 
 func _add_reputation_event(change: float, reason: String) -> void:
 	"""Ajoute un événement à l'historique de réputation"""

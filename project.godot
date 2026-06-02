@@ -17,7 +17,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="RaidLead"
 config/description="Un jeu de gestion de guilde dans un MMORPG fictif"
 run/main_scene="res://scenes/Main.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -35,12 +35,19 @@ AIGuildManager="*res://scripts/systems/ai_guild_manager.gd"
 MediaManager="*res://scripts/systems/media_manager.gd"
 SponsorshipManager="*res://scripts/systems/sponsorship_manager.gd"
 DramaManager="*res://scripts/systems/drama_manager.gd"
+StaffManager="*res://scripts/systems/staff_manager.gd"
+TournamentManager="*res://scripts/systems/tournament_manager.gd"
+TransferManager="*res://scripts/systems/transfer_manager.gd"
+LegacyManager="*res://scripts/systems/legacy_manager.gd"
 NotificationManager="*res://scripts/managers/notification_manager.gd"
 SaveManager="*res://scripts/autoloads/save_manager.gd"
 AssetLoader="*res://scripts/autoloads/asset_loader.gd"
 MCPScreenshot="*res://addons/godot_mcp/mcp_screenshot_service.gd"
 MCPInputService="*res://addons/godot_mcp/mcp_input_service.gd"
 MCPGameInspector="*res://addons/godot_mcp/mcp_game_inspector_service.gd"
+GuildCultureManager="*res://scripts/systems/guild_culture_manager.gd"
+AdvisorManager="*res://scripts/systems/advisor_manager.gd"
+BalanceManager="*res://scripts/systems/balance_manager.gd"
 
 [display]
 

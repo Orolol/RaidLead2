@@ -1,7 +1,6 @@
 extends PanelContainer
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
-const DungeonRunScript = preload("res://scripts/systems/dungeon_run.gd")
 const ActivityScript = preload("res://scripts/resources/activity.gd")
 const ItemScript = preload("res://scripts/resources/item.gd")
 const DraggableItem = preload("res://scripts/ui/components/draggable_item.gd")
@@ -19,6 +18,7 @@ var available_members_scroll: ScrollContainer
 var group_composition: VBoxContainer
 var group_slots: Dictionary = {}
 var draggable_members: Array = []
+var run_preview_label: Label
 
 var guild_members: Array = []
 var selected_activity: String = ""
@@ -34,8 +34,35 @@ func _ready():
 	
 	_setup_header(vbox)
 	_setup_content(vbox)
-	
+
+	# Rafraîchir la liste des membres disponibles aux connexions/déconnexions
+	if GuildManager:
+		GuildManager.member_connected.connect(_on_member_availability_changed)
+		GuildManager.member_disconnected.connect(_on_member_availability_changed)
+
 	hide()
+
+func _on_member_availability_changed(_player) -> void:
+	if visible:
+		_refresh_available_members()
+
+func refresh_window() -> void:
+	"""Recharge les membres et rafraîchit la liste disponible (appelé à l'affichage)."""
+	if GuildManager:
+		guild_members = GuildManager.guild_members
+	_refresh_available_members()
+
+func preselect_activity(kind: String) -> void:
+	"""Présélectionne un type de contenu (depuis le prompt/panneau joueur).
+	kind : 'dungeon' | 'raid' | 'fun'."""
+	var idx: int = 0
+	match kind:
+		"dungeon": idx = 1
+		"raid": idx = 2
+		"fun": idx = 3
+	if activity_option and idx > 0:
+		activity_option.select(idx)
+		_on_activity_selected(idx)
 
 func _setup_header(parent: VBoxContainer):
 	var header = HBoxContainer.new()
@@ -205,6 +232,12 @@ func _populate_dungeon_list():
 		instance_option.add_item(text)
 		instance_option.set_item_metadata(instance_option.get_item_count() - 1, dungeon.id)
 
+	# Donjons héroïques (niveau 60) — requis pour progresser vers la Phase Serveur
+	var heroics = DungeonDataScript.get_heroic_dungeons()
+	for hid in heroics:
+		instance_option.add_item(heroics[hid].name)
+		instance_option.set_item_metadata(instance_option.get_item_count() - 1, hid)
+
 func _populate_raid_list():
 	instance_option.add_item("Sélectionner un raid...")
 	
@@ -235,6 +268,7 @@ func _update_group_composition():
 		child.queue_free()
 	
 	group_slots.clear()
+	run_preview_label = null
 	
 	if selected_activity == "" or selected_instance == "":
 		return
@@ -262,6 +296,7 @@ func _update_group_composition():
 					_add_role_slot("Healer", 1)
 					_add_role_slot("DPS", 3)
 	
+		_setup_run_preview()
 	_check_launch_button()
 
 func _add_role_slot(role: String, count: int):
@@ -406,15 +441,148 @@ func _unassign_member_from_slot(slot_id: String):
 func _check_launch_button():
 	if selected_activity == "fun":
 		launch_button.disabled = false
+		_update_run_preview()
 		return
 	
-	var all_filled = true
+	var total: int = group_slots.size()
+	var filled: int = 0
 	for slot_id in group_slots:
-		if group_slots[slot_id].member == null:
-			all_filled = false
-			break
+		if group_slots[slot_id].member != null:
+			filled += 1
+
+	# Donjon : tous les rôles requis. Raid : lancement possible à effectif partiel
+	# (≥ 60 % du noyau), le sous-effectif se paie en combat (malus de composition).
+	var min_required: int = total
+	if selected_activity == "raid":
+		min_required = maxi(5, int(ceil(float(total) * 0.6)))
+
+	launch_button.disabled = filled < min_required or selected_instance == ""
+	_update_run_preview()
+
+func _setup_run_preview() -> void:
+	group_composition.add_child(HSeparator.new())
 	
-	launch_button.disabled = not all_filled or selected_instance == ""
+	run_preview_label = Label.new()
+	run_preview_label.text = "Apercu: assignez un groupe pour estimer le run."
+	run_preview_label.add_theme_font_size_override("font_size", 12)
+	run_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	run_preview_label.modulate = Color(0.78, 0.82, 0.92)
+	group_composition.add_child(run_preview_label)
+
+func _update_run_preview() -> void:
+	if not is_instance_valid(run_preview_label) or selected_instance == "" or selected_activity == "fun":
+		return
+	
+	var instance_data: Dictionary = DungeonDataScript.get_instance_data(selected_instance)
+	if instance_data.is_empty():
+		run_preview_label.text = "Apercu: instance inconnue."
+		return
+	
+	var group: Array[SimulatedPlayer] = _get_assigned_group()
+	var required: Dictionary = DungeonDataScript.get_group_composition(selected_instance)
+	var required_count: int = int(instance_data.get("group_size", _count_required_members(required)))
+	var group_count: int = group.size()
+	var missing_roles: Array[String] = _get_missing_roles(required, group)
+	
+	if group.is_empty():
+		run_preview_label.text = "Apercu %s : 0/%d membres. Assignez les roles pour voir le score." % [
+			instance_data.get("name", selected_instance),
+			required_count
+		]
+		return
+	
+	var avg_level: float = 0.0
+	var avg_equipment: float = 0.0
+	var avg_skill: float = 0.0
+	var avg_energy: float = 0.0
+	var avg_stress: float = 0.0
+	var burnout_count: int = 0
+	for member in group:
+		avg_level += float(member.personnage_niveau)
+		avg_equipment += float(member.get_total_ilvl())
+		avg_skill += float(member.skill)
+		avg_energy += float(member.energy)
+		avg_stress += float(member.stress_level)
+		if member.burnout_level >= 2:
+			burnout_count += 1
+	avg_level /= float(group_count)
+	avg_equipment /= float(group_count)
+	avg_skill /= float(group_count)
+	avg_energy /= float(group_count)
+	avg_stress /= float(group_count)
+
+	var difficulty_score: float = DungeonDataScript.calculate_difficulty_score(selected_instance, group)
+	var composition_factor: float = 1.0 if missing_roles.is_empty() else 0.65
+	# Reflète les malus appliqués en combat (DungeonInstance) : fatigue et moral.
+	var fatigue_factor: float = 0.7 if avg_energy < 30.0 else 1.0
+	var estimated_score: int = int(clamp(difficulty_score * composition_factor * fatigue_factor * 100.0, 5.0, 95.0))
+	var missing_text: String = "Composition complete"
+	if not missing_roles.is_empty():
+		missing_text = "Manque: %s" % ", ".join(missing_roles)
+
+	var warnings: Array[String] = []
+	if not missing_roles.is_empty():
+		warnings.append("composition incomplete")
+	if avg_energy < 30.0:
+		warnings.append("groupe fatigue (energie %.0f)" % avg_energy)
+	if avg_stress >= 60.0:
+		warnings.append("stress eleve (%.0f)" % avg_stress)
+	if burnout_count > 0:
+		warnings.append("%d membre(s) en burnout" % burnout_count)
+	var warning_text: String = "Aucun risque majeur"
+	if not warnings.is_empty():
+		warning_text = "⚠ " + " · ".join(warnings)
+
+	run_preview_label.text = "Apercu %s : %d/%d membres | Score estime %d%%\nNiv. %.1f / iLvl %.1f / Skill %.1f | %s\nForme: energie %.0f / stress %.0f | %s" % [
+		instance_data.get("name", selected_instance),
+		group_count,
+		required_count,
+		estimated_score,
+		avg_level,
+		avg_equipment,
+		avg_skill,
+		missing_text,
+		avg_energy,
+		avg_stress,
+		warning_text
+	]
+	# Code couleur du préavis selon le risque global.
+	if warnings.is_empty():
+		run_preview_label.modulate = Color(0.66, 0.86, 0.66)
+	elif missing_roles.is_empty() and burnout_count == 0:
+		run_preview_label.modulate = Color(0.92, 0.86, 0.55)
+	else:
+		run_preview_label.modulate = Color(0.92, 0.6, 0.55)
+
+func _get_assigned_group() -> Array[SimulatedPlayer]:
+	var group: Array[SimulatedPlayer] = []
+	for slot_id in group_slots:
+		var slot = group_slots[slot_id]
+		if slot.member != null:
+			group.append(slot.member)
+	return group
+
+func _get_missing_roles(required: Dictionary, group: Array[SimulatedPlayer]) -> Array[String]:
+	var actual: Dictionary = {}
+	for role in required:
+		actual[role] = 0
+	for member in group:
+		var role: String = member.get_role()
+		if actual.has(role):
+			actual[role] = int(actual[role]) + 1
+	
+	var missing: Array[String] = []
+	for role in required:
+		var deficit: int = int(required[role]) - int(actual.get(role, 0))
+		if deficit > 0:
+			missing.append("%d %s" % [deficit, role])
+	return missing
+
+func _count_required_members(required: Dictionary) -> int:
+	var total: int = 0
+	for role in required:
+		total += int(required[role])
+	return total
 
 func _refresh_available_members():
 	# Nettoyer les anciens DraggableItems
@@ -474,18 +642,19 @@ func _launch_fun_activity():
 	hide()
 
 func _launch_dungeon_or_raid():
-	# Vérifie que tous les slots sont remplis
+	# Construit le groupe à partir des slots assignés (effectif partiel autorisé pour les raids).
 	var group = []
 	for slot_id in group_slots:
 		var slot = group_slots[slot_id]
-		if slot.member == null:
-			var dialog = AcceptDialog.new()
-			dialog.dialog_text = "Tous les rôles doivent être assignés!"
-			get_tree().root.add_child(dialog)
-			dialog.popup_centered()
-			return
-		group.append(slot.member)
-	
+		if slot.member != null:
+			group.append(slot.member)
+	if group.is_empty():
+		var dialog = AcceptDialog.new()
+		dialog.dialog_text = "Assignez au moins quelques membres avant de lancer."
+		get_tree().root.add_child(dialog)
+		dialog.popup_centered()
+		return
+
 	# Utiliser le nouveau système de donjons via l'ActivityManager
 	var activity_manager = ActivityManager
 	if activity_manager:
@@ -641,7 +810,7 @@ func _on_auto_assign_pressed():
 	
 	if not all_filled:
 		# Utiliser NotificationManager si disponible
-		var notification_manager = get_node_or_null("/root/NotificationManager")
+		var notification_manager = NotificationManager
 		if notification_manager:
 			notification_manager.show_notification(
 				"Impossible de remplir tous les rôles. Vérifiez les membres disponibles.",

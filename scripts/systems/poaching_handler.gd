@@ -15,7 +15,7 @@ func _connect_to_ai_guild_manager() -> void:
 	if AIGuildManager:
 		if not AIGuildManager.is_connected("poaching_attempt", _on_poaching_attempt):
 			AIGuildManager.connect("poaching_attempt", _on_poaching_attempt)
-		print("PoachingHandler connecté au AIGuildManager")
+		GameLog.d("PoachingHandler connecté au AIGuildManager")
 
 func _on_poaching_attempt(target_member: SimulatedPlayer, source_guild: AIGuildScript, success: bool) -> void:
 	"""Gère les tentatives de débauchage par les guildes IA"""
@@ -27,10 +27,10 @@ func _on_poaching_attempt(target_member: SimulatedPlayer, source_guild: AIGuildS
 		return
 
 	if success:
-		print("ALERTE DE DEBAUCHAGE: %s tente de recruter %s !" % [source_guild.name, target_member.nom])
+		GameLog.d("ALERTE DE DEBAUCHAGE: %s tente de recruter %s !" % [source_guild.name, target_member.nom])
 		_show_poaching_popup(target_member, source_guild)
 	else:
-		print("Tentative de débauchage échouée: %s a refusé l'offre de %s" % [target_member.nom, source_guild.name])
+		GameLog.d("Tentative de débauchage échouée: %s a refusé l'offre de %s" % [target_member.nom, source_guild.name])
 
 func _show_poaching_popup(member: SimulatedPlayer, source_guild: AIGuildScript) -> void:
 	"""Affiche le popup de gestion de débauchage"""
@@ -80,15 +80,15 @@ func _generate_poaching_offer(source_guild: AIGuildScript, member: SimulatedPlay
 
 func _on_counter_offer_made(member: SimulatedPlayer, counter_offer: Dictionary) -> void:
 	"""Gère les contre-offres du joueur"""
-	print("Contre-offre envoyée pour %s: %s" % [member.nom, str(counter_offer)])
+	GameLog.d("Contre-offre envoyée pour %s: %s" % [member.nom, str(counter_offer)])
 
 	if counter_offer.get("salary_increase", 0) > 0:
 		member.mood = min(100.0, member.mood + 10.0)
-		print("Prime de fidélité accordée à %s" % member.nom)
+		GameLog.d("Prime de fidélité accordée à %s" % member.nom)
 
 func _on_member_released_to_poaching(member: SimulatedPlayer) -> void:
 	"""Gère le départ d'un membre suite à un débauchage"""
-	print("%s quitte la guilde suite au débauchage" % member.nom)
+	GameLog.d("%s quitte la guilde suite au débauchage" % member.nom)
 
 	GuildManager.remove_member(member, false)
 
@@ -97,8 +97,8 @@ func _on_member_released_to_poaching(member: SimulatedPlayer) -> void:
 			other_member.mood = max(0.0, other_member.mood - 5.0)
 			other_member.integration = max(0.0, other_member.integration - 3.0)
 
-	print("Le moral de l'équipe a été affecté par le départ de %s" % member.nom)
+	GameLog.d("Le moral de l'équipe a été affecté par le départ de %s" % member.nom)
 
 func _on_poaching_ignored() -> void:
 	"""Gère l'ignorance d'une tentative de débauchage"""
-	print("Tentative de débauchage ignorée")
+	GameLog.d("Tentative de débauchage ignorée")

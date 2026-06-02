@@ -23,7 +23,7 @@ func _process(_delta: float) -> bool:
 				# Régression : ouvrir Guilde + sélectionner un membre construit les
 				# StatDisplay (skill = VALUE_PERCENTAGE) — déclenchait le bug Container.
 				_main.window_manager.show_window("guilde")
-				var g = _main.window_manager._get_existing_instance("guilde")
+				var g = _main.window_manager.get_window_instance("guilde")
 				if g and g.has_method("_on_member_selected"):
 					g._on_member_selected(0)
 					print("Guilde: membre 0 sélectionné")
@@ -34,7 +34,7 @@ func _process(_delta: float) -> bool:
 				_frames = 0
 		2:
 			if _frames >= 60:
-				_win = _main.window_manager._get_existing_instance("national")
+				_win = _main.window_manager.get_window_instance("national")
 				if _win and _win.has_method("_refresh_all"):
 					_win._refresh_all()
 				_shoot("user://shot_national_celebrity.png")

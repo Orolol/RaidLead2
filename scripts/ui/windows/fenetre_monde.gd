@@ -2,6 +2,7 @@ extends PanelContainer
 
 var close_button: Button
 var title_label: Label
+var _drag_active: bool = false
 var advanced_tabs: AdvancedTabs
 
 var guild_ranking_list: ItemList
@@ -49,6 +50,13 @@ func _ready():
 	_generate_competing_guilds()
 	_refresh_recruitment_from_pool()
 
+func _on_header_drag(event: InputEvent) -> void:
+	"""Permet de déplacer la fenêtre en glissant sur la barre de titre."""
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_active = event.pressed
+	elif event is InputEventMouseMotion and _drag_active:
+		position += event.relative
+
 func _setup_header(parent: VBoxContainer):
 	var header = HBoxContainer.new()
 	parent.add_child(header)
@@ -56,6 +64,10 @@ func _setup_header(parent: VBoxContainer):
 	title_label = Label.new()
 	title_label.text = "Vue du Monde"
 	title_label.add_theme_font_size_override("font_size", 20)
+	title_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	title_label.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title_label.tooltip_text = "Glissez pour déplacer la fenêtre"
+	title_label.gui_input.connect(_on_header_drag)
 	header.add_child(title_label)
 	
 	header.add_spacer(false)
@@ -105,7 +117,7 @@ func _setup_guild_list_section(parent: HSplitContainer):
 	header_container.add_spacer(false)
 	
 	var phase_label = Label.new()
-	var phase_manager = get_node_or_null("/root/PhaseManager")
+	var phase_manager = PhaseManager
 	if phase_manager:
 		phase_label.text = "Phase: %s" % phase_manager.get_phase_name(phase_manager.get_current_phase())
 	else:
@@ -305,7 +317,7 @@ func _calculate_guild_progression() -> int:
 		progression += int(guild_manager.guild.get_integration_bonus() * 10)
 	
 	# Activités en cours (0-10 points)
-	var activity_manager = get_node_or_null("/root/ActivityManager")
+	var activity_manager = ActivityManager
 	if activity_manager:
 		var active_dungeons = activity_manager.active_dungeons.size()
 		progression += min(10, active_dungeons * 5)
@@ -316,6 +328,11 @@ func _calculate_guild_progression() -> int:
 		progression += 5  # Bonus fixe pour l'instant
 	
 	return min(100, progression)  # Plafonner à 100
+
+func refresh_window() -> void:
+	"""Rafraîchit le classement et le recrutement (appelé à l'affichage de la fenêtre)."""
+	_refresh_guild_ranking()
+	_refresh_recruitment_from_pool()
 
 func _refresh_recruitment_from_pool():
 	if not recruitment_pool:
@@ -334,7 +351,7 @@ func _on_player_lost_to_competition(player: SimulatedPlayer, guild_name: String)
 		_update_recruit_details()
 	
 	# Optionnel: afficher une notification
-	print("Le joueur %s a été recruté par %s" % [player.nom, guild_name])
+	GameLog.d("Le joueur %s a été recruté par %s" % [player.nom, guild_name])
 
 func _refresh_guild_ranking():
 	guild_ranking_list.clear()
@@ -651,7 +668,7 @@ func _on_negotiate_pressed() -> void:
 	match result.get("step", ""):
 		"accepted":
 			player_recruited.emit(result.player)
-			_show_recruit_dialog("%s rejoint la guilde pour %d or/semaine !" % [result.player.nom, result.salary])
+			_show_recruit_dialog(_format_national_signing(result))
 			selected_recruit = null
 			_refresh_recruitment_list()
 			_update_recruit_details()
@@ -659,6 +676,8 @@ func _on_negotiate_pressed() -> void:
 			_show_counter_offer_dialog(selected_recruit, result.counter_offer)
 		"rejected":
 			_show_recruit_dialog(result.reason)
+		"error":
+			_show_recruit_dialog(result.get("reason", "Recrutement impossible"))
 		_:
 			# Pas d'exigence salariale → recrutement standard
 			if result.get("success", false):
@@ -679,9 +698,12 @@ func _show_counter_offer_dialog(player, counter: int) -> void:
 		var res: Dictionary = recruitment_pool.accept_counter_offer(player, counter)
 		if res.get("success", false):
 			player_recruited.emit(res.player)
+			_show_recruit_dialog(_format_national_signing(res))
 			selected_recruit = null
 			_refresh_recruitment_list()
 			_update_recruit_details()
+		else:
+			_show_recruit_dialog(res.get("reason", "Recrutement impossible"))
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(dialog.queue_free)
@@ -699,6 +721,14 @@ func _on_scout_pressed() -> void:
 		msg += "\nTraits révélés : " + ", ".join(revealed)
 	_show_recruit_dialog(msg)
 	_update_recruit_details()
+
+func _format_national_signing(result: Dictionary) -> String:
+	var player_name: String = result.player.nom if result.get("player", null) else "La recrue"
+	var text: String = "%s rejoint la guilde pour %d or/semaine !" % [player_name, result.get("salary", 0)]
+	var agent_cost: int = int(result.get("agent_cost", 0))
+	if agent_cost > 0:
+		text += "\nCommission d'agent payée : %d or." % agent_cost
+	return text
 
 func _show_recruit_dialog(text: String) -> void:
 	var dialog = AcceptDialog.new()
@@ -734,13 +764,13 @@ func _get_planning_summary(planning: Dictionary) -> String:
 		return "Actif: " + ", ".join(active_days)
 
 func _on_invite_pressed():
-	print("Debug: Bouton recruter cliqué")
-	print("Debug: selected_recruit = ", selected_recruit)
-	print("Debug: recruitment_pool = ", recruitment_pool)
-	print("Debug: guild_manager = ", guild_manager)
+	GameLog.d("Debug: Bouton recruter cliqué")
+	GameLog.d("Debug: selected_recruit = " + str(selected_recruit))
+	GameLog.d("Debug: recruitment_pool = " + str(recruitment_pool))
+	GameLog.d("Debug: guild_manager = " + str(guild_manager))
 	
 	if not selected_recruit or not recruitment_pool or not guild_manager:
-		print("Debug: Une des conditions n'est pas remplie")
+		GameLog.d("Debug: Une des conditions n'est pas remplie")
 		return
 	
 	# Prépare les données de la guilde pour le recrutement
@@ -827,7 +857,7 @@ func _on_guild_position_changed(guild_name: String, old_position: int, new_posit
 		else:
 			change_text = "📉 Notre guilde descend au classement. #%d → #%d" % [old_position, new_position]
 		
-		print(change_text)
+		GameLog.d(change_text)
 		# TODO: Afficher une notification à l'écran
 	
 	# Mettre à jour l'affichage si visible
@@ -842,7 +872,7 @@ func _on_server_first(guild_name: String, achievement_name: String):
 	else:
 		message = "📢 %s a réalisé : %s" % [guild_name, achievement_name]
 	
-	print(message)
+	GameLog.d(message)
 	# TODO: Afficher une notification à l'écran
 	
 	# Mettre à jour le classement
@@ -862,7 +892,7 @@ func _on_refresh_ranking_pressed():
 	"""Appelé quand le bouton d'actualisation est pressé"""
 	if guild_ranking:
 		guild_ranking.update_rankings()
-		print("Actualisation du classement demandée...")
+		GameLog.d("Actualisation du classement demandée...")
 	else:
 		_refresh_guild_ranking()
 
@@ -1099,12 +1129,20 @@ func _populate_recent_events(list: ItemList, guild_data: Dictionary):
 	var is_player = guild_data.get("is_player", false)
 	
 	if is_player:
-		# Événements pour notre guilde
-		list.add_item("• Recrutement de 2 nouveaux membres")
-		list.add_item("• Clear de Scholomance avec succès")
-		list.add_item("• Organisation d'un événement de guilde")
+		# Événements RÉELS de notre guilde : derniers runs PvE (fini les faits inventés).
+		var added: bool = false
+		if GuildRanking and GuildRanking.has_method("get_player_run_history"):
+			var runs: Array = GuildRanking.get_player_run_history(4)
+			for i in range(runs.size() - 1, -1, -1):
+				var r: Dictionary = runs[i]
+				var wipes: int = int(r.get("wipes", 0))
+				var suffix: String = " (%d wipe(s))" % wipes if wipes > 0 else ""
+				list.add_item("• Clear : %s%s" % [str(r.get("name", r.get("content_id", "?"))), suffix])
+				added = true
+		if not added:
+			list.add_item("• Aucun run PvE récent — composez un groupe dans Organisation")
 	else:
-		# Événements simulés pour les autres guildes
+		# Estimations pour les guildes adverses (information partielle, normal pour un concurrent).
 		var events = [
 			"• Clear d'un nouveau donjon",
 			"• Recrutement d'un joueur expérimenté",
@@ -1125,7 +1163,16 @@ func _get_guild_strengths(guild_data: Dictionary) -> String:
 	var score = guild_data.get("score", 0.0)
 	
 	if is_player:
-		return "Forte cohésion d'équipe, progression équilibrée, gestion active des membres"
+		# Points forts dérivés de l'état RÉEL de la guilde.
+		var parts: Array[String] = []
+		if GuildManager and GuildManager.guild:
+			parts.append("Réputation %d" % int(GuildManager.guild.reputation))
+		var gcm: Node = GuildCultureManager
+		if gcm and gcm.has_method("get_morale_tier"):
+			parts.append("Ambiance %s" % gcm.get_morale_tier())
+		if GuildManager:
+			parts.append("%d membres" % GuildManager.guild_members.size())
+		return ", ".join(parts) if not parts.is_empty() else "Guilde en développement"
 	
 	# Générer des points forts basés sur le score et le nom
 	var strengths = []

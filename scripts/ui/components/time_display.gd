@@ -11,6 +11,16 @@ extends PanelContainer
 var game_time: Node
 var server_version: Node
 
+## Paliers de vitesse discrets (le slider continu seul est difficile à régler au point près).
+const SPEED_PRESETS := [
+	{"label": "1x", "value": 1.0},
+	{"label": "10x", "value": 10.0},
+	{"label": "60x", "value": 60.0},
+	{"label": "600x", "value": 600.0},
+	{"label": "Max", "value": 2400.0},
+]
+var _speed_preset_buttons: Array = []
+
 func _ready():
 	# On récupérera l'instance de GameTime depuis l'autoload
 	game_time = GameTime
@@ -23,13 +33,16 @@ func _ready():
 		
 		# Configure les contrôles
 		pause_button.pressed.connect(_on_pause_button_pressed)
-		debug_version_button.pressed.connect(_on_debug_version_button_pressed)
+		debug_version_button.visible = OS.is_debug_build()
+		if debug_version_button.visible:
+			debug_version_button.pressed.connect(_on_debug_version_button_pressed)
 		speed_slider.value_changed.connect(_on_speed_changed)
 		speed_slider.min_value = 0.1
 		speed_slider.max_value = 2400.0
 		speed_slider.value = game_time.time_speed
 		speed_slider.step = 0.1
-		
+		_setup_speed_presets()
+
 		# Mise à jour initiale
 		_update_display()
 		_update_speed_label()
@@ -82,6 +95,36 @@ func _on_speed_changed(value: float):
 	if game_time:
 		game_time.set_time_speed(value)
 		_update_speed_label()
+		_highlight_active_preset()
+
+func _setup_speed_presets() -> void:
+	"""Boutons de paliers de vitesse (Football-Manager-like) sous le slider."""
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	$VBoxContainer.add_child(row)
+	for preset in SPEED_PRESETS:
+		var b := Button.new()
+		b.text = preset.label
+		b.toggle_mode = true
+		b.tooltip_text = "Vitesse x%s" % str(preset.value)
+		b.custom_minimum_size = Vector2(44, 0)
+		b.pressed.connect(_set_speed_preset.bind(preset.value))
+		row.add_child(b)
+		_speed_preset_buttons.append({"button": b, "value": preset.value})
+	_highlight_active_preset()
+
+func _set_speed_preset(value: float) -> void:
+	if game_time:
+		game_time.set_time_speed(value)
+		speed_slider.set_value_no_signal(value)
+		_update_speed_label()
+		_highlight_active_preset()
+
+func _highlight_active_preset() -> void:
+	if not game_time:
+		return
+	for entry in _speed_preset_buttons:
+		entry.button.set_pressed_no_signal(is_equal_approx(entry.value, game_time.time_speed))
 
 func _update_speed_label():
 	if game_time:

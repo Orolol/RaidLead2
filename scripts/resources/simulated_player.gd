@@ -7,6 +7,11 @@ const EquipmentScript = preload("res://scripts/resources/equipment.gd")
 const LootTablesScript = preload("res://scripts/data/loot_tables.gd")
 const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.gd")
 
+## Identifiant stable inter-session (get_instance_id() ne survit pas au reload) —
+## utilisé pour persister le graphe social. Généré une fois à la création.
+static var _id_counter: int = 0
+@export var player_id: String = ""
+
 @export var nom: String = ""
 @export var tags_comportement: Array = []  # Tags visibles
 @export var tags_caches: Array = []  # Tags cachés
@@ -68,9 +73,14 @@ const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.
 @export var celebrity_level: float = 0.0  # 0-100
 @export var salary_demand: int = 0  # or/semaine pour recrues nationales (0 = pas d'exigence)
 
+# Phase Esport - Stress competitif et burnout
+@export var stress_level: float = 0.0  # 0-100, pression competitive (distinct de fatigue_accumulated)
+
 # Propriétés pour la compatibilité
 
 func _init():
+	_id_counter += 1
+	player_id = "p%d" % _id_counter
 	nom = _generate_random_name()
 	_generate_random_stats()
 	_initialize_behavior_profile()
@@ -237,32 +247,39 @@ func _check_tag_reveals():
 	for tag in revealed_tags:
 		tags_caches.erase(tag)
 		tags_comportement.append(tag)
-		print("Tag révélé pour %s: %s" % [nom, tag])
+		GameLog.d("Tag révélé pour %s: %s" % [nom, tag])
 
 func trigger_loot_conflict():
 	loot_conflicts += 1
+	if behavior_profile:
+		behavior_profile.adjust_from_experience("social_conflict", "negative")
 	_check_tag_reveals()
 
 func trigger_wipe():
 	wipes_experienced += 1
 	mood = max(0, mood - 20)  # Baisse de moral importante
+	add_stress(4.0)  # La pression des wipes alimente le stress competitif
 	last_wipe_day = _get_current_day()
 	
-	# Réaction selon le profil comportemental
+	# Réaction selon le profil comportemental + mémoire émotionnelle (le profil évolue).
 	if behavior_profile:
 		var stress_response = behavior_profile.get_stress_response(fatigue_accumulated)
 		mood += stress_response.get("mood_impact", 0)
 		energy += stress_response.get("energy_impact", 0)
-	
+		behavior_profile.adjust_from_experience("raid_wipe", "repeated")
+
 	_check_tag_reveals()
 
 func trigger_raid_success():
 	raid_successes += 1
 	mood = min(100, mood + 15)  # Boost de moral
 	last_raid_success_day = _get_current_day()
-	
-	# Réduction de fatigue après succès
+
+	# Réduction de fatigue et de stress après succès
 	fatigue_accumulated = max(0, fatigue_accumulated - 10)
+	reduce_stress(5.0)
+	if behavior_profile:
+		behavior_profile.adjust_from_experience("raid_success", "positive")
 	
 	_check_tag_reveals()
 
@@ -379,7 +396,7 @@ func try_auto_equip(item: Item) -> Dictionary:
 	if current_item == null:
 		# Slot vide, toujours équiper
 		equipment.equip_item(item)
-		print("%s a équipé %s (slot vide)" % [nom, item.get_display_name()])
+		GameLog.d("%s a équipé %s (slot vide)" % [nom, item.get_display_name()])
 		return {"equipped": true, "old_item": null}
 
 	var new_score: float = calculate_item_score(item)
@@ -387,7 +404,7 @@ func try_auto_equip(item: Item) -> Dictionary:
 
 	if new_score > current_score:
 		var old_item: Item = equipment.equip_item(item)
-		print("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
+		GameLog.d("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
 		return {"equipped": true, "old_item": old_item}
 	else:
 		return {"equipped": false, "old_item": null}
@@ -421,13 +438,60 @@ func get_celebrity_poaching_risk() -> float:
 		return 0.2
 	return 0.0
 
-func tick_celebrity_weekly() -> void:
-	"""Mise a jour hebdomadaire de la celebrite."""
-	# Decroissance naturelle
-	update_celebrity(-1.0)
-	# Bonus si haut skill
-	if skill > 80:
-		update_celebrity(0.5)
+# (tick_celebrity_weekly supprimé : la célébrité est gérée par MediaManager._update_celebrity,
+#  cette version était du code mort qui doublonnait la logique.)
+
+# --- Stress competitif & Burnout (Phase Esport) ---
+
+const ESPORT_BASELINE_STRESS := 3.0
+
+func add_stress(delta: float) -> void:
+	"""Augmente le stress competitif (0-100)."""
+	stress_level = clampf(stress_level + delta, 0.0, 100.0)
+
+func reduce_stress(delta: float) -> void:
+	"""Reduit le stress competitif (0-100)."""
+	stress_level = clampf(stress_level - delta, 0.0, 100.0)
+
+func get_burnout_risk() -> float:
+	"""Risque de burnout (0-1) combinant stress competitif et fatigue accumulee,
+	module par la tolerance au stress du profil comportemental."""
+	var tolerance: float = behavior_profile.stress_tolerance if behavior_profile else 0.5
+	var raw: float = (stress_level * 0.6 + fatigue_accumulated * 0.4) / 100.0
+	raw *= (1.3 - tolerance * 0.6)  # tolerance 0 -> x1.3, tolerance 1 -> x0.7
+	return clampf(raw, 0.0, 1.0)
+
+func get_stress_tier() -> String:
+	if stress_level >= 80.0:
+		return "Critique"
+	elif stress_level >= 60.0:
+		return "Élevé"
+	elif stress_level >= 35.0:
+		return "Modéré"
+	else:
+		return "Maîtrisé"
+
+func get_esport_performance_factor() -> float:
+	"""Facteur multiplicatif de performance en competition selon le stress (0.7-1.0)."""
+	if stress_level <= 40.0:
+		return 1.0
+	return clampf(1.0 - (stress_level - 40.0) * 0.005, 0.7, 1.0)  # 40 -> 1.0, 100 -> 0.7
+
+func tick_wellbeing_weekly(stress_relief: float, morale_bonus: float, in_esport: bool) -> void:
+	"""Mise a jour hebdomadaire du bien-etre, orchestree par StaffManager.
+	En phase Esport, une pression de base s'accumule ; le psychologue et le repos la reduisent.
+	Un stress severe degrade le moral et alimente la fatigue (qui pilote le burnout existant)."""
+	if in_esport:
+		var tolerance: float = behavior_profile.stress_tolerance if behavior_profile else 0.5
+		add_stress(ESPORT_BASELINE_STRESS * (1.2 - tolerance * 0.6))
+	if stress_relief > 0.0:
+		reduce_stress(stress_relief)
+	if morale_bonus != 0.0:
+		update_mood(morale_bonus)
+	if stress_level >= 60.0:
+		update_mood(-(stress_level - 60.0) * 0.1)
+	if stress_level >= 75.0:
+		fatigue_accumulated = clampf(fatigue_accumulated + 4.0, 0.0, 100.0)
 
 func equip_item(item) -> bool:
 	"""Fait équiper un objet au joueur"""
@@ -436,9 +500,9 @@ func equip_item(item) -> bool:
 	
 	var old_item = equipment.equip_item(item)
 	if old_item:
-		print("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
+		GameLog.d("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
 	else:
-		print("%s a équipé %s" % [nom, item.get_display_name()])
+		GameLog.d("%s a équipé %s" % [nom, item.get_display_name()])
 	
 	return true
 
@@ -484,11 +548,9 @@ func gain_experience(amount: int) -> void:
 		# Donner de l'XP à la guilde pour chaque niveau gagné
 		var guild_manager = Singletons.get_autoload("GuildManager")
 		if not guild_manager:
-			# Essayer via l'arbre de scène si on a accès à un node
-			var tree = Engine.get_main_loop()
-			if tree and tree.root:
-				guild_manager = tree.root.get_node_or_null("/root/GuildManager")
-		
+			# Repli sur l'identifiant global de l'autoload
+			guild_manager = GuildManager
+
 		if guild_manager:
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(personnage_niveau, nom + " a atteint le niveau " + str(personnage_niveau))
@@ -648,15 +710,11 @@ func _initialize_activity_preferences():
 			activity_preferences["FARMING"] *= 1.2
 
 func _get_current_day() -> int:
-	"""Obtient le jour actuel du jeu"""
+	"""Jour ABSOLU écoulé (et non current_day 1-7 qui se réinitialise chaque semaine,
+	ce qui faussait les calculs "jours depuis le dernier wipe/succès/loot")."""
 	var game_time = Singletons.get_autoload("GameTime")
-	if game_time:
-		# GameTime pourrait être un autoload, essayer de le récupérer depuis l'arbre
-		var tree = Engine.get_main_loop()
-		if tree and tree.root:
-			var gt = tree.root.get_node_or_null("/root/GameTime")
-			if gt:
-				return gt.current_day
+	if game_time and game_time.has_method("get_total_days_elapsed"):
+		return game_time.get_total_days_elapsed()
 	return 0
 
 func equip_epic_item(item):

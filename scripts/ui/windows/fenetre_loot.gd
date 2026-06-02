@@ -2,11 +2,16 @@ extends AcceptDialog
 class_name FenetreLoot
 
 const ItemScript = preload("res://scripts/resources/item.gd")
+const PveRunReportScript = preload("res://scripts/systems/pve_run_report.gd")
 
 var header_label: Label
 var result_label: Label
 var time_value_label: Label
 var gold_value_label: Label
+var boss_value_label: Label
+var wipes_value_label: Label
+var performance_value_label: Label
+var participants_label: Label
 var total_items_label: Label
 var loot_container: VBoxContainer
 var empty_label: Label
@@ -26,23 +31,25 @@ func show_loot_summary(
 		total_time: float,
 		gold_reward: int,
 		loot_entries: Array,
-		reason: String = ""
+		reason: String = "",
+		run_details: Dictionary = {}
 	) -> void:
-	title = "Butin - %s" % dungeon_name
+	title = "Rapport PvE - %s" % dungeon_name
 	
 	header_label.text = "Victoire !" if success else "Expédition interrompue"
 	
 	if success:
-		result_label.text = "Le groupe a vaincu tous les boss du donjon."
+		result_label.text = _build_success_summary(dungeon_name, total_time, run_details)
 	else:
 		var reason_text = reason if reason != "" else "Le groupe n'a pas réussi à terminer le donjon."
 		result_label.text = reason_text
 	
 	time_value_label.text = _format_duration(total_time)
 	gold_value_label.text = "%d or" % gold_reward if gold_reward > 0 else "0 or"
+	_update_run_report(success, total_time, gold_reward, loot_entries, run_details)
 	
 	_populate_loot_entries(loot_entries)
-	popup_centered(Vector2i(560, 420))
+	popup_centered(Vector2i(640, 520))
 
 func _setup_ui() -> void:
 	var root = VBoxContainer.new()
@@ -83,6 +90,40 @@ func _setup_ui() -> void:
 	gold_value_label = Label.new()
 	gold_value_label.text = "0"
 	info_grid.add_child(gold_value_label)
+	
+	var boss_label = Label.new()
+	boss_label.text = "Boss :"
+	boss_label.modulate = Color(0.8, 0.8, 0.8)
+	info_grid.add_child(boss_label)
+	
+	boss_value_label = Label.new()
+	boss_value_label.text = "0/0"
+	info_grid.add_child(boss_value_label)
+	
+	var wipes_label = Label.new()
+	wipes_label.text = "Wipes :"
+	wipes_label.modulate = Color(0.8, 0.8, 0.8)
+	info_grid.add_child(wipes_label)
+	
+	wipes_value_label = Label.new()
+	wipes_value_label.text = "0"
+	info_grid.add_child(wipes_value_label)
+	
+	var performance_label = Label.new()
+	performance_label.text = "Performance :"
+	performance_label.modulate = Color(0.8, 0.8, 0.8)
+	info_grid.add_child(performance_label)
+	
+	performance_value_label = Label.new()
+	performance_value_label.text = "0/100"
+	info_grid.add_child(performance_value_label)
+	
+	participants_label = Label.new()
+	participants_label.text = "Participants : -"
+	participants_label.add_theme_font_size_override("font_size", 12)
+	participants_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	participants_label.modulate = Color(0.78, 0.82, 0.92)
+	root.add_child(participants_label)
 	
 	total_items_label = Label.new()
 	total_items_label.text = "Aucun objet obtenu"
@@ -198,6 +239,55 @@ func _populate_loot_entries(loot_entries: Array) -> void:
 		total_count += count
 	
 	total_items_label.text = "Objets obtenus : %d (%s)" % [total_count, ", ".join(summary_parts)]
+
+func _update_run_report(success: bool, total_time: float, gold_reward: int, loot_entries: Array, run_details: Dictionary) -> void:
+	var bosses_defeated: int = int(run_details.get("bosses_defeated", 0))
+	var total_bosses: int = int(run_details.get("total_bosses", bosses_defeated))
+	var wipes: int = int(run_details.get("wipes", 0))
+	var participants: Array = run_details.get("participants", [])
+	var loot_count: int = loot_entries.size() if typeof(loot_entries) == TYPE_ARRAY else 0
+	var performance_score: int = PveRunReportScript.calculate_performance_score(success, total_time, gold_reward, loot_count, run_details)
+	
+	boss_value_label.text = "%d/%d" % [bosses_defeated, total_bosses]
+	wipes_value_label.text = "%d" % wipes
+	performance_value_label.text = "%d/100 (%s)" % [performance_score, PveRunReportScript.get_performance_label(performance_score)]
+	performance_value_label.modulate = _get_performance_color(performance_score)
+	participants_label.text = "Participants : %s" % _format_participants(participants)
+
+static func calculate_performance_score(success: bool, total_time: float, gold_reward: int, loot_count: int, run_details: Dictionary) -> int:
+	return PveRunReportScript.calculate_performance_score(success, total_time, gold_reward, loot_count, run_details)
+
+static func get_performance_label(score: int) -> String:
+	return PveRunReportScript.get_performance_label(score)
+
+func _build_success_summary(dungeon_name: String, total_time: float, run_details: Dictionary) -> String:
+	var bosses_defeated: int = int(run_details.get("bosses_defeated", 0))
+	var total_bosses: int = int(run_details.get("total_bosses", bosses_defeated))
+	var wipes: int = int(run_details.get("wipes", 0))
+	return "%s termine en %s : %d/%d boss, %d wipe(s)." % [
+		dungeon_name,
+		_format_duration(total_time),
+		bosses_defeated,
+		total_bosses,
+		wipes
+	]
+
+func _format_participants(participants: Array) -> String:
+	if participants.is_empty():
+		return "-"
+	var names: Array[String] = []
+	for participant in participants:
+		names.append(str(participant))
+	return ", ".join(names)
+
+func _get_performance_color(score: int) -> Color:
+	if score >= 85:
+		return Color(0.35, 1.0, 0.45)
+	if score >= 65:
+		return Color(0.8, 0.95, 0.45)
+	if score >= 45:
+		return Color(1.0, 0.7, 0.25)
+	return Color(1.0, 0.35, 0.35)
 
 func _format_duration(duration_seconds: float) -> String:
 	var seconds = int(round(duration_seconds))

@@ -2,6 +2,36 @@ class_name GameRandom
 
 ## Utilitaires de probabilité centralisés.
 ## Remplace les appels `randf() < X` éparpillés dans le code.
+##
+## Déterminisme : les helpers ci-dessous s'appuient sur le générateur GLOBAL de Godot
+## (les mêmes que `randf()`, `randi()`, `randf_range()`, `Array.pick_random()`,
+## `Array.shuffle()`...). Appeler `GameRandom.seed_rng(graine)` fixe ce générateur
+## global, ce qui rend reproductible TOUTE la simulation (pas seulement les appels
+## passant par GameRandom). Les tests et scénarios E2E peuvent ainsi rejouer une
+## séquence à l'identique ; une partie normale utilise `randomize_rng()`.
+
+static var _current_seed: int = 0
+static var _is_seeded: bool = false
+
+static func seed_rng(new_seed: int) -> void:
+	"""Fixe la graine du générateur global pour des séquences reproductibles."""
+	_current_seed = new_seed
+	_is_seeded = true
+	seed(new_seed)
+
+static func randomize_rng() -> void:
+	"""Réinitialise le générateur global depuis l'entropie système (partie normale)."""
+	_is_seeded = false
+	_current_seed = 0
+	randomize()
+
+static func get_seed() -> int:
+	"""Retourne la dernière graine fixée via seed_rng() (0 si non fixée)."""
+	return _current_seed
+
+static func is_seeded() -> bool:
+	"""Vrai si une graine déterministe a été fixée via seed_rng()."""
+	return _is_seeded
 
 static func chance(probability: float) -> bool:
 	"""Retourne true avec la probabilité donnée (0.0 à 1.0)."""

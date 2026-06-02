@@ -121,7 +121,7 @@ func _check_version_update():
 		# Émettre les signaux de contenu débloqué
 		_emit_content_unlocked_signals(old_version, current_version)
 		
-		print("Serveur mis à jour vers la version %s: %s" % [current_version, version_info.name])
+		GameLog.d("Serveur mis à jour vers la version %s: %s" % [current_version, version_info.name])
 
 func _get_target_version_for_days(days: int) -> float:
 	"""Retourne la version du serveur correspondant au nombre de jours écoulés"""
@@ -263,7 +263,7 @@ func force_version_update(target_version: float):
 		version_updated.emit(current_version, version_info.name)
 		_emit_content_unlocked_signals(old_version, current_version)
 		
-		print("Version forcée vers %s: %s" % [current_version, version_info.name])
+		GameLog.d("Version forcée vers %s: %s" % [current_version, version_info.name])
 
 func get_all_versions() -> Array:
 	"""Retourne toutes les versions disponibles (debug)"""

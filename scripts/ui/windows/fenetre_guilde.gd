@@ -56,6 +56,12 @@ func _ready():
 	
 	hide()
 	_load_test_members()
+	_update_guild_info()
+
+func refresh_window() -> void:
+	"""Rafraîchit la liste des membres et les infos de guilde (appelé à l'affichage)."""
+	_refresh_member_list()
+	_update_guild_info()
 
 func _setup_header(parent: VBoxContainer):
 	# Barre de titre personnalisée
@@ -128,6 +134,8 @@ func _setup_content(parent: VBoxContainer):
 
 	members_list = ItemList.new()
 	members_list.custom_minimum_size = Vector2(300, 500)
+	members_list.icon_mode = ItemList.ICON_MODE_LEFT
+	members_list.fixed_icon_size = Vector2i(28, 28)  # portraits 1024px -> miniatures lisibles
 	members_list.item_selected.connect(_on_member_selected)
 	members_list.gui_input.connect(_on_members_list_gui_input)
 	left_vbox.add_child(members_list)
@@ -195,6 +203,8 @@ func _refresh_member_list():
 		var idx: int = members_list.item_count - 1
 		if not member.is_online:
 			members_list.set_item_custom_fg_color(idx, Color(0.5, 0.5, 0.5))
+		else:
+			members_list.set_item_custom_fg_color(idx, Color(0.90, 0.90, 0.93))
 
 func _on_member_selected(index: int):
 	if index < 0 or index >= guild_members.size():
@@ -667,7 +677,7 @@ func _kick_member(member):
 		_update_guild_info()
 		
 		# Notification
-		var notification_manager = get_node_or_null("/root/NotificationManager")
+		var notification_manager = NotificationManager
 		if notification_manager:
 			notification_manager.show_warning(
 				"%s a été exclu de la guilde." % member.nom,
