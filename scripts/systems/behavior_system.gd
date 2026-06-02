@@ -293,40 +293,53 @@ func apply_circadian_modifier(player, hour: int) -> float:
 
 func trigger_personal_event(player, event_type: String):
 	"""Déclenche un événement personnel pour un joueur"""
-	
+
 	var event = PersonalEventsScript.get_event(event_type)
-	if not event:
+	if event.is_empty():
 		return
-	
-	# Appliquer les effets de l'événement
-	match event.effect_type:
+
+	# Effets génériques sur l'humeur / l'énergie (présents sur la plupart des events)
+	if event.has("mood_impact"):
+		player.mood = clampf(player.mood + float(event["mood_impact"]), 0.0, 100.0)
+	if event.has("energy_boost"):
+		player.energy = clampf(player.energy + float(event["energy_boost"]), 0.0, 100.0)
+
+	# Effets spécifiques selon le type
+	match event.get("effect_type", ""):
 		"immediate_disconnect":
 			player.has_urgent_event = true
 			if player.is_online:
 				behavior_changed.emit(player, "urgent_disconnect")
-		
+
 		"schedule_absence":
 			if player.scheduled_absences == null:
 				player.scheduled_absences = []
 			player.scheduled_absences.append({
-				"start_day": _absolute_day() + event.get("delay_days", 0),
-				"duration_days": event.get("duration_days", 1)
+				"event": event_type,
+				"start_day": _absolute_day() + int(event.get("delay_days", 0)),
+				"duration_days": int(event.get("duration_days", 1))
 			})
-		
+
 		"bonus_time":
 			player.bonus_session_hours = event.get("bonus_hours", 2)
 			behavior_changed.emit(player, "bonus_time")
-	
+
+		"mood_modifier":
+			player.mood = clampf(player.mood + float(event.get("mood_change", 0)), 0.0, 100.0)
+
+		"energy_modifier":
+			player.energy = clampf(player.energy + float(event.get("energy_change", 0)), 0.0, 100.0)
+
 	personal_event_triggered.emit(player, event)
-	
-	# Mémoriser l'événement
+
+	# Mémoriser l'événement (jour absolu)
 	if player.recent_events_memory == null:
 		player.recent_events_memory = []
-	
+
 	player.recent_events_memory.append({
 		"type": "personal_event",
 		"event": event_type,
-		"day": game_time.current_day
+		"day": _absolute_day()
 	})
 
 func update_burnout_level(player):
@@ -474,19 +487,18 @@ func _check_personal_events():
 		# Passer le joueur
 		if member.get_meta("is_player", false):
 			continue
-		
-		# Probabilités d'événements
-		var rand = randf()
-		
-		if rand < 0.05:  # 5% urgence
-			trigger_personal_event(member, "urgent_family")
-			member.daily_event_triggered = true
-		elif rand < 0.15:  # 10% obligation
-			trigger_personal_event(member, "planned_obligation")
-			member.daily_event_triggered = true
-		elif rand < 0.23:  # 8% temps bonus
-			trigger_personal_event(member, "free_evening")
-			member.daily_event_triggered = true
+
+		# Probabilité globale d'avoir un événement (modulée par profil/burnout)
+		if not PersonalEventsScript.should_trigger_event(member):
+			continue
+
+		# Choisir un événement adapté à l'état du membre dans toute la base (~18 events)
+		var event: Dictionary = PersonalEventsScript.get_event_for_player(member)
+		if event.is_empty():
+			continue
+
+		trigger_personal_event(member, event.get("id", ""))
+		member.daily_event_triggered = true
 
 func _initialize_activity_preferences(player) -> Dictionary:
 	"""Initialise les préférences d'activité selon la personnalité"""
@@ -522,6 +534,50 @@ func _absolute_day() -> int:
 	if game_time and game_time.has_method("get_total_days_elapsed"):
 		return game_time.get_total_days_elapsed()
 	return 0
+
+func _connection_state_modifier(player) -> float:
+	"""Multiplicateur de présence selon l'état dynamique du membre (1.0 = neutre).
+	C'est ce qui fait que fatigue / burnout / humeur / amis en ligne influencent
+	réellement la connexion (le moteur `should_connect_dynamic` n'était pas branché)."""
+	var m: float = 1.0
+
+	# Fatigue
+	var fatigue: float = player.fatigue_accumulated if player.fatigue_accumulated != null else 0.0
+	if fatigue > 60.0:
+		m *= 0.7
+	elif fatigue > 40.0:
+		m *= 0.85
+
+	# Burnout
+	var burnout: int = player.burnout_level if player.burnout_level != null else 0
+	match burnout:
+		1: m *= 0.9
+		2: m *= 0.7
+		3: m *= 0.4
+
+	# Humeur
+	var mood: float = player.mood if player.mood != null else 75.0
+	if mood < 30.0:
+		m *= 0.6
+	elif mood > 80.0:
+		m *= 1.2
+
+	# Influence sociale : des amis en ligne donnent envie de se connecter (+20%/ami, max +60%)
+	if social_dynamics:
+		var friends_online: Array = social_dynamics.get_online_friends(player)
+		if friends_online.size() > 0:
+			m *= 1.0 + (0.2 * min(3, friends_online.size()))
+
+	return clampf(m, 0.2, 2.0)
+
+func _should_force_disconnect(player) -> bool:
+	"""Déconnexion imposée par l'état : épuisement ou burnout sévère."""
+	if player.energy <= 5.0:
+		return true
+	var burnout: int = player.burnout_level if player.burnout_level != null else 0
+	if burnout >= 3 and randf() < 0.3:
+		return true
+	return false
 
 func _is_member_absent_today(member) -> bool:
 	"""Vrai si le membre a une absence planifiée (événement personnel) couvrant le jour courant."""
@@ -559,12 +615,19 @@ func _check_scheduled_connections():
 		if not member.is_online and _is_member_absent_today(member):
 			continue
 
+		# Déconnexion dynamique : l'épuisement / le burnout sévère priment sur l'horaire.
+		if member.is_online and _should_force_disconnect(member):
+			behavior_changed.emit(member, "spontaneous_disconnection")
+			_schedule_next_connection_time(member)
+			continue
+
 		# Vérifier connexion
 		if not member.is_online and schedule.has("next_connection"):
 			var connection_time = schedule["next_connection"]
 			if current_time >= connection_time and current_time < connection_time + 10:
-				# Fenêtre de 10 minutes pour se connecter
-				if randf() < 0.3:  # 30% de chance par vérification
+				# Fenêtre de 10 minutes ; la chance dépend de l'état (fatigue/burnout/humeur/amis)
+				var connect_chance: float = clampf(0.3 * _connection_state_modifier(member), 0.05, 0.95)
+				if randf() < connect_chance:
 					member.go_online()
 					behavior_changed.emit(member, "scheduled_connection")
 					_schedule_next_disconnection_time(member)
@@ -576,7 +639,11 @@ func _check_scheduled_connections():
 				# Probabilité croissante de se déconnecter après l'heure prévue
 				var overtime = current_time - disconnection_time
 				var disconnect_prob = min(0.1 + (overtime * 0.02), 0.8)  # Max 80%
-				
+
+				# L'état dynamique pousse à partir plus tôt : fatigue/burnout augmentent
+				# la proba ; des amis en ligne la réduisent (on reste avec eux).
+				disconnect_prob = clampf(disconnect_prob / _connection_state_modifier(member), 0.05, 0.95)
+
 				if randf() < disconnect_prob:
 					behavior_changed.emit(member, "scheduled_disconnection")
 					_schedule_next_connection_time(member)
@@ -645,7 +712,14 @@ func _schedule_next_disconnection_time(member):
 	# Variance de ±30 minutes
 	var duration_variance = randi_range(-30, 30)
 	var session_duration = max(30, base_duration + duration_variance)  # Minimum 30 minutes
-	
+
+	# Temps bonus (événement personnel « soirée libre / congé ») : rallonge la
+	# session puis se consomme — auparavant stocké mais jamais lu.
+	var bonus_hours: float = member.bonus_session_hours if member.bonus_session_hours != null else 0.0
+	if bonus_hours > 0.0:
+		session_duration += int(bonus_hours * 60.0)
+		member.bonus_session_hours = 0
+
 	# Ajuster selon le burnout
 	var burnout = member.burnout_level if member.burnout_level != null else 0
 	if burnout > 0:

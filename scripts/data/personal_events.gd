@@ -260,19 +260,20 @@ static func should_trigger_event(player) -> bool:
 	var base_chance = 0.15  # 15% de base par jour
 	
 	# Modificateurs selon le profil comportemental
-	if player.has("behavior_profile"):
+	# (player est une Resource : pas de .has() — on teste la propriété directement)
+	if player.behavior_profile != null:
 		var profile = player.behavior_profile
-		
+
 		# Les flexibles ont plus d'événements imprévus
 		base_chance *= (1.0 + profile.flexibility * 0.3)
-		
+
 		# Les routiniers ont moins d'événements
 		base_chance *= (1.0 - profile.routine_preference * 0.2)
-	
+
 	# Modificateur selon le burnout (plus d'événements si burnout)
-	if player.has("burnout_level"):
-		base_chance *= (1.0 + player.burnout_level * 0.1)
-	
+	var burnout: int = player.burnout_level if player.burnout_level != null else 0
+	base_chance *= (1.0 + burnout * 0.1)
+
 	return randf() < base_chance
 
 static func get_event_for_player(player) -> Dictionary:
@@ -419,12 +420,12 @@ static func apply_event_effects(player, event: Dictionary):
 			player.has_urgent_event = true
 		
 		"schedule_absence":
-			if not player.has("scheduled_absences"):
+			if player.scheduled_absences == null:
 				player.scheduled_absences = []
 			player.scheduled_absences.append({
 				"event": event.get("id", "unknown"),
 				"start_day": event.get("delay_days", 0),
-				"duration": event.get("duration_days", 1)
+				"duration_days": event.get("duration_days", 1)
 			})
 		
 		"bonus_time":

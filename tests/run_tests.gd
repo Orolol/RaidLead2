@@ -19,6 +19,7 @@ func _run_all() -> void:
 	_suite_item_equipment(tf)
 	_suite_player(tf)
 	_suite_player_flow(tf)
+	_suite_simulation_depth(tf)
 	_suite_balance(tf)
 	_suite_advisor(tf)
 	_suite_save(tf)
@@ -151,6 +152,58 @@ func _suite_player_flow(tf) -> void:
 	pc.set_meta("is_player", true)
 	var data: Dictionary = SaveManager._serialize_player(pc)
 	tf.eq(data.get("last_activity_choice", ""), "LEVELING", "last_activity_choice sérialisée")
+
+func _suite_simulation_depth(tf) -> void:
+	tf.suite("Simulation (connexion dynamique + events)")
+	var PE = load("res://scripts/data/personal_events.gd")
+
+	# PersonalEvents : plus de crash player.has() sur une Resource
+	var p = SimulatedPlayer.new()
+	p.mood = 50.0
+	p.energy = 80.0
+	p.burnout_level = 0
+	p.fatigue_accumulated = 0.0
+	p.is_online = true
+	var triggered = PE.should_trigger_event(p)
+	tf.ok(triggered == true or triggered == false, "should_trigger_event renvoie un bool (pas de crash .has())")
+	var ev = PE.get_event_for_player(p)
+	tf.ok(ev is Dictionary, "get_event_for_player renvoie un Dictionary")
+	if not ev.is_empty():
+		tf.ok(ev.has("id") and PE.EVENTS_DATABASE.has(ev["id"]), "l'événement choisi existe dans la base")
+
+	# BehaviorSystem : la connexion dépend désormais de l'état dynamique
+	var bs = GuildManager.behavior_system
+	tf.ok(bs != null, "behavior_system instancié")
+	if bs:
+		var p2 = SimulatedPlayer.new()
+		p2.mood = 75.0
+		p2.burnout_level = 0
+		p2.fatigue_accumulated = 0.0
+		p2.energy = 100.0
+		var base_mod: float = bs._connection_state_modifier(p2)
+		tf.between(base_mod, 0.2, 2.0, "modificateur de connexion borné [0.2, 2.0]")
+		p2.burnout_level = 3
+		var burnout_mod: float = bs._connection_state_modifier(p2)
+		tf.ok(burnout_mod < base_mod, "le burnout réduit la probabilité de présence")
+
+		# Déconnexion forcée par épuisement
+		p2.energy = 2.0
+		tf.ok(bs._should_force_disconnect(p2), "l'épuisement force la déconnexion")
+
+		# trigger_personal_event applique réellement les effets (events auparavant inertes)
+		var p3 = SimulatedPlayer.new()
+		p3.mood = 50.0
+		p3.energy = 50.0
+		p3.is_online = true
+		bs.trigger_personal_event(p3, "free_evening")  # bonus_time + humeur/énergie
+		tf.eq(int(p3.bonus_session_hours), 3, "free_evening accorde 3h de temps bonus")
+		tf.ok(p3.mood > 50.0, "free_evening améliore l'humeur")
+
+		var p4 = SimulatedPlayer.new()
+		p4.mood = 50.0
+		p4.is_online = true
+		bs.trigger_personal_event(p4, "great_news")  # mood_modifier +40
+		tf.ok(p4.mood > 50.0, "great_news (mood_modifier) améliore l'humeur")
 
 func _suite_balance(tf) -> void:
 	tf.suite("BalanceManager")
