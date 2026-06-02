@@ -660,6 +660,15 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Refonte de la gestion du personnage joueur (2 juin 2026)
+*Suite de tests : 131 → 145 assertions, 100 % vertes + E2E dédié 8/8 (Godot 4.6.2 headless).*
+- 🔴 **Bug corrigé — l'énergie ne baissait jamais** : le personnage joueur démarrait connecté **sans activité** (`current_activity == null`), or les deux chemins de drain faisaient un *early-return*. Désormais le drain a une **source unique** (tick 5 min de l'`ActivityManager`) — suppression du double-drain horaire dans `GuildManager._update_player_character`.
+- ✅ **Pause-si-oisif (style Football Manager)** : quand le joueur est connecté sans activité, `GameTime` se met en **pause** et un **prompt modal** demande un ordre (Leveling / Farming / Détente / Se reposer). Le temps repart automatiquement dès qu'une activité est choisie (via le prompt **ou** le panneau de contrôle). Déclenché aussi au démarrage de partie.
+- ✅ **Reprise auto après repos** : nouvelle propriété persistante `last_activity_choice` (conservée à la déconnexion) ; après un repos (forcé par épuisement **ou** volontaire), le joueur se **reconnecte et reprend automatiquement** sa dernière activité. Repos unifié et **instantané** (`GameTime.fast_forward_hours`) en remplacement du hack temps-réel à 2400x.
+- ✅ **UI temps réel** : nouveau signal `PlayerCharacter.player_state_changed` ; la jauge d'énergie du panneau et la fenêtre Personnage se rafraîchissent **à l'instant** (plus seulement par polling 3-5 s). La fenêtre Personnage affiche désormais l'**activité courante** (🎯 en cours / ⏸️ en attente / 😴 hors ligne).
+- ✅ **Robustesse** : bouton « Se reposer » fonctionnel (l'ancien était un TODO désactivé) ; fermeture du dialog de repos via la croix routée vers la confirmation (évite un gel du verrou de repos) ; nettoyage des `print()` de debug (gated `OS.is_debug_build()`).
+- ✅ **Persistance** : `last_activity_choice` sauvegardée/chargée (`SaveManager`). Nouveau test `e2e_player_flow.gd` (pause → choix → drain) + suite unitaire `PlayerCharacter (flow)`.
+
 ### Implémentation de l'audit AuditAmeliorations.md (1er juin 2026)
 *Suite de tests : 57 → 101 assertions, 100 % vertes (Godot 4.6.2 headless).*
 - **Recrutement national (P5)** : la commission d'agent est désormais prélevée sur l'or dans **tous** les chemins d'acceptation (offre directe ET contre-proposition), avec contrôle de solvabilité, centralisé dans `RecruitmentPool._finalize_national_recruit()` (à l'image de `TransferManager`). UI mise à jour (message de signature + cas « inabordable »).

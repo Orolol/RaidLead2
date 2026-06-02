@@ -120,11 +120,12 @@ func _setup_status_and_controls(parent: VBoxContainer):
 	status_label.modulate = Color(0.8, 0.8, 0.8)
 	controls_container.add_child(status_label)
 	
-	# Bouton de déconnexion
+	# Bouton de repos (récupère l'énergie puis reprend l'activité)
 	disconnect_button = Button.new()
-	disconnect_button.text = "⏰ Se déconnecter"
+	disconnect_button.text = "😴 Se reposer"
+	disconnect_button.tooltip_text = "Repos : récupère toute l'énergie puis reprend automatiquement l'activité en cours"
 	disconnect_button.custom_minimum_size = Vector2(0, 35)
-	disconnect_button.modulate = Color(1.0, 0.7, 0.7)
+	disconnect_button.modulate = Color(0.8, 0.9, 1.0)
 	controls_container.add_child(disconnect_button)
 
 func _setup_session_info(parent: VBoxContainer):
@@ -168,10 +169,11 @@ func _connect_signals():
 func set_player_character(player: PlayerCharacterScript):
 	player_character = player
 	_update_display()
-	
-	# Se connecter aux signaux du joueur si nécessaire
-	if player_character:
-		print("Player control panel configuré pour: %s" % player_character.nom)
+
+	# Rafraîchissement temps réel piloté par le signal d'état (énergie/activité)
+	if player_character and player_character.has_signal("player_state_changed"):
+		if not player_character.player_state_changed.is_connected(_update_display):
+			player_character.player_state_changed.connect(_update_display)
 
 func _update_display():
 	if not player_character:
@@ -255,25 +257,17 @@ func _format_duration(minutes: int) -> String:
 func _on_activity_selected(index: int):
 	var metadata = activity_option.get_item_metadata(index)
 	if metadata == null or not player_character:
-		print("PlayerControlPanel: metadata null ou player_character null")
 		return
 	
 	var activity_type = metadata as String
-	print("PlayerControlPanel: Tentative de changement d'activité vers: %s" % activity_type)
-	print("PlayerControlPanel: manual_control_enabled = %s" % player_character.manual_control_enabled)
-	print("PlayerControlPanel: Énergie actuelle: %.1f" % player_character.player_energy_pool)
-	
+
 	if player_character.can_perform_activity(activity_type):
-		print("PlayerControlPanel: Activité autorisée, tentative de démarrage...")
 		if player_character.choose_activity(activity_type):
-			print("PlayerControlPanel: Activité démarrée avec succès!")
 			activity_changed.emit(activity_type)
 			_show_activity_feedback(activity_type)
 		else:
-			print("PlayerControlPanel: Échec du démarrage de l'activité")
 			_show_error_message("Impossible de démarrer cette activité")
 	else:
-		print("PlayerControlPanel: Activité non autorisée (énergie insuffisante)")
 		_show_error_message("Énergie insuffisante pour cette activité")
 
 func _on_disconnect_pressed():

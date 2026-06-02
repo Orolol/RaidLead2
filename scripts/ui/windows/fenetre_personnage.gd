@@ -27,9 +27,11 @@ var reputation_bonus_label: Label
 # Éléments du joueur
 var xp_progress_bar: ProgressBar
 var xp_label: Label
+var activity_label: Label
 var energy_label: Label
 var mood_label: Label
 var session_label: Label
+var _state_signal_connected: bool = false
 
 # Timer pour mise à jour automatique
 var update_timer: Timer
@@ -237,7 +239,12 @@ func _setup_player_stats(parent: VBoxContainer):
 	stats_title.text = "⚡ État Actuel"
 	stats_title.add_theme_font_size_override("font_size", 14)
 	stats_container.add_child(stats_title)
-	
+
+	activity_label = Label.new()
+	activity_label.text = "Activité: En attente"
+	activity_label.add_theme_font_size_override("font_size", 12)
+	stats_container.add_child(activity_label)
+
 	energy_label = Label.new()
 	energy_label.text = "Énergie: 100/100"
 	energy_label.add_theme_font_size_override("font_size", 12)
@@ -382,7 +389,25 @@ func update_character_info():
 	var player = guild_manager.get_player_character()
 	if not player:
 		return
-	
+
+	# Rafraîchissement temps réel piloté par le signal d'état du joueur (énergie/activité)
+	if not _state_signal_connected and player.has_signal("player_state_changed"):
+		player.player_state_changed.connect(update_character_info)
+		_state_signal_connected = true
+
+	# Activité courante
+	if activity_label:
+		if not player.is_online:
+			activity_label.text = "Activité: 😴 Hors ligne (repos)"
+			activity_label.modulate = Color(0.7, 0.7, 0.7)
+		elif player.current_activity:
+			var act_name: String = player.get_activity_display_name(player.current_activity.get_type_string().to_upper())
+			activity_label.text = "Activité: 🎯 " + act_name
+			activity_label.modulate = Color(0.6, 1.0, 0.6)
+		else:
+			activity_label.text = "Activité: ⏸️ En attente d'un ordre"
+			activity_label.modulate = Color(1.0, 0.9, 0.4)
+
 	# Informations de base
 	classe_label.text = "Classe: " + player.personnage_classe
 	niveau_label.text = "Niveau: " + str(player.personnage_niveau)

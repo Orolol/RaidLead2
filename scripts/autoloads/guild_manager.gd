@@ -134,15 +134,13 @@ func _update_all_members() -> void:
 			_assign_default_activity(member)
 
 func _update_player_character(player: PlayerCharacterScript) -> void:
-	"""Met à jour le personnage joueur"""
+	"""Met à jour le personnage joueur.
+	Le drain d'énergie est géré exclusivement par l'ActivityManager (tick 5 min)
+	pour éviter un double comptage. Ici on ne traite que la reconnexion programmée."""
 	if not player.is_player_controlled:
 		return
-	
-	# Mettre à jour l'énergie du joueur basée sur le temps écoulé
-	if player.current_activity:
-		player.update_player_energy(5.0)  # 5 minutes écoulées
-	
-	# Vérifier les tentatives de reconnexion
+
+	# Vérifier les tentatives de reconnexion (repos volontaire programmé)
 	if not player.is_online:
 		player.try_reconnect()
 

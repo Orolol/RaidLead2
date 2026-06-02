@@ -18,6 +18,7 @@ func _run_all() -> void:
 	_suite_time(tf)
 	_suite_item_equipment(tf)
 	_suite_player(tf)
+	_suite_player_flow(tf)
 	_suite_balance(tf)
 	_suite_advisor(tf)
 	_suite_save(tf)
@@ -107,6 +108,49 @@ func _suite_player(tf) -> void:
 		p.behavior_profile.achievement_drive = 0.5
 		p.trigger_raid_success()
 		tf.ok(p.behavior_profile.achievement_drive > 0.5, "un succès de raid fait évoluer le profil comportemental")
+
+func _suite_player_flow(tf) -> void:
+	tf.suite("PlayerCharacter (flow)")
+	var PC = load("res://scripts/resources/player_character.gd")
+	var pc = PC.new()
+
+	# État initial : connecté, sans activité → doit attendre un ordre (pause-si-oisif)
+	tf.ok(pc.needs_activity_choice(), "joueur sans activité = en attente d'un ordre")
+	tf.eq(pc.last_activity_choice, "", "aucune dernière activité au départ")
+	tf.ok(pc.can_perform_activity("LEVELING"), "peut faire du leveling avec énergie pleine")
+
+	# Choix d'une activité : démarre + mémorise comme dernière activité
+	var started: bool = pc.choose_activity("LEVELING")
+	tf.ok(started, "choose_activity(LEVELING) démarre l'activité")
+	tf.eq(pc.last_activity_choice, "LEVELING", "dernière activité mémorisée")
+	tf.ok(not pc.needs_activity_choice(), "avec une activité, plus en attente")
+
+	# Drain d'énergie sur 1h de leveling (15/h)
+	var before_energy: float = pc.player_energy_pool
+	pc.update_player_energy(60.0)
+	tf.ok(pc.player_energy_pool < before_energy, "l'énergie baisse pendant l'activité")
+	tf.approx(pc.player_energy_pool, before_energy - 15.0, "drain leveling = 15/h", 0.5)
+
+	# Déconnexion : conserve la dernière activité pour la reprise auto
+	pc.disconnect_player("Test")
+	tf.ok(not pc.is_online, "déconnecté après disconnect_player")
+	tf.eq(pc.last_activity_choice, "LEVELING", "dernière activité conservée à la déconnexion")
+
+	# Reconnexion + reprise auto de la dernière activité
+	pc.reconnect_player()
+	tf.ok(pc.is_online, "reconnecté")
+	var resumed: bool = pc.resume_last_activity()
+	tf.ok(resumed, "resume_last_activity relance la dernière activité")
+	tf.ok(not pc.needs_activity_choice(), "après reprise, plus en attente d'ordre")
+
+	# Nettoyage : retirer l'activité de l'ActivityManager pour ne pas polluer les autres suites
+	if ActivityManager and ActivityManager.has_method("interrupt_activity"):
+		ActivityManager.interrupt_activity(pc, "Fin de test")
+
+	# Round-trip persistance de last_activity_choice (bloc joueur sérialisé si meta is_player)
+	pc.set_meta("is_player", true)
+	var data: Dictionary = SaveManager._serialize_player(pc)
+	tf.eq(data.get("last_activity_choice", ""), "LEVELING", "last_activity_choice sérialisée")
 
 func _suite_balance(tf) -> void:
 	tf.suite("BalanceManager")

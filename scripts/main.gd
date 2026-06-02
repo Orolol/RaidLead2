@@ -20,6 +20,9 @@ var _loot_dialog_active: bool = false
 # Système joueur
 var player_control_panel: PlayerControlPanelScript = null
 var player_character = null  # Référence au personnage joueur
+var is_in_forced_rest: bool = false  # Verrou pendant un repos (forcé ou volontaire)
+var _auto_paused_for_idle: bool = false  # Le temps a été mis en pause car le joueur attend un ordre
+var _activity_prompt: AcceptDialog = null  # Modal de choix d'activité (pause-si-oisif)
 # var fast_forward_manager: Node = null  # Supprimé - système simplifié
 
 func _ready() -> void:
@@ -821,90 +824,193 @@ func _connect_player_systems() -> void:
 	if guild_manager and guild_manager.get_player_character():
 		player_character = guild_manager.get_player_character()
 		player_character.forced_disconnect_requested.connect(_on_player_forced_disconnect)
-	
-	print("Systèmes joueur configurés")
+		# Suivi temps réel de l'état joueur (énergie/activité) pour la pause-si-oisif
+		if player_character.has_signal("player_state_changed"):
+			player_character.player_state_changed.connect(_on_player_state_changed)
 
-func _on_player_disconnect_requested(return_hour: int, return_minute: int) -> void:
-	"""Gère la demande de déconnexion manuelle du joueur"""
-	print("Joueur demande déconnexion manuelle")
-	# TODO: Implémenter déconnexion manuelle simple si nécessaire
-	print("Déconnexion manuelle temporairement désactivée")
+	if OS.is_debug_build():
+		print("Systèmes joueur configurés")
+
+	# Au démarrage, si le joueur n'a aucune activité, on bloque le temps et on
+	# demande un ordre (sauf en mode test sans save autoload).
+	call_deferred("_on_player_state_changed")
+
+func _on_player_disconnect_requested(_return_hour: int, _return_minute: int) -> void:
+	"""Bouton « Se reposer » : repos volontaire avec reprise auto de l'activité."""
+	_perform_rest(8, false)
 
 func _on_player_forced_disconnect(recovery_hours: int) -> void:
-	"""Gère la déconnexion forcée du joueur (épuisement)"""
-	print("Joueur déconnecté automatiquement - repos forcé de %d heures" % recovery_hours)
-	execute_forced_rest()
+	"""Déconnexion forcée du joueur (épuisement total)."""
+	_perform_rest(recovery_hours, true)
 
-func execute_forced_rest() -> void:
-	"""Execute le repos forcé de 12h avec système robuste"""
-	print("Démarrage du repos forcé - BLOCAGE TOTAL")
-	
-	# 1. PAUSE GLOBALE - Bloque tout sauf les dialogs avec PROCESS_MODE_ALWAYS
+func _perform_rest(recovery_hours: int, forced: bool) -> void:
+	"""Repos unifié (forcé ou volontaire) : pause → confirmation → avance le temps
+	instantanément → récupère l'énergie → reconnecte → reprend la dernière activité."""
+	if is_in_forced_rest:
+		return
+	is_in_forced_rest = true
+
+	# Fermer un éventuel prompt d'oisiveté (il est remplacé par le repos)
+	if is_instance_valid(_activity_prompt):
+		_activity_prompt.queue_free()
+		_activity_prompt = null
+
+	# Déconnecter le joueur s'il est encore en ligne (cas du repos volontaire)
+	if player_character and player_character.is_online:
+		player_character.disconnect_player("Repos")
+
+	# Bloque tout (sauf le dialog en PROCESS_MODE_ALWAYS) pendant la confirmation
 	get_tree().paused = true
-	
-	# 2. Créer dialog simple et robuste
-	var dialog = AcceptDialog.new()
-	dialog.title = "ÉPUISEMENT TOTAL"
-	dialog.dialog_text = "Votre personnage est complètement épuisé !\n\nUn repos de 12 heures est OBLIGATOIRE.\n\nPendant ce temps :\n• Récupération de 100% d'énergie\n• Aucune action possible\n• Le temps passera à vitesse maximale"
-	dialog.get_ok_button().text = "COMMENCER LE REPOS"
+
+	var dialog := AcceptDialog.new()
+	if forced:
+		dialog.title = "Épuisement total"
+		dialog.dialog_text = "Votre personnage est complètement épuisé !\n\nUn repos de %dh est nécessaire.\n• Récupération complète de l'énergie\n• Vous reprendrez automatiquement votre activité" % recovery_hours
+		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
+	else:
+		dialog.title = "Repos"
+		dialog.dialog_text = "Votre personnage va se reposer %dh.\n• Récupération complète de l'énergie\n• Reprise automatique de l'activité au réveil" % recovery_hours
+		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
 	dialog.process_mode = Node.PROCESS_MODE_ALWAYS  # Reste actif pendant la pause
-	dialog.exclusive = true  # Modal exclusif
-	
+	dialog.exclusive = true
+	# Fermer via la croix doit aussi valider le repos, sinon le verrou de repos
+	# resterait actif et figerait le jeu.
+	dialog.close_requested.connect(func(): dialog.emit_signal("confirmed"))
 	get_tree().root.add_child(dialog)
-	dialog.popup_centered(Vector2(600, 400))
-	
-	# 3. Attendre la confirmation de l'utilisateur
+	dialog.popup_centered(Vector2(460, 220))
+
 	await dialog.confirmed
-	print("Utilisateur a confirmé le repos - démarrage fast-forward")
-	
-	# 4. REPRENDRE LE JEU pour permettre le fast-forward
+	if is_instance_valid(dialog):
+		dialog.queue_free()
+
+	# Reprendre l'arbre, puis avancer le temps de jeu instantanément
 	get_tree().paused = false
-	print("Jeu repris pour le fast-forward")
-	
-	# 5. Fast-forward direct sans FastForwardManager
-	var game_time = GameTime
-	if game_time:
-		game_time.set_time_speed(2400.0)  # Vitesse maximum
-		print("Vitesse mise au maximum (2400x)")
-	
-	# 6. Calculer combien de temps réel pour 12h de jeu
-	var real_time_for_12h = (12.0 * 3600.0) / 2400.0  # 12h de jeu / vitesse = temps réel en secondes
-	print("Fast-forward de 12h en %.1f secondes réelles" % real_time_for_12h)
-	
-	# 7. Timer pour attendre la fin du fast-forward
-	var timer = Timer.new()
-	timer.wait_time = real_time_for_12h
-	timer.one_shot = true
-	timer.process_mode = Node.PROCESS_MODE_ALWAYS  # Continue pendant la pause
-	add_child(timer)
-	timer.start()
-	
-	# 8. Attendre la fin du fast-forward
-	await timer.timeout
-	print("Fast-forward terminé - restauration")
-	
-	# 9. Restaurer l'énergie directement
+	if GameTime:
+		GameTime.fast_forward_hours(recovery_hours)
+
+	# Récupération complète + reconnexion
 	if player_character:
 		player_character.player_energy_pool = player_character.max_energy_pool
-		print("Énergie restaurée : %.1f/%.1f" % [player_character.player_energy_pool, player_character.max_energy_pool])
-		
-		# Reconnecter le joueur
+		player_character.energy = 100.0
 		player_character.reconnect_player()
-	
-	# 10. Retour à la normale
-	if game_time:
-		game_time.set_time_speed(60.0)  # Vitesse normale
-	
-	# 11. Nettoyer
-	dialog.queue_free()
-	timer.queue_free()
-	
-	print("Repos forcé terminé - retour à la normale")
 
-func _on_player_activity_changed(activity_type: String) -> void:
-	"""Gère le changement d'activité du joueur"""
-	print("Joueur a changé d'activité: %s" % activity_type)
-	
-	# Actualiser le panneau de contrôle
+	is_in_forced_rest = false
+
+	# Reprise automatique de la dernière activité (sinon, demander un ordre)
+	if player_character and not player_character.resume_last_activity():
+		_auto_paused_for_idle = false
+		_on_player_state_changed()
+	else:
+		_exit_idle_prompt()
+
 	if player_control_panel:
 		player_control_panel.refresh_display()
+
+func _on_player_activity_changed(_activity_type: String) -> void:
+	"""Le joueur a changé d'activité depuis le panneau : rafraîchit l'affichage."""
+	if player_control_panel:
+		player_control_panel.refresh_display()
+
+# --- Pause-si-oisif : le temps se bloque tant que le joueur n'a pas d'ordre ---
+
+func _on_player_state_changed() -> void:
+	"""Réagit aux changements d'état du joueur (énergie/activité/connexion)."""
+	if is_in_forced_rest:
+		return
+	if not player_character:
+		return
+	if player_character.needs_activity_choice():
+		_enter_idle_prompt()
+	else:
+		_exit_idle_prompt()
+	if player_control_panel:
+		player_control_panel.refresh_display()
+
+func _enter_idle_prompt() -> void:
+	"""Bloque le temps et demande une activité au joueur."""
+	if _auto_paused_for_idle:
+		return
+	_auto_paused_for_idle = true
+	if GameTime:
+		GameTime.pause()
+	_show_activity_prompt()
+
+func _exit_idle_prompt() -> void:
+	"""Ferme le prompt et reprend le temps si on l'avait mis en pause pour oisiveté."""
+	if is_instance_valid(_activity_prompt):
+		_activity_prompt.queue_free()
+		_activity_prompt = null
+	if not _auto_paused_for_idle:
+		return
+	_auto_paused_for_idle = false
+	if GameTime:
+		GameTime.resume()
+
+func _show_activity_prompt() -> void:
+	"""Modal de choix d'activité (style Football Manager : « donnez un ordre »)."""
+	if is_instance_valid(_activity_prompt):
+		return
+	var p = player_character
+	if not p:
+		return
+
+	var dialog := AcceptDialog.new()
+	dialog.title = "Votre personnage attend vos ordres"
+	dialog.get_ok_button().visible = false
+	dialog.process_mode = Node.PROCESS_MODE_ALWAYS
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+
+	var info := Label.new()
+	info.text = "⏸️  Jeu en pause — que fait %s ?\nÉnergie : %.0f / %.0f" % [p.nom, p.player_energy_pool, p.max_energy_pool]
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(info)
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	vbox.add_child(row)
+
+	var choices := [
+		{"key": "LEVELING", "label": "🗡️ Leveling"},
+		{"key": "FARMING", "label": "💰 Farming"},
+		{"key": "FUN", "label": "🎮 Détente"},
+	]
+	for c in choices:
+		var b := Button.new()
+		b.text = c["label"]
+		b.custom_minimum_size = Vector2(120, 42)
+		b.disabled = not p.can_perform_activity(c["key"])
+		b.pressed.connect(_on_prompt_activity_chosen.bind(c["key"]))
+		row.add_child(b)
+
+	var rest_btn := Button.new()
+	rest_btn.text = "😴 Se reposer (8h)"
+	rest_btn.custom_minimum_size = Vector2(0, 36)
+	rest_btn.pressed.connect(_on_prompt_rest_chosen)
+	vbox.add_child(rest_btn)
+
+	# Si fermé via la croix : on libère le node (le temps reste en pause, le joueur
+	# peut choisir via le panneau de contrôle qui relancera le temps).
+	dialog.close_requested.connect(func():
+		if is_instance_valid(_activity_prompt):
+			_activity_prompt.queue_free()
+			_activity_prompt = null
+	)
+
+	dialog.add_child(vbox)
+	get_tree().root.add_child(dialog)
+	dialog.popup_centered(Vector2(460, 230))
+	_activity_prompt = dialog
+
+func _on_prompt_activity_chosen(activity_type: String) -> void:
+	"""Choix d'activité depuis le prompt : démarre l'activité (le temps reprend via le signal)."""
+	if not player_character:
+		return
+	player_character.choose_activity(activity_type)
+	# choose_activity émet player_state_changed → _exit_idle_prompt (ferme + reprend le temps)
+
+func _on_prompt_rest_chosen() -> void:
+	"""Bouton « Se reposer » du prompt d'oisiveté."""
+	_perform_rest(8, false)

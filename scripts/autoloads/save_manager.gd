@@ -380,6 +380,7 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		data["max_energy_pool"] = pc.get("max_energy_pool") if pc.get("max_energy_pool") != null else 100.0
 		data["session_xp_gained"] = pc.get("session_xp_gained") if pc.get("session_xp_gained") != null else 0
 		data["session_gold_gained"] = pc.get("session_gold_gained") if pc.get("session_gold_gained") != null else 0
+		data["last_activity_choice"] = pc.get("last_activity_choice") if pc.get("last_activity_choice") != null else ""
 
 	return data
 
@@ -439,6 +440,7 @@ func _deserialize_player_character(player, data: Dictionary) -> void:
 	player.max_energy_pool = data.get("max_energy_pool", 100.0)
 	player.session_xp_gained = data.get("session_xp_gained", 0)
 	player.session_gold_gained = data.get("session_gold_gained", 0)
+	player.last_activity_choice = data.get("last_activity_choice", "")
 	player.is_player_controlled = true
 	player.manual_control_enabled = true
 
