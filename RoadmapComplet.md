@@ -660,6 +660,13 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Reprise des améliorations de l'audit — santé/simulation/UI (2 juin 2026)
+*155 assertions vertes + 2 E2E (Godot 4.6.2). Lots « volontairement reportés » de l'audit repris.*
+- ✅ **Santé du code** : 38 `get_node("/root/X")` remplacés par les identifiants globaux d'autoload ; nouveau `GameLog` (debug gardé par `OS.is_debug_build()`) avec 132 `print()` de boucle migrés. `singletons.gd` laissé intact (résolveur dynamique).
+- ✅ **Profondeur de simulation** : connexion dynamique branchée — fatigue/burnout/humeur/amis en ligne influencent enfin la présence (`_connection_state_modifier` + déconnexion forcée sur épuisement) ; `PersonalEvents` routé via la vraie API (`should_trigger_event`/`get_event_for_player`, ~18 events au lieu de 3 ids en dur dont un inexistant), `player.has(...)` corrigé, effets (humeur/énergie/tous types) réellement appliqués, **temps bonus** (soirée libre/congé) consommé.
+- ✅ **UI — multi-fenêtres mort tranché** : mode **mono-fenêtre** assumé. Retrait du code mort/cassé (Alt+Tab `cycle_windows`, cascade/tuiles, minimisation/taskbar, layouts nommés, signaux et constantes orphelins). Bonus : la **mémorisation des positions** de fenêtres devient réellement persistée (écrite à la fermeture, relue au boot).
+- ✅ **UI — source unique de couleurs** : `UITheme` est la palette canonique ; `UIConstants` en dérive ses couleurs structurelles et `chat_panel.MESSAGE_COLORS` cesse d'être une 3e source (dérive de `UIConstants`). Rendu vérifié par screenshot (aucune régression).
+
 ### Prompt d'oisiveté thémé + Donjon/Raid au choix joueur (2 juin 2026)
 *E2E dédiés : flow 8/8 + organisation 4/4, 145/145 assertions vertes (Godot 4.6.2).*
 - ✅ **(b) Prompt d'oisiveté thémé** : l'`AcceptDialog` brut est remplacé par un **overlay in-game** (CanvasLayer + fond assombri à 72 % + `PanelContainer` à bordure accent) qui hérite du thème global `UITheme`. Titre « Jeu en pause », énergie, boutons d'activité avec descriptions, séparateurs — rendu vérifié par screenshot.

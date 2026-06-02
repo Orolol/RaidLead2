@@ -5,16 +5,18 @@ class_name ChatPanel
 @onready var scroll_container: ScrollContainer = $VBoxContainer/ScrollContainer
 
 const MAX_MESSAGES = 100
+# Couleurs dérivées de la palette canonique (UIConstants ← UITheme) plutôt que
+# d'une 3e source. Seul l'orange « donjon » reste un hue spécifique au chat.
 const MESSAGE_COLORS = {
-	"info": Color(0.8, 0.8, 0.8),      # Gris clair
-	"connect": Color(0.4, 1.0, 0.4),    # Vert
-	"disconnect": Color(1.0, 0.4, 0.4), # Rouge
-	"levelup": Color(1.0, 1.0, 0.4),    # Jaune
-	"activity": Color(0.4, 0.8, 1.0),   # Bleu clair
-	"dungeon": Color(1.0, 0.6, 0.2),    # Orange
-	"loot": Color(0.8, 0.4, 1.0),       # Violet
-	"warning": Color(1.0, 0.8, 0.3),    # Jaune orangé
-	"error": Color(1.0, 0.3, 0.3)       # Rouge vif
+	"info": UIConstants.COLOR_TEXT_DIM,
+	"connect": UIConstants.COLOR_SUCCESS,
+	"disconnect": UIConstants.COLOR_ERROR,
+	"levelup": UIConstants.COLOR_TEXT_HIGHLIGHT,
+	"activity": UIConstants.COLOR_INFO,
+	"dungeon": Color(1.0, 0.6, 0.2),
+	"loot": UIConstants.COLOR_RARITY_EPIC,
+	"warning": UIConstants.COLOR_WARNING,
+	"error": UIConstants.COLOR_ERROR,
 }
 
 var messages: Array = []

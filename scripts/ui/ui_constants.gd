@@ -1,22 +1,28 @@
 class_name UIConstants
 
 ## Constantes UI centralisées — remplace les magic numbers éparpillés dans les composants.
+##
+## Source unique des couleurs : la PALETTE de référence est `UITheme` (c'est elle
+## qui est appliquée au thème global de tout l'arbre). Les couleurs structurelles
+## ci-dessous y sont rattachées ; seules les couleurs *sémantiques*
+## (succès/avertissement/erreur/info/achievement) et de rareté sont définies ici.
 
-# --- Couleurs ---
-const COLOR_BG_DARK := Color(0.1, 0.1, 0.15)
-const COLOR_BG_PANEL := Color(0.12, 0.12, 0.18, 0.95)
-const COLOR_BG_HEADER := Color(0.15, 0.15, 0.22, 0.95)
+# --- Couleurs structurelles (dérivées de UITheme = palette canonique) ---
+const COLOR_BG_DARK := UITheme.BG_DEEP
+const COLOR_BG_PANEL := UITheme.BG_PANEL
+const COLOR_BG_HEADER := UITheme.BG_RAISED
 
-const COLOR_PRIMARY := Color(0.2, 0.6, 0.9)
+const COLOR_PRIMARY := UITheme.ACCENT
+const COLOR_TEXT := UITheme.TEXT
+const COLOR_TEXT_DIM := UITheme.TEXT_DIM
+const COLOR_TEXT_HIGHLIGHT := Color(1.0, 0.9, 0.5)
+
+# --- Couleurs sémantiques (canoniques ici) ---
 const COLOR_SUCCESS := Color(0.3, 0.8, 0.3)
 const COLOR_WARNING := Color(0.9, 0.7, 0.2)
 const COLOR_ERROR := Color(0.9, 0.3, 0.3)
 const COLOR_INFO := Color(0.4, 0.7, 0.9)
 const COLOR_ACHIEVEMENT := Color(0.8, 0.4, 0.9)
-
-const COLOR_TEXT := Color(0.9, 0.9, 0.9)
-const COLOR_TEXT_DIM := Color(0.6, 0.6, 0.6)
-const COLOR_TEXT_HIGHLIGHT := Color(1.0, 0.9, 0.5)
 
 # Couleurs de rareté (WoW style)
 const COLOR_RARITY_COMMON := Color.WHITE

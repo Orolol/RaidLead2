@@ -883,3 +883,14 @@ La majorité des reportés ci-dessus a été reprise dans une seconde passe (sui
 - ✅ **Santé du code** : chemin enfant fragile `"/root/GuildManager/BehaviorSystem"` remplacé par `GuildManager.behavior_system` ; prints horaires d'`EventManager` gardés en build debug.
 
 Restent volontairement reportés (à faire avec validation **visuelle** via l'éditeur/MCP, ou design à trancher) : refonte complète de la connexion dynamique (`should_connect_dynamic`) et routage de la pool `PersonalEvents` ; **drag&drop d'équipement**, unification `UIConstants`/`UITheme`, décision sur le code multi-fenêtres mort ; migration de masse des `get_node("/root/..")` restants et `print()`→logger complet.
+
+### Lot reporté — repris (2 juin 2026, passe « reprise des améliorations »)
+
+Suite de tests **131 → 155 assertions** vertes, + E2E. Reste uniquement le **drag&drop d'équipement** (= construire un inventaire/banque, vraie feature).
+
+- ✅ **Connexion dynamique (C1)** : `_connection_state_modifier()` (fatigue/burnout/humeur/amis) injecté dans `_check_scheduled_connections` (chance de connexion + proba de déconnexion) ; déconnexion forcée sur épuisement/burnout sévère. Présence enfin pilotée par l'état.
+- ✅ **PersonalEvents** : `_check_personal_events` route via `should_trigger_event()` + `get_event_for_player()` (toute la base) ; `player.has(...)` (crash Resource) corrigé ; `trigger_personal_event` applique humeur/énergie + tous les types d'effet ; **temps bonus consommé** (rallonge la session).
+- ✅ **`get_node("/root/..")` → autoloads** : 38 sites migrés (managers/systèmes/UI/resources) ; `singletons.gd` intact.
+- ✅ **`print()` → logger** : `GameLog.d()` gardé par `OS.is_debug_build()`, 132 prints de boucle migrés.
+- ✅ **Multi-fenêtres mort (E)** : mono-fenêtre assumé ; `cycle_windows`/`arrange_cascade`/`arrange_tile`/minimisation/taskbar/layouts nommés + signaux/consts orphelins retirés ; mémorisation des positions rendue réellement persistante.
+- ✅ **Couleurs (E)** : `UITheme` = palette unique ; `UIConstants` et `chat_panel.MESSAGE_COLORS` en dérivent (plus de 3 sources divergentes).
