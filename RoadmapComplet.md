@@ -660,6 +660,11 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Prompt d'oisiveté thémé + Donjon/Raid au choix joueur (2 juin 2026)
+*E2E dédiés : flow 8/8 + organisation 4/4, 145/145 assertions vertes (Godot 4.6.2).*
+- ✅ **(b) Prompt d'oisiveté thémé** : l'`AcceptDialog` brut est remplacé par un **overlay in-game** (CanvasLayer + fond assombri à 72 % + `PanelContainer` à bordure accent) qui hérite du thème global `UITheme`. Titre « Jeu en pause », énergie, boutons d'activité avec descriptions, séparateurs — rendu vérifié par screenshot.
+- ✅ **(a) Donjon/Raid comme choix joueur** : nouveau bouton « ⚔️ Donjon / Raid » dans le prompt **et** le panneau de contrôle. Il route vers la **vraie fenêtre d'organisation de groupe** (flow PvE existant : composition → `DungeonInstance`), présélectionnée sur le bon contenu via `Fenetre_OrganisationGroupe.preselect_activity()`. Pas de fausse activité solo : Donjon/Raid restent du contenu de groupe. Choisir « organiser » relance le temps (c'est un ordre donné).
+
 ### Refonte de la gestion du personnage joueur (2 juin 2026)
 *Suite de tests : 131 → 145 assertions, 100 % vertes + E2E dédié 8/8 (Godot 4.6.2 headless).*
 - 🔴 **Bug corrigé — l'énergie ne baissait jamais** : le personnage joueur démarrait connecté **sans activité** (`current_activity == null`), or les deux chemins de drain faisaient un *early-return*. Désormais le drain a une **source unique** (tick 5 min de l'`ActivityManager`) — suppression du double-drain horaire dans `GuildManager._update_player_character`.

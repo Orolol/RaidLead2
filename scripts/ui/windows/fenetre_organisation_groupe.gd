@@ -52,6 +52,18 @@ func refresh_window() -> void:
 		guild_members = GuildManager.guild_members
 	_refresh_available_members()
 
+func preselect_activity(kind: String) -> void:
+	"""Présélectionne un type de contenu (depuis le prompt/panneau joueur).
+	kind : 'dungeon' | 'raid' | 'fun'."""
+	var idx: int = 0
+	match kind:
+		"dungeon": idx = 1
+		"raid": idx = 2
+		"fun": idx = 3
+	if activity_option and idx > 0:
+		activity_option.select(idx)
+		_on_activity_selected(idx)
+
 func _setup_header(parent: VBoxContainer):
 	var header = HBoxContainer.new()
 	parent.add_child(header)

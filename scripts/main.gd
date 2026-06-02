@@ -22,7 +22,7 @@ var player_control_panel: PlayerControlPanelScript = null
 var player_character = null  # Référence au personnage joueur
 var is_in_forced_rest: bool = false  # Verrou pendant un repos (forcé ou volontaire)
 var _auto_paused_for_idle: bool = false  # Le temps a été mis en pause car le joueur attend un ordre
-var _activity_prompt: AcceptDialog = null  # Modal de choix d'activité (pause-si-oisif)
+var _activity_prompt: CanvasLayer = null  # Overlay thémé de choix d'activité (pause-si-oisif)
 # var fast_forward_manager: Node = null  # Supprimé - système simplifié
 
 func _ready() -> void:
@@ -818,6 +818,8 @@ func _connect_player_systems() -> void:
 	if player_control_panel:
 		player_control_panel.disconnect_requested.connect(_on_player_disconnect_requested)
 		player_control_panel.activity_changed.connect(_on_player_activity_changed)
+		if player_control_panel.has_signal("organize_requested"):
+			player_control_panel.organize_requested.connect(_on_player_organize_requested)
 	
 	# Connecter le signal de déconnexion forcée du joueur
 	var guild_manager = GuildManager
@@ -947,62 +949,104 @@ func _exit_idle_prompt() -> void:
 		GameTime.resume()
 
 func _show_activity_prompt() -> void:
-	"""Modal de choix d'activité (style Football Manager : « donnez un ordre »)."""
+	"""Overlay thémé de choix d'activité (style Football Manager : « donnez un ordre »).
+	Construit en jeu (CanvasLayer + PanelContainer) pour hériter du thème global et
+	assombrir l'arrière-plan plutôt qu'un AcceptDialog brut."""
 	if is_instance_valid(_activity_prompt):
 		return
 	var p = player_character
 	if not p:
 		return
 
-	var dialog := AcceptDialog.new()
-	dialog.title = "Votre personnage attend vos ordres"
-	dialog.get_ok_button().visible = false
-	dialog.process_mode = Node.PROCESS_MODE_ALWAYS
+	var overlay := CanvasLayer.new()
+	overlay.layer = 200  # au-dessus des fenêtres et du chat
+
+	# Fond assombri qui capture les clics (empêche d'agir derrière)
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.72)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
+
+	# Panneau thémé avec bordure accent pour bien ressortir sur le fond assombri
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(440, 0)
+	var pstyle := StyleBoxFlat.new()
+	pstyle.bg_color = UITheme.BG_PANEL
+	pstyle.set_corner_radius_all(8)
+	pstyle.set_border_width_all(2)
+	pstyle.border_color = UITheme.ACCENT_DIM
+	pstyle.set_content_margin_all(0)
+	panel.add_theme_stylebox_override("panel", pstyle)
+	center.add_child(panel)
+
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 20)
+	panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "⏸️  Jeu en pause"
+	title.add_theme_font_size_override("font_size", UITheme.FONT_NORMAL + 6)
+	title.add_theme_color_override("font_color", UITheme.ACCENT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
 
 	var info := Label.new()
-	info.text = "⏸️  Jeu en pause — que fait %s ?\nÉnergie : %.0f / %.0f" % [p.nom, p.player_energy_pool, p.max_energy_pool]
+	info.text = "Que fait %s ?" % p.nom
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(info)
 
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 8)
-	vbox.add_child(row)
+	var energy := Label.new()
+	energy.text = "⚡ Énergie : %.0f / %.0f" % [p.player_energy_pool, p.max_energy_pool]
+	energy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	energy.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	vbox.add_child(energy)
+
+	vbox.add_child(HSeparator.new())
 
 	var choices := [
-		{"key": "LEVELING", "label": "🗡️ Leveling"},
-		{"key": "FARMING", "label": "💰 Farming"},
-		{"key": "FUN", "label": "🎮 Détente"},
+		{"key": "LEVELING", "label": "🗡️  Leveling", "desc": "Gagner de l'XP"},
+		{"key": "FARMING", "label": "💰  Farming", "desc": "Récolter de l'or"},
+		{"key": "FUN", "label": "🎮  Détente", "desc": "Récupérer du moral"},
 	]
 	for c in choices:
 		var b := Button.new()
-		b.text = c["label"]
-		b.custom_minimum_size = Vector2(120, 42)
+		b.text = "%s — %s" % [c["label"], c["desc"]]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(0, 44)
 		b.disabled = not p.can_perform_activity(c["key"])
 		b.pressed.connect(_on_prompt_activity_chosen.bind(c["key"]))
-		row.add_child(b)
+		vbox.add_child(b)
+
+	# Contenu de groupe : route vers la fenêtre d'organisation (vrai flow PvE)
+	var org_btn := Button.new()
+	org_btn.text = "⚔️  Donjon / Raid — organiser un groupe"
+	org_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	org_btn.tooltip_text = "Ouvre l'organisation de groupe pour composer et lancer un donjon ou un raid"
+	org_btn.custom_minimum_size = Vector2(0, 44)
+	org_btn.pressed.connect(_on_prompt_organize_chosen.bind("dungeon"))
+	vbox.add_child(org_btn)
+
+	vbox.add_child(HSeparator.new())
 
 	var rest_btn := Button.new()
-	rest_btn.text = "😴 Se reposer (8h)"
-	rest_btn.custom_minimum_size = Vector2(0, 36)
+	rest_btn.text = "😴  Se reposer (8h)"
+	rest_btn.tooltip_text = "Récupère toute l'énergie puis reprend l'activité précédente"
+	rest_btn.custom_minimum_size = Vector2(0, 40)
 	rest_btn.pressed.connect(_on_prompt_rest_chosen)
 	vbox.add_child(rest_btn)
 
-	# Si fermé via la croix : on libère le node (le temps reste en pause, le joueur
-	# peut choisir via le panneau de contrôle qui relancera le temps).
-	dialog.close_requested.connect(func():
-		if is_instance_valid(_activity_prompt):
-			_activity_prompt.queue_free()
-			_activity_prompt = null
-	)
-
-	dialog.add_child(vbox)
-	get_tree().root.add_child(dialog)
-	dialog.popup_centered(Vector2(460, 230))
-	_activity_prompt = dialog
+	add_child(overlay)
+	_activity_prompt = overlay
 
 func _on_prompt_activity_chosen(activity_type: String) -> void:
 	"""Choix d'activité depuis le prompt : démarre l'activité (le temps reprend via le signal)."""
@@ -1014,3 +1058,21 @@ func _on_prompt_activity_chosen(activity_type: String) -> void:
 func _on_prompt_rest_chosen() -> void:
 	"""Bouton « Se reposer » du prompt d'oisiveté."""
 	_perform_rest(8, false)
+
+func _on_prompt_organize_chosen(kind: String) -> void:
+	"""Donjon/Raid : ferme le prompt, relance le temps et ouvre l'organisation de groupe."""
+	_exit_idle_prompt()
+	_open_organization(kind)
+
+func _open_organization(kind: String) -> void:
+	"""Ouvre la fenêtre d'organisation de groupe présélectionnée sur Donjon/Raid."""
+	if not window_manager:
+		return
+	window_manager.show_window("organisation")
+	var inst: Control = window_manager.get_window_instance("organisation")
+	if inst and inst.has_method("preselect_activity"):
+		inst.call_deferred("preselect_activity", kind)
+
+func _on_player_organize_requested(kind: String) -> void:
+	"""Bouton « Donjon/Raid » du panneau de contrôle joueur."""
+	_open_organization(kind)

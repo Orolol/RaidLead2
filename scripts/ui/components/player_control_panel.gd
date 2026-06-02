@@ -6,6 +6,7 @@ const CustomProgressBarScript = preload("res://scripts/ui/components/custom_prog
 
 signal activity_changed(activity_type: String)
 signal disconnect_requested(return_hour: int, return_minute: int)
+signal organize_requested(kind: String)  # Donjon/Raid : ouvre l'organisation de groupe
 
 var player_character: PlayerCharacterScript = null
 
@@ -104,9 +105,17 @@ func _setup_activity_selector(parent: VBoxContainer):
 	activity_option = OptionButton.new()
 	activity_option.custom_minimum_size = Vector2(0, 35)
 	activity_container.add_child(activity_option)
-	
+
 	# Ajouter les options d'activité
 	_populate_activity_options()
+
+	# Contenu de groupe : ouvre la fenêtre d'organisation (vrai flow PvE)
+	var organize_button = Button.new()
+	organize_button.text = "⚔️ Donjon / Raid"
+	organize_button.tooltip_text = "Organiser un groupe pour lancer un donjon ou un raid"
+	organize_button.custom_minimum_size = Vector2(0, 32)
+	organize_button.pressed.connect(func(): organize_requested.emit("dungeon"))
+	activity_container.add_child(organize_button)
 
 func _setup_status_and_controls(parent: VBoxContainer):
 	var controls_container = VBoxContainer.new()
