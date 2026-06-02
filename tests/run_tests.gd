@@ -40,6 +40,8 @@ func _run_all() -> void:
 	_suite_chat_scoring(tf)
 	_suite_chat_reactive(tf)
 	_suite_chat_scenes(tf)
+	_suite_chat_robustness(tf)
+	_suite_chat_data_schema(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
 	print(tf.summary())
@@ -1006,3 +1008,120 @@ func _suite_chat_scenes(tf) -> void:
 	GuildManager.guild_members.erase(a)
 	GuildManager.guild_members.erase(b)
 	GuildManager.guild_members.erase(c)
+
+func _suite_chat_robustness(tf) -> void:
+	tf.suite("Chat anti-répétition (Phase E)")
+	var added: Array = []
+	for i in range(5):
+		var p := SimulatedPlayer.new()
+		p.nom = "Rob%d" % i
+		p.player_id = "rob_%d" % i
+		p.is_online = true
+		p.mood = 70.0
+		p.personnage_classe = "Guerrier"
+		GuildManager.guild_members.append(p)
+		added.append(p)
+
+	var texts: Array = []
+	var cb: Callable = func(_n, t, _c): texts.append(t)
+	ChatDirector.line_emitted.connect(cb)
+	ChatDirector.scenes_enabled = false
+	GameRandom.seed_rng(999)
+	for i in range(30):
+		ChatDirector.debug_force_ambient()
+	ChatDirector.scenes_enabled = true
+	GameRandom.randomize_rng()
+	ChatDirector.line_emitted.disconnect(cb)
+
+	var distinct: Dictionary = {}
+	var freq: Dictionary = {}
+	for t in texts:
+		distinct[t] = true
+		freq[t] = int(freq.get(t, 0)) + 1
+	var max_freq: int = 0
+	for k in freq:
+		max_freq = maxi(max_freq, int(freq[k]))
+	tf.ok(texts.size() >= 15, "le stream produit des émissions")
+	tf.ok(distinct.size() >= 10, "variété : >=10 répliques distinctes")
+	tf.ok(float(max_freq) / float(maxi(1, texts.size())) <= 0.5, "aucune réplique ne domine (anti-répétition)")
+
+	for p in added:
+		GuildManager.guild_members.erase(p)
+
+func _suite_chat_data_schema(tf) -> void:
+	tf.suite("Chat data schema (Phase E)")
+	var known_axes := ["speaker.class", "speaker.role", "speaker.has_trait", "speaker.mood", "speaker.energy", "speaker.stress", "speaker.burnout", "speaker.integration", "speaker.days_in_guild", "relation", "relation_to_role", "context.event_magnitude", "context.time_of_day", "context.guild_morale", "context.phase"]
+	var known_curves := ["boolean", "linear", "inverse", "gaussian", "threshold"]
+	var known_kinds := ["bonus", "veto"]
+
+	# Lignes
+	var line_errors: int = 0
+	var ids: Dictionary = {}
+	for path in ["res://data/chat/lines/ambient_banter.json", "res://data/chat/lines/reactive.json"]:
+		var data: Dictionary = _chat_load_json(path)
+		for line in data.get("lines", []):
+			var lid := String(line.get("id", ""))
+			if lid == "" or ids.has(lid):
+				line_errors += 1
+			ids[lid] = true
+			if String(line.get("text", "")).strip_edges() == "":
+				line_errors += 1
+			if not (line.get("pools", []) is Array):
+				line_errors += 1
+			line_errors += _chat_check_cons(line.get("considerations", []), known_axes, known_curves, known_kinds)
+	tf.eq(line_errors, 0, "lignes : schéma valide (ids uniques / text / pools / considérations)")
+
+	# Scènes
+	var scene_errors: int = 0
+	for sc in _chat_load_json("res://data/chat/scenes.json").get("scenes", []):
+		var roles: Variant = sc.get("cast", {})
+		if not (roles is Dictionary) or roles.is_empty():
+			scene_errors += 1
+			continue
+		var beats: Variant = sc.get("beats", [])
+		if not (beats is Array) or beats.is_empty():
+			scene_errors += 1
+			continue
+		for beat in beats:
+			if not roles.has(String(beat.get("actor", ""))):
+				scene_errors += 1   # l'acteur doit être un rôle casté
+			if beat.has("branch"):
+				var opts: Variant = beat["branch"].get("options", [])
+				if not (opts is Array) or opts.is_empty():
+					scene_errors += 1
+				else:
+					for opt in opts:
+						if String(opt.get("text", "")).strip_edges() == "":
+							scene_errors += 1
+						scene_errors += _chat_check_cons(opt.get("considerations", []), known_axes, known_curves, known_kinds)
+			elif String(beat.get("text", "")).strip_edges() == "":
+				scene_errors += 1
+		for rn in roles:
+			scene_errors += _chat_check_cons(roles[rn].get("considerations", []), known_axes, known_curves, known_kinds)
+	tf.eq(scene_errors, 0, "scènes : schéma valide (cast / beats / actor∈cast / branches)")
+
+func _chat_load_json(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	return d if d is Dictionary else {}
+
+func _chat_check_cons(cons: Variant, known_axes: Array, known_curves: Array, known_kinds: Array) -> int:
+	if not (cons is Array):
+		return 1
+	var errs: int = 0
+	for c in cons:
+		if not (c is Dictionary):
+			errs += 1
+			continue
+		if not (String(c.get("axis", "")) in known_axes):
+			errs += 1
+		if not (String(c.get("curve", "boolean")) in known_curves):
+			errs += 1
+		if not (String(c.get("kind", "bonus")) in known_kinds):
+			errs += 1
+	return errs

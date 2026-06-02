@@ -28,6 +28,12 @@ const SceneRunnerScript = preload("res://scripts/systems/chat/scene_runner.gd")
 # Probabilité de jouer une SCÈNE multi-acteurs plutôt qu'un one-liner lors d'un tick ambient.
 const AMBIENT_SCENE_CHANCE: float = 0.25
 
+# Anti-répétition & équité de parole (Phase E).
+const RECENT_LINES_MAX: int = 8         # mémoire courte des dernières répliques
+const REPEAT_PENALTY: float = 0.3       # pénalité de score si la réplique est récente
+const EQUITY_WINDOW_MIN: float = 120.0  # fenêtre (min de jeu) pour redonner la parole
+const EQUITY_BONUS: float = 1.0         # bonus max de poids pour un membre longtemps muet
+
 # Cadence ambient (en minutes de JEU).
 const BASE_INTERVAL_MIN: float = 22.0   # avant division par sqrt(online) × bavardise
 const MIN_GAP_MIN: float = 4.0
@@ -49,6 +55,9 @@ var _scene_runner: Node = null
 var _scenes: Array = []
 var _scene_cooldowns: Dictionary = {}  # scene id -> minute de jeu de dernière utilisation
 var scene_active: bool = false         # une scène multi-acteurs occupe le chat
+var scenes_enabled: bool = true        # désactivable (soak/tests one-liner)
+var _recent_line_ids: Array = []       # ring buffer anti-répétition (ids de one-liners)
+var _last_spoke: Dictionary = {}       # player_id -> minute de jeu de dernière prise de parole
 
 func _ready() -> void:
 	_load_corpus()
@@ -145,10 +154,19 @@ func _emit_line(speaker: Variant, line: Variant, vars: Dictionary = {}) -> void:
 	if text.strip_edges() == "":
 		return
 	_line_cooldowns[String(line.get("id", ""))] = _now_total_minutes()
+	_remember_line(String(line.get("id", "")))
+	_last_spoke[String(speaker.player_id)] = _now_total_minutes()
 	_last_speaker_id = String(speaker.player_id)
 	_last_emit_ms = Time.get_ticks_msec()
 	_emitted_count += 1
 	line_emitted.emit(String(speaker.nom), text, "guild")
+
+func _remember_line(id: String) -> void:
+	if id == "":
+		return
+	_recent_line_ids.append(id)
+	if _recent_line_ids.size() > RECENT_LINES_MAX:
+		_recent_line_ids.pop_front()
 
 # ==================== SÉLECTION (version Phase A — généralisée en Phase B) ====================
 
@@ -156,7 +174,7 @@ func _pick_speaker(online: Array) -> Variant:
 	var opts: Array = []
 	var weights: Array = []
 	for m in online:
-		var w: float = _talkativeness(m)
+		var w: float = _talkativeness(m) * _equity_factor(m)
 		if String(m.player_id) == _last_speaker_id:
 			w *= 0.3   # évite le monologue
 		opts.append(m)
@@ -178,10 +196,13 @@ func _pick_line(speaker: Variant, pool: String, subject: Variant = null, tempera
 		if _on_cooldown(line, now):
 			continue
 		var r: Dictionary = ChatScoring.score_line(line, ctx)
-		if r["score"] <= 0.0:
+		var sc: float = r["score"]
+		if sc <= 0.0:
 			continue
+		if String(line.get("id", "")) in _recent_line_ids:
+			sc *= REPEAT_PENALTY   # anti-répétition douce, au-delà du cooldown dur
 		lines.append(line)
-		scores.append(r["score"])
+		scores.append(sc)
 	return ChatScoring.softmax_sample(lines, scores, temperature)
 
 func _on_cooldown(line: Variant, now: int) -> bool:
@@ -245,6 +266,12 @@ func _talkativeness(m: Variant) -> float:
 	# Humeur : plus on est de bonne humeur, plus on jase.
 	t *= lerpf(0.6, 1.3, clampf(float(m.mood) / 100.0, 0.0, 1.0))
 	return maxf(0.1, t)
+
+func _equity_factor(m: Variant) -> float:
+	# Équité de parole : un membre longtemps muet voit son poids monter (tout le monde a une voix).
+	var last: float = float(_last_spoke.get(String(m.player_id), -1000000.0))
+	var silent: float = float(_now_total_minutes()) - last
+	return 1.0 + clampf(silent / EQUITY_WINDOW_MIN, 0.0, 1.0) * EQUITY_BONUS
 
 # ==================== GRAMMAIRE (inline {a|b|c} — étendue en Phase B/F) ====================
 
@@ -399,7 +426,7 @@ func _pick_reactive_speaker(subject: Variant) -> Variant:
 	for m in online:
 		if subject != null and m == subject:
 			continue
-		var w: float = _talkativeness(m)
+		var w: float = _talkativeness(m) * _equity_factor(m)
 		if subject != null:
 			var rel: String = _relation_between(m, subject)
 			if rel != "" and rel != "neutral":
@@ -413,7 +440,7 @@ func _pick_reactive_speaker(subject: Variant) -> Variant:
 # ==================== SCÈNES ====================
 
 func _try_scene(pool: String, subject: Variant = null, extra_vars: Dictionary = {}) -> bool:
-	if scene_active or _scene_runner == null:
+	if scene_active or _scene_runner == null or not scenes_enabled:
 		return false
 	var online_count: int = _online_members().size()
 	var now: int = _now_total_minutes()
@@ -463,6 +490,7 @@ func build_cast_ctx(candidate: Variant, cast: Dictionary) -> Dictionary:
 func emit_scene_line(speaker: Variant, text: String) -> void:
 	if text.strip_edges() == "":
 		return
+	_last_spoke[String(speaker.player_id)] = _now_total_minutes()
 	_last_speaker_id = String(speaker.player_id)
 	_last_emit_ms = Time.get_ticks_msec()
 	_emitted_count += 1
