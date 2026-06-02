@@ -44,7 +44,7 @@ func _ready():
 	# Créer la taskbar si nécessaire
 	_setup_taskbar()
 	
-	print("WindowManager avancé initialisé")
+	GameLog.d("WindowManager avancé initialisé")
 
 func _setup_keyboard_shortcuts():
 	"""Configure les raccourcis clavier pour la navigation"""

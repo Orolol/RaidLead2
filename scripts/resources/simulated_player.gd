@@ -247,7 +247,7 @@ func _check_tag_reveals():
 	for tag in revealed_tags:
 		tags_caches.erase(tag)
 		tags_comportement.append(tag)
-		print("Tag révélé pour %s: %s" % [nom, tag])
+		GameLog.d("Tag révélé pour %s: %s" % [nom, tag])
 
 func trigger_loot_conflict():
 	loot_conflicts += 1
@@ -396,7 +396,7 @@ func try_auto_equip(item: Item) -> Dictionary:
 	if current_item == null:
 		# Slot vide, toujours équiper
 		equipment.equip_item(item)
-		print("%s a équipé %s (slot vide)" % [nom, item.get_display_name()])
+		GameLog.d("%s a équipé %s (slot vide)" % [nom, item.get_display_name()])
 		return {"equipped": true, "old_item": null}
 
 	var new_score: float = calculate_item_score(item)
@@ -404,7 +404,7 @@ func try_auto_equip(item: Item) -> Dictionary:
 
 	if new_score > current_score:
 		var old_item: Item = equipment.equip_item(item)
-		print("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
+		GameLog.d("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
 		return {"equipped": true, "old_item": old_item}
 	else:
 		return {"equipped": false, "old_item": null}
@@ -500,9 +500,9 @@ func equip_item(item) -> bool:
 	
 	var old_item = equipment.equip_item(item)
 	if old_item:
-		print("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
+		GameLog.d("%s a remplacé %s par %s" % [nom, old_item.get_display_name(), item.get_display_name()])
 	else:
-		print("%s a équipé %s" % [nom, item.get_display_name()])
+		GameLog.d("%s a équipé %s" % [nom, item.get_display_name()])
 	
 	return true
 
@@ -548,11 +548,9 @@ func gain_experience(amount: int) -> void:
 		# Donner de l'XP à la guilde pour chaque niveau gagné
 		var guild_manager = Singletons.get_autoload("GuildManager")
 		if not guild_manager:
-			# Essayer via l'arbre de scène si on a accès à un node
-			var tree = Engine.get_main_loop()
-			if tree and tree.root:
-				guild_manager = tree.root.get_node_or_null("/root/GuildManager")
-		
+			# Repli sur l'identifiant global de l'autoload
+			guild_manager = GuildManager
+
 		if guild_manager:
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(personnage_niveau, nom + " a atteint le niveau " + str(personnage_niveau))

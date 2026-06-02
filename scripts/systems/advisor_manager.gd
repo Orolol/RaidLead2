@@ -43,7 +43,7 @@ func _on_week_changed(_week: int, _year: int) -> void:
 
 func _push_notification(advice: Dictionary) -> void:
 	advice_pushed.emit(advice)
-	var nm: Node = get_node_or_null("/root/NotificationManager")
+	var nm: Node = NotificationManager
 	if not nm:
 		return
 	var title: String = advice.get("title", "Conseil")
@@ -107,7 +107,7 @@ func _analyze_burnout(out: Array) -> void:
 			"%d membres accusent un stress élevé. Un psychologue dans le staff ou un repos d'équipe ferait baisser la pression." % high_stress)
 
 func _analyze_morale(out: Array) -> void:
-	var gcm: Node = get_node_or_null("/root/GuildCultureManager")
+	var gcm: Node = GuildCultureManager
 	if not gcm or not gcm.has_method("get_guild_morale"):
 		return
 	var morale: float = gcm.get_guild_morale()
@@ -119,7 +119,7 @@ func _analyze_morale(out: Array) -> void:
 			"Le moral de guilde s'effrite (%d/100). Un événement de team-building remonterait l'ambiance (Cohésion)." % int(morale))
 
 func _analyze_tensions(out: Array) -> void:
-	var gcm: Node = get_node_or_null("/root/GuildCultureManager")
+	var gcm: Node = GuildCultureManager
 	if not gcm or not gcm.has_method("get_tensions"):
 		return
 	var tensions: Array = gcm.get_tensions()

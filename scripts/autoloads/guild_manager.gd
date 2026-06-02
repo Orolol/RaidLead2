@@ -104,7 +104,7 @@ func _pay_salaries() -> void:
 	if total <= 0:
 		return
 
-	var notification_manager: Node = get_node_or_null("/root/NotificationManager")
+	var notification_manager: Node = NotificationManager
 	if guild and guild.gold >= total:
 		guild.spend_gold(total)
 		if notification_manager:
@@ -250,7 +250,7 @@ func _on_activity_interrupted(player, _activity, _reason: String) -> void:
 		_assign_default_activity(player)
 
 func _on_server_version_updated(new_version: float, _update_name: String) -> void:
-	print("Guilde : mise à jour vers version %s" % new_version)
+	GameLog.d("Guilde : mise à jour vers version %s" % new_version)
 	
 	# Permettre aux membres de progresser en niveau
 	var max_level = ServerVersion.get_max_player_level()
@@ -265,11 +265,11 @@ func _on_server_version_updated(new_version: float, _update_name: String) -> voi
 				# Émettre le signal de level up
 				member_leveled_up.emit(member, member.personnage_niveau)
 			# L'équipement ne suit plus automatiquement le niveau avec le nouveau système
-			print("%s a gagné %d niveau(s) (maintenant niveau %d)" % [member.nom, level_gain, member.personnage_niveau])
+			GameLog.d("%s a gagné %d niveau(s) (maintenant niveau %d)" % [member.nom, level_gain, member.personnage_niveau])
 
 func _on_guild_level_up(new_level: int) -> void:
 	guild_level_changed.emit(new_level)
-	print("La guilde a atteint le niveau %d!" % new_level)
+	GameLog.d("La guilde a atteint le niveau %d!" % new_level)
 
 
 func _create_player_character() -> void:
@@ -296,14 +296,14 @@ func _create_player_character() -> void:
 	player_character.tags_comportement = ["leader", "organise", "social", "patient"]
 	player_character.set_meta("is_player", true)  # Marquer comme personnage du joueur
 	
-	print("Personnage joueur créé: %s (Niveau %d, Classe: %s)" % [player_character.nom, player_character.personnage_niveau, player_character.personnage_classe])
+	GameLog.d("Personnage joueur créé: %s (Niveau %d, Classe: %s)" % [player_character.nom, player_character.personnage_niveau, player_character.personnage_classe])
 	
 	# Ajouter à la guilde
 	add_member(player_character)
 
 func _on_guild_perk_unlocked(_perk_name: String, _level: int) -> void:
 	guild_perk_unlocked.emit(_perk_name)
-	print("Nouveau perk débloqué: %s (niveau %d)" % [_perk_name, _level])
+	GameLog.d("Nouveau perk débloqué: %s (niveau %d)" % [_perk_name, _level])
 
 func get_total_integration_bonus() -> float:
 	return guild.get_integration_bonus()
@@ -326,7 +326,7 @@ func _connect_to_ai_guild_manager() -> void:
 	poaching_handler.set_script(handler_script)
 	poaching_handler.name = "PoachingHandler"
 	add_child(poaching_handler)
-	print("GuildManager connecté au AIGuildManager")
+	GameLog.d("GuildManager connecté au AIGuildManager")
 
 func _init_behavior_system() -> void:
 	"""Initialise le système de comportement dynamique"""
@@ -348,29 +348,29 @@ func _on_behavior_changed(player, change_type: String) -> void:
 	"""Gère les changements de comportement"""
 	match change_type:
 		"urgent_disconnect":
-			print("%s a eu une urgence et doit se déconnecter!" % player.nom)
+			GameLog.d("%s a eu une urgence et doit se déconnecter!" % player.nom)
 			if player.is_online:
 				_disconnect_member(player)
 		"bonus_time":
-			print("%s peut jouer plus longtemps aujourd'hui!" % player.nom)
+			GameLog.d("%s peut jouer plus longtemps aujourd'hui!" % player.nom)
 		"scheduled_connection":
-			print("%s se connecte (planifié)" % player.nom)
+			GameLog.d("%s se connecte (planifié)" % player.nom)
 			_connect_member(player)
 		"scheduled_disconnection":
-			print("%s se déconnecte (planifié)" % player.nom)
+			GameLog.d("%s se déconnecte (planifié)" % player.nom)
 			_disconnect_member(player)
 		"spontaneous_connection":
-			print("%s se connecte spontanément!" % player.nom)
+			GameLog.d("%s se connecte spontanément!" % player.nom)
 			_connect_member(player)
 		"spontaneous_disconnection":
-			print("%s doit se déconnecter de manière imprévue" % player.nom)
+			GameLog.d("%s doit se déconnecter de manière imprévue" % player.nom)
 			_disconnect_member(player)
 
 func _on_personal_event(player, event: Dictionary) -> void:
 	"""Gère les événements personnels"""
 	if event.has("message"):
 		var message = event.message.replace("{player}", player.nom)
-		print("📅 " + message)
+		GameLog.d("📅 " + message)
 
 func add_loot_entry(item: Item, member_name: String, dungeon_name: String, boss_name: String) -> void:
 	"""Ajoute une entrée à l'historique de loot"""
@@ -394,10 +394,10 @@ func _on_burnout_changed(player, new_level: int) -> void:
 	"""Gère les changements de niveau de burnout"""
 	match new_level:
 		0:
-			print("%s se sent en forme!" % player.nom)
+			GameLog.d("%s se sent en forme!" % player.nom)
 		1:
-			print("%s commence à ressentir de la fatigue" % player.nom)
+			GameLog.d("%s commence à ressentir de la fatigue" % player.nom)
 		2:
-			print("⚠️ %s montre des signes de burnout" % player.nom)
+			GameLog.d("⚠️ %s montre des signes de burnout" % player.nom)
 		3:
-			print("🚨 %s est en burnout sévère!" % player.nom)
+			GameLog.d("🚨 %s est en burnout sévère!" % player.nom)

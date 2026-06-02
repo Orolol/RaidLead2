@@ -390,7 +390,7 @@ func start_dungeon(dungeon_id: String, group_members: Array):
 		if active_activities.has(member):
 			var current_activity = active_activities[member]
 			if current_activity.type == ActivityScript.ActivityType.DUNGEON:
-				print("Erreur: %s est déjà en donjon" % member.nom)
+				GameLog.d("Erreur: %s est déjà en donjon" % member.nom)
 				return null
 	
 	# Créer l'instance de donjon

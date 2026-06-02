@@ -677,7 +677,7 @@ func _kick_member(member):
 		_update_guild_info()
 		
 		# Notification
-		var notification_manager = get_node_or_null("/root/NotificationManager")
+		var notification_manager = NotificationManager
 		if notification_manager:
 			notification_manager.show_warning(
 				"%s a été exclu de la guilde." % member.nom,

@@ -28,7 +28,7 @@ signal chain_continued(chain_id: String, event: RandomEventResource)
 signal chain_ended(chain_id: String)
 
 func _ready():
-	print("EventManager démarré")
+	GameLog.d("EventManager démarré")
 	# S'arrête automatiquement avec get_tree().paused
 	process_mode = PROCESS_MODE_PAUSABLE
 	_load_events()
@@ -37,7 +37,7 @@ func _ready():
 
 func _load_events():
 	event_pool = EventsDataResource.get_all_events()
-	print("Événements chargés: %d" % event_pool.size())
+	GameLog.d("Événements chargés: %d" % event_pool.size())
 
 func _connect_time_signals():
 	var game_time = GameTime
@@ -56,14 +56,14 @@ func _on_hour_changed(hour: int):
 	_check_for_events()
 
 func _on_day_changed(day: int, week: int, year: int):
-	print("EventManager: Nouveau jour, réinitialisation du compteur d'événements")
+	GameLog.d("EventManager: Nouveau jour, réinitialisation du compteur d'événements")
 	events_today = 0
 	last_day_count = day
 
 func _check_for_events():
 	# Le process_mode PAUSABLE s'occupe automatiquement de la pause
 	if pending_event:
-		print("EventManager: Événement en attente, pas de nouveau tirage")
+		GameLog.d("EventManager: Événement en attente, pas de nouveau tirage")
 		return
 	
 	var game_time = GameTime
@@ -85,7 +85,7 @@ func _should_trigger_event(delta_hours: float) -> bool:
 	
 	# Si on a déjà eu notre quota d'événements aujourd'hui
 	if events_today >= daily_event_target:
-		print("EventManager: Quota d'événements atteint pour aujourd'hui")
+		GameLog.d("EventManager: Quota d'événements atteint pour aujourd'hui")
 		return false
 	
 	# Calculer la probabilité ajustée basée sur les événements restants dans la journée
@@ -113,7 +113,7 @@ func _select_event():
 			eligible_events.append(event)
 	
 	if eligible_events.is_empty():
-		print("EventManager: Aucun événement éligible trouvé")
+		GameLog.d("EventManager: Aucun événement éligible trouvé")
 		return null
 	
 	# Sélection pondérée basée sur MTTH et poids
@@ -126,7 +126,7 @@ func _select_event():
 		total_weight += weight
 	
 	if total_weight <= 0:
-		print("EventManager: Poids total nul")
+		GameLog.d("EventManager: Poids total nul")
 		return null
 	
 	# Tirage aléatoire pondéré
@@ -136,7 +136,7 @@ func _select_event():
 	for weighted_event in weighted_events:
 		cumulative_weight += weighted_event.weight
 		if random_value <= cumulative_weight:
-			print("EventManager: Événement sélectionné: %s" % weighted_event.event.title)
+			GameLog.d("EventManager: Événement sélectionné: %s" % weighted_event.event.title)
 			return weighted_event.event
 	
 	# Fallback
@@ -187,8 +187,8 @@ func _calculate_event_weight(event: RandomEventResource) -> float:
 	return base_weight
 
 func _trigger_event(event: RandomEventResource):
-	print("EventManager: Déclenchement de l'événement: %s" % event.title)
-	print("EventManager: ID de l'événement: %s" % event.id)
+	GameLog.d("EventManager: Déclenchement de l'événement: %s" % event.title)
+	GameLog.d("EventManager: ID de l'événement: %s" % event.id)
 	
 	# Mettre à jour l'historique
 	var game_time = GameTime
@@ -220,10 +220,10 @@ func _trigger_event(event: RandomEventResource):
 
 func resolve_event(event: RandomEventResource, choice: EventChoiceResource) -> Dictionary:
 	if pending_event != event:
-		print("EventManager: Erreur - événement non pending")
+		GameLog.d("EventManager: Erreur - événement non pending")
 		return {}
 	
-	print("EventManager: Résolution de l'événement %s avec le choix %s" % [event.title, choice.text])
+	GameLog.d("EventManager: Résolution de l'événement %s avec le choix %s" % [event.title, choice.text])
 	
 	# Appliquer les conséquences du choix
 	var consequences = choice.apply_consequences()
@@ -260,7 +260,7 @@ func _apply_consequences(consequences: Dictionary):
 	var effect_system = EffectSystem
 	
 	if not guild_manager:
-		print("EventManager: GuildManager non trouvé")
+		GameLog.d("EventManager: GuildManager non trouvé")
 		return
 	
 	# Appliquer les conséquences immédiates
@@ -308,7 +308,7 @@ func _apply_stat_change(stat: String, value, guild_manager):
 			if value and guild_manager.guild_members.size() > 0:
 				var member_to_remove = guild_manager.guild_members[randi() % guild_manager.guild_members.size()]
 				guild_manager.remove_member(member_to_remove)
-				print("Événement: %s a quitté la guilde" % member_to_remove.nom)
+				GameLog.d("Événement: %s a quitté la guilde" % member_to_remove.nom)
 
 func _find_event_by_id(event_id: String):
 	for event in event_pool:
@@ -338,14 +338,14 @@ func _get_game_state() -> Dictionary:
 
 # Méthodes utilitaires publiques
 func force_event(event_id: String) -> bool:
-	print("EventManager: Tentative de forcer l'événement: %s" % event_id)
+	GameLog.d("EventManager: Tentative de forcer l'événement: %s" % event_id)
 	var event = _find_event_by_id(event_id)
 	if event:
-		print("EventManager: Événement trouvé, déclenchement de %s" % event.title)
+		GameLog.d("EventManager: Événement trouvé, déclenchement de %s" % event.title)
 		_trigger_event(event)
 		return true
 	else:
-		print("EventManager: Événement non trouvé: %s" % event_id)
+		GameLog.d("EventManager: Événement non trouvé: %s" % event_id)
 	return false
 
 func get_event_stats() -> Dictionary:

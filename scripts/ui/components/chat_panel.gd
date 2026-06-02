@@ -78,7 +78,7 @@ func _create_ui_structure():
 	scroll_container = scroll
 
 func _connect_to_guild_events():
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if guild_manager:
 		# Connexions/Déconnexions
 		if not guild_manager.member_connected.is_connected(_on_member_connected):
@@ -95,7 +95,7 @@ func _connect_to_guild_events():
 			guild_manager.member_recruited.connect(_on_member_recruited)
 
 func _connect_to_activity_events():
-	var activity_manager = get_node_or_null("/root/ActivityManager")
+	var activity_manager = ActivityManager
 	if activity_manager:
 		# Activités
 		if not activity_manager.activity_started.is_connected(_on_activity_started):
@@ -113,7 +113,7 @@ func add_message(text: String, type: String = "info", timestamp: bool = true):
 	# Créer le message avec timestamp si demandé
 	var message = ""
 	if timestamp:
-		var game_time = get_node_or_null("/root/GameTime")
+		var game_time = GameTime
 		if game_time:
 			message = "[color=#666666][%s][/color] " % game_time.get_current_time_string()
 		else:

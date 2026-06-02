@@ -342,7 +342,7 @@ func _update_time_display(hours: int):
 	time_label.text = "%dh" % hours
 	
 	# Calculer l'heure de retour
-	var game_time = get_node_or_null("/root/GameTime")
+	var game_time = GameTime
 	if game_time:
 		var return_hour = (game_time.current_hour + hours) % 24
 		var return_day = game_time.current_day

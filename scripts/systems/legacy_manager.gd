@@ -50,7 +50,7 @@ func add_legacy_entry(title: String, description: String, points: int) -> void:
 	legacy_points += points
 	legacy_earned.emit(entry)
 	_check_titles()
-	var nm: Node = get_node_or_null("/root/NotificationManager")
+	var nm: Node = NotificationManager
 	if nm:
 		nm.show_achievement("%s (+%d legacy)" % [title, points], "Hall of Fame")
 
@@ -64,7 +64,7 @@ func _unlock_title(title: String) -> void:
 		return
 	unlocked_titles.append(title)
 	title_unlocked.emit(title)
-	var nm: Node = get_node_or_null("/root/NotificationManager")
+	var nm: Node = NotificationManager
 	if nm:
 		nm.show_achievement("Titre débloqué : %s" % title, "Legacy")
 

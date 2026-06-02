@@ -94,7 +94,7 @@ func _pay_staff_salaries() -> void:
 	var total: int = get_total_weekly_salary()
 	if total <= 0:
 		return
-	var nm: Node = get_node_or_null("/root/NotificationManager")
+	var nm: Node = NotificationManager
 	if GuildManager.guild and GuildManager.guild.gold >= total:
 		GuildManager.guild.spend_gold(total)
 	else:

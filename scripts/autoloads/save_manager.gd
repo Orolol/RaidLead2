@@ -38,7 +38,7 @@ func _setup_autosave() -> void:
 func _on_phase_changed_autosave(_new_phase, _old_phase) -> void:
 	"""Moment critique : on sauvegarde et on le signale au joueur."""
 	if save_game():
-		var nm: Node = get_node_or_null("/root/NotificationManager")
+		var nm: Node = NotificationManager
 		if nm:
 			nm.show_success("Progression sauvegardée (nouvelle phase)", "Sauvegarde auto")
 
@@ -90,7 +90,7 @@ func save_game() -> bool:
 
 	file.store_string(json_string)
 	file.close()
-	print("SaveManager: sauvegarde réussie (%d octets)" % json_string.length())
+	GameLog.d("SaveManager: sauvegarde réussie (%d octets)" % json_string.length())
 	save_completed.emit(true)
 	return true
 
@@ -116,7 +116,7 @@ func load_game() -> bool:
 		push_warning("SaveManager: sauvegarde principale illisible, tentative de restauration du backup")
 		if _try_load(BACKUP_PATH):
 			return true
-	print("SaveManager: pas de sauvegarde valide, nouvelle partie")
+	GameLog.d("SaveManager: pas de sauvegarde valide, nouvelle partie")
 	load_completed.emit(false)
 	return false
 
@@ -144,7 +144,7 @@ func _try_load(path: String) -> bool:
 	var loaded_version: int = int(data.save_version)
 	data = _migrate_save_data(data)
 	_apply_save_data(data)
-	print("SaveManager: chargement réussi (format v%d -> v%d) depuis %s" % [loaded_version, CURRENT_SAVE_VERSION, path])
+	GameLog.d("SaveManager: chargement réussi (format v%d -> v%d) depuis %s" % [loaded_version, CURRENT_SAVE_VERSION, path])
 	load_completed.emit(true)
 	return true
 
@@ -175,7 +175,7 @@ func _migrate_save_data(data: Dictionary) -> Dictionary:
 	while version < CURRENT_SAVE_VERSION:
 		if migrations.has(version):
 			data = migrations[version].call(data)
-			print("SaveManager: migration de sauvegarde v%d -> v%d" % [version, version + 1])
+			GameLog.d("SaveManager: migration de sauvegarde v%d -> v%d" % [version, version + 1])
 		version += 1
 		data["save_version"] = version
 	return data
@@ -253,7 +253,7 @@ func delete_save() -> void:
 	"""Supprime la sauvegarde."""
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH)
-		print("SaveManager: sauvegarde supprimée")
+		GameLog.d("SaveManager: sauvegarde supprimée")
 
 # --- Sérialisation du graphe social (via behavior_system.social_dynamics) ---
 

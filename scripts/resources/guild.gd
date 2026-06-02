@@ -184,7 +184,7 @@ func gain_reputation(amount: float, reason: String) -> void:
 	_add_reputation_event(amount, reason)
 	reputation_changed.emit(old_reputation, reputation, reason)
 	
-	print("Réputation: +%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
+	GameLog.d("Réputation: +%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
 
 func lose_reputation(amount: float, reason: String) -> void:
 	"""Diminue la réputation de la guilde"""
@@ -194,7 +194,7 @@ func lose_reputation(amount: float, reason: String) -> void:
 	_add_reputation_event(-amount, reason)
 	reputation_changed.emit(old_reputation, reputation, reason)
 	
-	print("Réputation: -%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
+	GameLog.d("Réputation: -%.1f (%s) - Nouvelle réputation: %.1f (%s)" % [amount, reason, reputation, get_reputation_tier()])
 
 func _add_reputation_event(change: float, reason: String) -> void:
 	"""Ajoute un événement à l'historique de réputation"""

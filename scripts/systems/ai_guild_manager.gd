@@ -66,7 +66,7 @@ func _ready():
 	# Initialiser les guildes pour la phase actuelle
 	_initialize_guilds_for_current_phase()
 	
-	print("AIGuildManager initialisé avec %d guildes" % ai_guilds.size())
+	GameLog.d("AIGuildManager initialisé avec %d guildes" % ai_guilds.size())
 
 func _setup_simulation_timers() -> void:
 	# Obsolète : la simulation IA est désormais pilotée par GameTime
@@ -91,7 +91,7 @@ func _initialize_guilds_for_current_phase():
 		
 		ai_guild_created.emit(ai_guild)
 	
-	print("Créé %d guildes IA pour la phase %s" % [guild_count, PhaseManager.get_phase_name(current_phase) if PhaseManager else "Serveur"])
+	GameLog.d("Créé %d guildes IA pour la phase %s" % [guild_count, PhaseManager.get_phase_name(current_phase) if PhaseManager else "Serveur"])
 
 func get_all_guilds() -> Array[AIGuild]:
 	"""Retourne toutes les guildes IA"""
@@ -120,7 +120,7 @@ func get_top_guilds(count: int = 5) -> Array[AIGuild]:
 
 func _run_monthly_simulation():
 	"""Exécute la simulation mensuelle de toutes les guildes"""
-	print("🎯 Début de la simulation mensuelle des guildes IA")
+	GameLog.d("🎯 Début de la simulation mensuelle des guildes IA")
 	
 	var guilds_data = []
 	
@@ -137,7 +137,7 @@ func _run_monthly_simulation():
 		call_deferred("_update_guild_rankings", guilds_data)
 	
 	monthly_simulation_completed.emit(guilds_data)
-	print("✅ Simulation mensuelle terminée")
+	GameLog.d("✅ Simulation mensuelle terminée")
 
 func _simulate_inter_guild_interactions():
 	"""Simule les interactions entre guildes (débauchage, etc.)"""
@@ -195,10 +195,10 @@ func _process_successful_poaching_from_player(result: Dictionary, source_guild: 
 		# Ajouter un membre similaire à la guilde IA
 		_add_recruited_member_to_ai_guild(source_guild, target_member)
 		
-		print("🔄 %s a débauché %s de notre guilde !" % [source_guild.name, target_member.nom])
+		GameLog.d("🔄 %s a débauché %s de notre guilde !" % [source_guild.name, target_member.nom])
 		poaching_attempt.emit(target_member, source_guild, true)
 	else:
-		print("🛡️ %s a tenté de débaucher %s, mais il a refusé" % [source_guild.name, target_member.nom])
+		GameLog.d("🛡️ %s a tenté de débaucher %s, mais il a refusé" % [source_guild.name, target_member.nom])
 		poaching_attempt.emit(target_member, source_guild, false)
 		
 		# Le membre gagne en loyauté après avoir refusé
@@ -265,7 +265,7 @@ func _process_successful_poaching_between_ai(result: Dictionary, source_guild: A
 	target_member.days_in_guild = 0
 	source_guild.members.append(target_member)
 	
-	print("🔄 %s a débauché %s de %s" % [source_guild.name, target_member.name, target_guild.name])
+	GameLog.d("🔄 %s a débauché %s de %s" % [source_guild.name, target_member.name, target_guild.name])
 
 func _run_daily_checks():
 	"""Exécute des vérifications quotidiennes plus légères"""
@@ -287,7 +287,7 @@ func _update_guild_rankings(_guilds_data: Array):
 
 func _on_phase_changed(new_phase, old_phase):
 	"""Réagit aux changements de phase"""
-	print("Changement de phase détecté: adaptation des guildes IA")
+	GameLog.d("Changement de phase détecté: adaptation des guildes IA")
 	
 	# Réinitialiser les guildes pour la nouvelle phase
 	call_deferred("_initialize_guilds_for_current_phase")
@@ -443,4 +443,4 @@ func load_ai_guilds_data(data: Dictionary):
 			GuildRanking.register_guild(ai_guild.name, false)
 	
 	
-	print("Données des guildes IA chargées: %d guildes" % ai_guilds.size())
+	GameLog.d("Données des guildes IA chargées: %d guildes" % ai_guilds.size())

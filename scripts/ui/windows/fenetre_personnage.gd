@@ -382,7 +382,7 @@ func _notification(what: int):
 
 func update_character_info():
 	"""Met à jour les informations du personnage joueur"""
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager:
 		return
 	
@@ -892,7 +892,7 @@ func _setup_reputation_tab():
 
 func _refresh_reputation_display():
 	"""Met à jour l'affichage de la réputation"""
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager or not guild_manager.guild:
 		return
 	
@@ -932,7 +932,7 @@ func _refresh_reputation_history():
 	"""Met à jour l'historique de réputation"""
 	reputation_history_list.clear()
 	
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if not guild_manager or not guild_manager.guild:
 		reputation_history_list.add_item("Aucune donnée de réputation disponible")
 		return

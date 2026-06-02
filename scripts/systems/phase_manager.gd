@@ -101,7 +101,7 @@ func _ready() -> void:
 	# Initialiser le tracking de progression
 	_initialize_phase_progress()
 	
-	print("PhaseManager initialisé - Phase actuelle: %s" % get_phase_name(current_phase))
+	GameLog.d("PhaseManager initialisé - Phase actuelle: %s" % get_phase_name(current_phase))
 
 func _initialize_phase_progress() -> void:
 	"""Initialise le tracking de progression pour chaque phase"""
@@ -222,7 +222,7 @@ func unlock_next_phase() -> bool:
 		var message = "Passage de %s à %s !" % [get_phase_name(old_phase), get_phase_name(current_phase)]
 		notification_manager.show_achievement(message, "Nouvelle Phase")
 	
-	print("Phase débloquée ! Passage de %s à %s" % [get_phase_name(old_phase), get_phase_name(current_phase)])
+	GameLog.d("Phase débloquée ! Passage de %s à %s" % [get_phase_name(old_phase), get_phase_name(current_phase)])
 	
 	return true
 
@@ -259,7 +259,7 @@ func complete_heroic_dungeon(dungeon_name: String = "") -> void:
 		else:
 			notification_manager.show_success("Donjon héroïque #%d complété" % heroic_dungeons_completed, "Victoire")
 	
-	print("Donjon héroïque complété ! Total: %d" % heroic_dungeons_completed)
+	GameLog.d("Donjon héroïque complété ! Total: %d" % heroic_dungeons_completed)
 	
 	# Vérifier automatiquement si on peut passer à la phase suivante
 	if current_phase == GamePhase.LEVELING:
@@ -275,7 +275,7 @@ func add_achievement(achievement_name: String, description: String = "") -> void
 	}
 	
 	phase_progress[current_phase]["achievements"].append(achievement)
-	print("Achievement débloqué: %s" % achievement_name)
+	GameLog.d("Achievement débloqué: %s" % achievement_name)
 
 func get_achievements_for_phase(phase: GamePhase) -> Array:
 	"""Retourne les achievements d'une phase"""
@@ -512,7 +512,7 @@ func force_phase_change(target_phase: GamePhase) -> bool:
 	# Émettre les signaux
 	phase_changed.emit(current_phase, old_phase)
 	
-	print("Phase forcée vers: %s" % get_phase_name(current_phase))
+	GameLog.d("Phase forcée vers: %s" % get_phase_name(current_phase))
 	return true
 
 func get_debug_info() -> Dictionary:
@@ -548,4 +548,4 @@ func load_phase_data(data: Dictionary) -> void:
 	# S'assurer que toutes les phases ont des données de progression
 	_initialize_phase_progress()
 	
-	print("Données de phases chargées - Phase actuelle: %s" % get_phase_name(current_phase))
+	GameLog.d("Données de phases chargées - Phase actuelle: %s" % get_phase_name(current_phase))

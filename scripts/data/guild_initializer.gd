@@ -78,7 +78,7 @@ static func create_initial_members() -> void:
 
 		GuildManager.add_member(member)
 
-		print("Membre initial créé: %s - %s %s Niv.%d" % [
+		GameLog.d("Membre initial créé: %s - %s %s Niv.%d" % [
 			member.nom,
 			member.personnage_role,
 			member.personnage_classe,

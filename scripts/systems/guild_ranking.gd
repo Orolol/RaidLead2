@@ -68,7 +68,7 @@ func _ready() -> void:
 	# Initialiser les rankings
 	_initialize_rankings()
 	
-	print("GuildRanking initialisé")
+	GameLog.d("GuildRanking initialisé")
 
 func _initialize_rankings() -> void:
 	"""Initialise les systèmes de classement"""
@@ -85,7 +85,7 @@ func register_guild(guild_name: String, is_player_guild: bool = false) -> void:
 	if not ranking_history.has(guild_name):
 		ranking_history[guild_name] = []
 		
-	print("Guilde enregistrée dans le classement: %s" % guild_name)
+	GameLog.d("Guilde enregistrée dans le classement: %s" % guild_name)
 
 func calculate_guild_score(guild_name: String, guild_data: Dictionary) -> float:
 	"""Calcule le score d'une guilde pour le classement"""
@@ -231,7 +231,7 @@ func _update_server_rankings() -> void:
 	_check_position_changes(old_server_rankings, server_rankings)
 	
 	last_ranking_update = _get_current_date()
-	print("Classement serveur mis à jour - %d guildes" % server_rankings.size())
+	GameLog.d("Classement serveur mis à jour - %d guildes" % server_rankings.size())
 
 func _update_national_rankings() -> void:
 	"""Met a jour le classement national (Phase 2)."""
@@ -298,7 +298,7 @@ func _publish_rankings(scope_name: String, old_rankings: Array, new_rankings: Ar
 	ranking_updated.emit(new_rankings)
 	_check_position_changes(old_rankings, new_rankings)
 	last_ranking_update = _get_current_date()
-	print("Classement %s mis Ã  jour - %d guildes" % [scope_name, new_rankings.size()])
+	GameLog.d("Classement %s mis Ã  jour - %d guildes" % [scope_name, new_rankings.size()])
 
 func _get_player_guild_data() -> Dictionary:
 	"""Récupère les données de la guilde du joueur pour le classement"""
@@ -401,9 +401,9 @@ func _check_position_changes(old_rankings: Array, new_rankings: Array) -> void:
 			
 			if guild_name == GuildManager.guild.name if GuildManager and GuildManager.guild else "":
 				if new_position < old_position:
-					print("🎉 Notre guilde monte au classement ! Position %d -> %d" % [old_position, new_position])
+					GameLog.d("🎉 Notre guilde monte au classement ! Position %d -> %d" % [old_position, new_position])
 				else:
-					print("📉 Notre guilde descend au classement. Position %d -> %d" % [old_position, new_position])
+					GameLog.d("📉 Notre guilde descend au classement. Position %d -> %d" % [old_position, new_position])
 
 func register_server_first(guild_name: String, content_id: String) -> void:
 	"""Enregistre un server first pour une guilde"""
@@ -412,9 +412,9 @@ func register_server_first(guild_name: String, content_id: String) -> void:
 	new_server_first.emit(guild_name, "Server First: %s" % content_id)
 	
 	if guild_name == GuildManager.guild.name if GuildManager and GuildManager.guild else "":
-		print("🏆 SERVER FIRST! Nous avons fait le premier clear de %s!" % content_id)
+		GameLog.d("🏆 SERVER FIRST! Nous avons fait le premier clear de %s!" % content_id)
 	else:
-		print("📢 %s a fait le server first de %s" % [guild_name, content_id])
+		GameLog.d("📢 %s a fait le server first de %s" % [guild_name, content_id])
 	
 	# Mettre à jour les rankings immédiatement après un server first
 	call_deferred("update_rankings")
@@ -585,7 +585,7 @@ func _on_activity_completed(player, activity) -> void:
 
 func _on_phase_changed(new_phase, old_phase) -> void:
 	"""Réagit aux changements de phase"""
-	print("Changement de phase détecté : mise à jour du système de classement")
+	GameLog.d("Changement de phase détecté : mise à jour du système de classement")
 	update_rankings()
 
 func _on_ai_simulation_completed(guilds_data: Array) -> void:
@@ -648,4 +648,4 @@ func load_ranking_data(data: Dictionary) -> void:
 	player_run_history = data.get("player_run_history", [])
 	last_ranking_update = data.get("last_ranking_update", _get_current_date())
 	
-	print("Données de classement chargées - %d server firsts, %d guildes trackées" % [server_firsts.size(), ranking_history.size()])
+	GameLog.d("Données de classement chargées - %d server firsts, %d guildes trackées" % [server_firsts.size(), ranking_history.size()])

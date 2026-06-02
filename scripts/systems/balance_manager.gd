@@ -141,7 +141,7 @@ func compute_standing() -> Dictionary:
 	return {"struggle": last_struggle, "dominance": last_dominance, "rank": rank}
 
 func _get_morale() -> float:
-	var gcm: Node = get_node_or_null("/root/GuildCultureManager")
+	var gcm: Node = GuildCultureManager
 	if gcm and gcm.has_method("get_guild_morale"):
 		return gcm.get_guild_morale()
 	return 65.0
@@ -174,7 +174,7 @@ func _apply_catchup(st: Dictionary) -> void:
 		catchup_applied.emit(gold_aid)
 
 	# Soutien de moral : plancher doux pour éviter la spirale
-	var gcm: Node = get_node_or_null("/root/GuildCultureManager")
+	var gcm: Node = GuildCultureManager
 	if gcm and gcm.has_method("get_guild_morale") and gcm.get_guild_morale() < 45.0:
 		gcm.guild_morale = minf(50.0, gcm.guild_morale + 3.0 * strength)
 

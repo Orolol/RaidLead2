@@ -117,7 +117,7 @@ func _setup_guild_list_section(parent: HSplitContainer):
 	header_container.add_spacer(false)
 	
 	var phase_label = Label.new()
-	var phase_manager = get_node_or_null("/root/PhaseManager")
+	var phase_manager = PhaseManager
 	if phase_manager:
 		phase_label.text = "Phase: %s" % phase_manager.get_phase_name(phase_manager.get_current_phase())
 	else:
@@ -317,7 +317,7 @@ func _calculate_guild_progression() -> int:
 		progression += int(guild_manager.guild.get_integration_bonus() * 10)
 	
 	# Activités en cours (0-10 points)
-	var activity_manager = get_node_or_null("/root/ActivityManager")
+	var activity_manager = ActivityManager
 	if activity_manager:
 		var active_dungeons = activity_manager.active_dungeons.size()
 		progression += min(10, active_dungeons * 5)
@@ -351,7 +351,7 @@ func _on_player_lost_to_competition(player: SimulatedPlayer, guild_name: String)
 		_update_recruit_details()
 	
 	# Optionnel: afficher une notification
-	print("Le joueur %s a été recruté par %s" % [player.nom, guild_name])
+	GameLog.d("Le joueur %s a été recruté par %s" % [player.nom, guild_name])
 
 func _refresh_guild_ranking():
 	guild_ranking_list.clear()
@@ -764,13 +764,13 @@ func _get_planning_summary(planning: Dictionary) -> String:
 		return "Actif: " + ", ".join(active_days)
 
 func _on_invite_pressed():
-	print("Debug: Bouton recruter cliqué")
-	print("Debug: selected_recruit = ", selected_recruit)
-	print("Debug: recruitment_pool = ", recruitment_pool)
-	print("Debug: guild_manager = ", guild_manager)
+	GameLog.d("Debug: Bouton recruter cliqué")
+	GameLog.d("Debug: selected_recruit = " + str(selected_recruit))
+	GameLog.d("Debug: recruitment_pool = " + str(recruitment_pool))
+	GameLog.d("Debug: guild_manager = " + str(guild_manager))
 	
 	if not selected_recruit or not recruitment_pool or not guild_manager:
-		print("Debug: Une des conditions n'est pas remplie")
+		GameLog.d("Debug: Une des conditions n'est pas remplie")
 		return
 	
 	# Prépare les données de la guilde pour le recrutement
@@ -857,7 +857,7 @@ func _on_guild_position_changed(guild_name: String, old_position: int, new_posit
 		else:
 			change_text = "📉 Notre guilde descend au classement. #%d → #%d" % [old_position, new_position]
 		
-		print(change_text)
+		GameLog.d(change_text)
 		# TODO: Afficher une notification à l'écran
 	
 	# Mettre à jour l'affichage si visible
@@ -872,7 +872,7 @@ func _on_server_first(guild_name: String, achievement_name: String):
 	else:
 		message = "📢 %s a réalisé : %s" % [guild_name, achievement_name]
 	
-	print(message)
+	GameLog.d(message)
 	# TODO: Afficher une notification à l'écran
 	
 	# Mettre à jour le classement
@@ -892,7 +892,7 @@ func _on_refresh_ranking_pressed():
 	"""Appelé quand le bouton d'actualisation est pressé"""
 	if guild_ranking:
 		guild_ranking.update_rankings()
-		print("Actualisation du classement demandée...")
+		GameLog.d("Actualisation du classement demandée...")
 	else:
 		_refresh_guild_ranking()
 
@@ -1167,7 +1167,7 @@ func _get_guild_strengths(guild_data: Dictionary) -> String:
 		var parts: Array[String] = []
 		if GuildManager and GuildManager.guild:
 			parts.append("Réputation %d" % int(GuildManager.guild.reputation))
-		var gcm: Node = get_node_or_null("/root/GuildCultureManager")
+		var gcm: Node = GuildCultureManager
 		if gcm and gcm.has_method("get_morale_tier"):
 			parts.append("Ambiance %s" % gcm.get_morale_tier())
 		if GuildManager:

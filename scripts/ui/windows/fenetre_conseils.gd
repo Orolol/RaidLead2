@@ -352,7 +352,7 @@ func _build_stats() -> void:
 	_kv(overview, "Trésorerie", "%s or" % _fmt_int(guild.gold), GOLD)
 	_kv(overview, "Réputation", "%d (%s)" % [int(guild.reputation), guild.get_reputation_tier()], _rep_color(guild.reputation))
 
-	var gcm: Node = get_node_or_null("/root/GuildCultureManager")
+	var gcm: Node = GuildCultureManager
 	if gcm and gcm.has_method("get_guild_morale"):
 		var morale: float = gcm.get_guild_morale()
 		_kv(overview, "Moral de guilde", "%d (%s)" % [int(morale), gcm.get_morale_tier()], _morale_color(morale))

@@ -251,103 +251,103 @@ func _on_player_recruited(player: SimulatedPlayer) -> void:
 			org_inst.set_guild_members(guild_manager_node.guild_members)
 
 func _on_debug_menu_pressed(id: int) -> void:
-	print("Debug menu pressed - Option ID: %d" % id)
+	GameLog.d("Debug menu pressed - Option ID: %d" % id)
 	var guild_manager = GuildManager
 	if not guild_manager:
-		print("ERREUR: GuildManager non trouvé")
+		GameLog.d("ERREUR: GuildManager non trouvé")
 		return
 		
 	match id:
 		0: # Ajouter 100 XP à la guilde
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(100, "Debug: +100 XP")
-				print("Debug: +100 XP à la guilde")
+				GameLog.d("Debug: +100 XP à la guilde")
 				
 		1: # Ajouter 1000 XP à la guilde
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(1000, "Debug: +1000 XP")
-				print("Debug: +1000 XP à la guilde")
+				GameLog.d("Debug: +1000 XP à la guilde")
 				
 		2: # Level up un membre aléatoire
 			if guild_manager.guild_members.size() > 0:
 				var member = guild_manager.guild_members[randi() % guild_manager.guild_members.size()]
 				member.gain_experience(member.personnage_niveau * member.personnage_niveau * 100)
-				print("Debug: Level up de %s" % member.nom)
+				GameLog.d("Debug: Level up de %s" % member.nom)
 				
 		3: # Level up tous les membres
 			for member in guild_manager.guild_members:
 				member.gain_experience(member.personnage_niveau * member.personnage_niveau * 100)
-			print("Debug: Level up de tous les membres")
+			GameLog.d("Debug: Level up de tous les membres")
 			
 		4: # Ajouter 1000 or à la guilde
 			if guild_manager.guild:
 				guild_manager.guild.add_gold(1000)
-				print("Debug: +1000 or à la guilde")
+				GameLog.d("Debug: +1000 or à la guilde")
 				
 		5: # Donner équipement aux membres
 			for member in guild_manager.guild_members:
 				# TODO: Avec le nouveau système, donner des objets spécifiques
 				# member.personnage_equipement += 10
 				pass
-			print("Debug: +10 équipement à tous les membres")
+			GameLog.d("Debug: +10 équipement à tous les membres")
 			
 		6: # Forcer mise à jour serveur
 			var server_version = ServerVersion
 			if server_version:
 				server_version._check_version_update()
-				print("Debug: Vérification de mise à jour serveur forcée")
+				GameLog.d("Debug: Vérification de mise à jour serveur forcée")
 				
 		7: # Compléter un donjon (succès)
 			if guild_manager.guild:
 				guild_manager.guild.gain_xp(100, "Debug: Donjon complété")
-				print("Debug: Simulation de donjon complété (+100 XP)")
+				GameLog.d("Debug: Simulation de donjon complété (+100 XP)")
 		
 		8: # Déclencher événement test
 			var event_manager = EventManager
 			if event_manager:
 				event_manager.force_event("member_dispute")
-				print("Debug: Événement 'dispute entre membres' forcé")
+				GameLog.d("Debug: Événement 'dispute entre membres' forcé")
 		
 		9: # Afficher stats événements
 			var event_manager = EventManager
 			if event_manager:
 				var stats = event_manager.get_event_stats()
-				print("=== STATS ÉVÉNEMENTS ===")
-				print("Événements aujourd'hui: %d" % stats.events_today)
-				print("Événement en attente: %s" % ("Oui" if stats.pending_event else "Non"))
-				print("Chaînes actives: %s" % str(stats.active_chains))
-				print("Total événements: %d" % stats.total_events)
-				print("========================")
+				GameLog.d("=== STATS ÉVÉNEMENTS ===")
+				GameLog.d("Événements aujourd'hui: %d" % stats.events_today)
+				GameLog.d("Événement en attente: %s" % ("Oui" if stats.pending_event else "Non"))
+				GameLog.d("Chaînes actives: %s" % str(stats.active_chains))
+				GameLog.d("Total événements: %d" % stats.total_events)
+				GameLog.d("========================")
 				
 		10: # Test notification INFO
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_info("Ceci est un test de notification info", "Test Info")
-				print("Debug: Test notification INFO")
+				GameLog.d("Debug: Test notification INFO")
 				
 		11: # Test notification SUCCESS
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_success("Ceci est un test de notification succès", "Test Success")
-				print("Debug: Test notification SUCCESS")
+				GameLog.d("Debug: Test notification SUCCESS")
 				
 		12: # Test notification WARNING
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_warning("Ceci est un test de notification avertissement", "Test Warning")
-				print("Debug: Test notification WARNING")
+				GameLog.d("Debug: Test notification WARNING")
 				
 		13: # Test notification ERROR
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_error("Ceci est un test de notification erreur", "Test Error")
-				print("Debug: Test notification ERROR")
+				GameLog.d("Debug: Test notification ERROR")
 				
 		14: # Test notification ACHIEVEMENT
 			var notification_manager = NotificationManager
 			if notification_manager:
 				notification_manager.show_achievement("Ceci est un test de notification achievement", "Test Achievement")
-				print("Debug: Test notification ACHIEVEMENT")
+				GameLog.d("Debug: Test notification ACHIEVEMENT")
 	
 	# Rafraîchir la fenêtre guilde si elle est ouverte
 	var guilde_inst: Control = window_manager.get_window_instance("guilde")
@@ -397,48 +397,48 @@ func _input(event: InputEvent) -> void:
 				window_manager.close_active_window()
 			KEY_F1:  # F1 pour déclencher un événement test
 				if _is_debug_ui_enabled():
-					print("F1 pressed - Tentative de déclencher un événement")
+					GameLog.d("F1 pressed - Tentative de déclencher un événement")
 					_on_debug_menu_pressed(8)  # ID 8 = Déclencher événement test
 			KEY_F2:  # F2 pour afficher les stats
 				if _is_debug_ui_enabled():
-					print("F2 pressed - Affichage des stats")
+					GameLog.d("F2 pressed - Affichage des stats")
 					_on_debug_menu_pressed(9)  # ID 9 = Afficher stats événements
 			KEY_F5:  # F5 pour sauvegarder
 				SaveManager.save_game()
 
 func _connect_event_system() -> void:
-	print("Main: Connexion du système d'événements")
+	GameLog.d("Main: Connexion du système d'événements")
 	var event_manager = EventManager
 	if event_manager:
 		event_manager.event_triggered.connect(_on_event_triggered)
-		print("Main: Signal event_triggered connecté")
+		GameLog.d("Main: Signal event_triggered connecté")
 	else:
-		print("Main: ERREUR - EventManager non trouvé!")
+		GameLog.d("Main: ERREUR - EventManager non trouvé!")
 
 func _on_event_triggered(event: RandomEventResource) -> void:
-	print("Main: Signal event_triggered reçu pour: %s" % event.title)
+	GameLog.d("Main: Signal event_triggered reçu pour: %s" % event.title)
 	show_event_popup(event)
 
 func show_event_popup(event: RandomEventResource) -> void:
-	print("Main: show_event_popup appelé pour l'événement: %s" % event.title)
+	GameLog.d("Main: show_event_popup appelé pour l'événement: %s" % event.title)
 	
 	# File d'attente : ne pas empiler sur un autre popup modal (loot, drama, ou un événement déjà affiché)
 	if event_popup != null or _drama_popup_active or _loot_dialog_active:
 		_pending_event_queue.append(event)
 		return
 	
-	print("Main: Chargement de la scène EventPopup.tscn")
+	GameLog.d("Main: Chargement de la scène EventPopup.tscn")
 	var event_popup_scene = load("res://scenes/EventPopup.tscn")
 	event_popup = event_popup_scene.instantiate()
 	add_child(event_popup)
 	
-	print("Main: Popup ajoutée comme enfant")
+	GameLog.d("Main: Popup ajoutée comme enfant")
 	
 	# Connecter les signaux
 	event_popup.choice_selected.connect(_on_event_choice_selected)
 	event_popup.popup_closed.connect(_on_event_popup_closed)
 	
-	print("Main: Signaux connectés, affichage de l'événement")
+	GameLog.d("Main: Signaux connectés, affichage de l'événement")
 	# Afficher l'événement
 	event_popup.show_event(event)
 
@@ -558,7 +558,7 @@ func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Arr
 			candidate.trigger_loot_conflict()
 
 	# Notification
-	var notification_manager: Node = get_node_or_null("/root/NotificationManager")
+	var notification_manager: Node = NotificationManager
 	if notification_manager:
 		notification_manager.show_info(
 			"%s a reçu %s" % [winner.nom, item.name],
@@ -781,7 +781,7 @@ func _setup_player_systems() -> void:
 	
 	var guild_manager = GuildManager
 	if not guild_manager:
-		print("ERREUR: GuildManager non trouvé pour _setup_player_systems")
+		GameLog.d("ERREUR: GuildManager non trouvé pour _setup_player_systems")
 		return
 	
 	# Créer le panneau de contrôle du joueur
@@ -831,7 +831,7 @@ func _connect_player_systems() -> void:
 			player_character.player_state_changed.connect(_on_player_state_changed)
 
 	if OS.is_debug_build():
-		print("Systèmes joueur configurés")
+		GameLog.d("Systèmes joueur configurés")
 
 	# Au démarrage, si le joueur n'a aucune activité, on bloque le temps et on
 	# demande un ordre (sauf en mode test sans save autoload).

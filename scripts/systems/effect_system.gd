@@ -40,7 +40,7 @@ func apply_effect(target, effect: EffectResource, source: String = "") -> Effect
 		return null
 	
 	if not effect.applies_to(target):
-		print("Effet %s ne peut pas être appliqué à %s" % [effect.name, target])
+		GameLog.d("Effet %s ne peut pas être appliqué à %s" % [effect.name, target])
 		return null
 	
 	var target_id = _get_target_id(target)
@@ -76,7 +76,7 @@ func apply_effect(target, effect: EffectResource, source: String = "") -> Effect
 	# Notifier l'application de l'effet
 	effect_applied.emit(target, effect_instance)
 	
-	print("Effet appliqué: %s sur %s (source: %s)" % [effect.name, target_id, source])
+	GameLog.d("Effet appliqué: %s sur %s (source: %s)" % [effect.name, target_id, source])
 	
 	return effect_instance
 
@@ -128,7 +128,7 @@ func _remove_effect_internal(target_id: String, effect_instance: EffectInstanceR
 	else:
 		effect_removed.emit(target, effect_instance)
 	
-	print("Effet supprimé: %s de %s" % [effect_instance.effect.name, target_id])
+	GameLog.d("Effet supprimé: %s de %s" % [effect_instance.effect.name, target_id])
 	
 	return true
 

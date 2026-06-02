@@ -372,10 +372,7 @@ func _get_game_time() -> Node:
 
 func _get_activity_manager() -> Node:
 	"""Récupère l'ActivityManager"""
-	var tree = Engine.get_main_loop()
-	if tree and tree.root:
-		return tree.root.get_node_or_null("/root/ActivityManager")
-	return null
+	return ActivityManager
 
 func get_energy_percentage() -> float:
 	"""Retourne le pourcentage d'énergie restante"""

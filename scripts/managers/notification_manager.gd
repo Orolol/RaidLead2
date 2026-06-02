@@ -76,7 +76,7 @@ func _connect_to_game_events():
 	"""Connecte aux événements du jeu pour afficher automatiquement des notifications"""
 	
 	# Connexion au PhaseManager pour les changements de phase
-	var phase_manager = get_node_or_null("/root/PhaseManager")
+	var phase_manager = PhaseManager
 	if phase_manager:
 		if phase_manager.has_signal("phase_changed"):
 			phase_manager.phase_changed.connect(_on_phase_changed)
@@ -84,7 +84,7 @@ func _connect_to_game_events():
 			phase_manager.progression_updated.connect(_on_progression_updated)
 	
 	# Connexion au GuildManager pour les événements de guilde
-	var guild_manager = get_node_or_null("/root/GuildManager")
+	var guild_manager = GuildManager
 	if guild_manager:
 		if guild_manager.has_signal("member_recruited"):
 			guild_manager.member_recruited.connect(_on_member_recruited)
@@ -98,7 +98,7 @@ func _connect_to_game_events():
 			guild_manager.member_disconnected.connect(_on_member_disconnected)
 	
 	# Connexion à l'ActivityManager pour les activités
-	var activity_manager = get_node_or_null("/root/ActivityManager")
+	var activity_manager = ActivityManager
 	if activity_manager:
 		if activity_manager.has_signal("activity_completed"):
 			activity_manager.activity_completed.connect(_on_activity_completed)
@@ -108,13 +108,13 @@ func _connect_to_game_events():
 			activity_manager.dungeon_ended.connect(_on_dungeon_ended)
 	
 	# Connexion au RecruitmentPool pour les événements de recrutement
-	var recruitment_pool = get_node_or_null("/root/RecruitmentPool")
+	var recruitment_pool = RecruitmentPool
 	if recruitment_pool:
 		if recruitment_pool.has_signal("pool_updated"):
 			recruitment_pool.pool_updated.connect(_on_recruitment_pool_updated)
 	
 	# Connexion à l'EventManager pour les événements aléatoires
-	var event_manager = get_node_or_null("/root/EventManager")
+	var event_manager = EventManager
 	if event_manager:
 		if event_manager.has_signal("event_triggered"):
 			event_manager.event_triggered.connect(_on_random_event_triggered)

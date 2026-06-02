@@ -95,7 +95,7 @@ func _initialize_ai_guild():
 	# XP initiale selon la réputation
 	xp = int(reputation * 10) + randi_range(0, 200)
 	
-	print("Guilde IA '%s' créée - Stratégie: %s, Réputation: %.1f" % [name, Strategy.keys()[ai_strategy], reputation])
+	GameLog.d("Guilde IA '%s' créée - Stratégie: %s, Réputation: %.1f" % [name, Strategy.keys()[ai_strategy], reputation])
 
 func _generate_initial_members(count: int):
 	"""Génère des membres initiaux pour la guilde IA"""
@@ -226,7 +226,7 @@ func simulate_monthly_progress():
 	var monthly_xp: int = int(120 + reputation * 4.0 + config.raid_focus * 200.0)
 	gain_xp(monthly_xp, "Progression mensuelle")
 
-	print("Progression mensuelle simulée pour %s - Membres: %d, Réputation: %.1f" % [name, members.size(), reputation])
+	GameLog.d("Progression mensuelle simulée pour %s - Membres: %d, Réputation: %.1f" % [name, members.size(), reputation])
 
 func _simulate_pve_progression():
 	"""Simule la progression PvE de la guilde"""
@@ -324,7 +324,7 @@ func _attempt_recruitment():
 		}
 		
 		members.append(new_member)
-		print("Guilde IA %s a recruté %s" % [name, new_member.name])
+		GameLog.d("Guilde IA %s a recruté %s" % [name, new_member.name])
 
 func _simulate_member_turnover():
 	"""Simule les départs de membres"""
@@ -351,7 +351,7 @@ func _simulate_member_turnover():
 	members_to_remove.reverse()
 	for index in members_to_remove:
 		var leaving_member = members[index]
-		print("Membre %s quitte la guilde %s" % [leaving_member.name, name])
+		GameLog.d("Membre %s quitte la guilde %s" % [leaving_member.name, name])
 		members.remove_at(index)
 	
 	# Calculer le taux de turnover

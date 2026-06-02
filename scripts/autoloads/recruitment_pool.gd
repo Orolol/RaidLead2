@@ -275,7 +275,7 @@ func attempt_recruitment(player: SimulatedPlayer, guild_data: Dictionary) -> Dic
 	var final_chance = base_chance * (1.0 - recruitment_difficulty)
 
 	# Équilibrage adaptatif : bonus de recrutement si le joueur est à la traîne (US 6.4)
-	var balance_manager = get_node_or_null("/root/BalanceManager")
+	var balance_manager = BalanceManager
 	if balance_manager:
 		final_chance *= balance_manager.get_recruit_chance_mult()
 	final_chance = clamp(final_chance, 0.0, 1.0)
@@ -315,7 +315,7 @@ func _generate_rejection_reasons(player: SimulatedPlayer, guild_data: Dictionary
 	return reasons
 
 func _on_server_version_updated(new_version: float, _update_name: String) -> void:
-	print("Pool de recrutement : mise à jour vers version %s" % new_version)
+	GameLog.d("Pool de recrutement : mise à jour vers version %s" % new_version)
 	
 	# Augmenter la taille du pool si nécessaire
 	var pool_limits = _get_current_pool_limits()

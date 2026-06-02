@@ -810,7 +810,7 @@ func _on_auto_assign_pressed():
 	
 	if not all_filled:
 		# Utiliser NotificationManager si disponible
-		var notification_manager = get_node_or_null("/root/NotificationManager")
+		var notification_manager = NotificationManager
 		if notification_manager:
 			notification_manager.show_notification(
 				"Impossible de remplir tous les rôles. Vérifiez les membres disponibles.",
