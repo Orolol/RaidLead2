@@ -81,7 +81,9 @@ static func read_axis(axis: String, param: Variant, ctx: Dictionary) -> Variant:
 		"speaker.days_in_guild":
 			return float(sp.days_in_guild) if sp else 0.0
 		"relation":
-			return _relation(sp, ctx.get("subject", null))
+			# Relation locuteur→sujet, résolue en amont par le ChatDirector (accès SocialDynamics)
+			# et passée dans ctx pour garder ce moteur pur. "" pour l'ambient (pas de sujet).
+			return String(ctx.get("relation", ""))
 		"context.event_magnitude":
 			return float(ctx.get("salience", 0.0))
 		"context.time_of_day":
@@ -160,28 +162,3 @@ static func _traits(m: Variant) -> Array:
 	if m.tags_caches is Array:
 		t.append_array(m.tags_caches)
 	return t
-
-static func _relation(sp: Variant, subject: Variant) -> String:
-	## Best-effort (raffiné en Phase C/D avec SocialDynamics). Pour l'ambient, subject=null → "".
-	if sp == null or subject == null:
-		return ""
-	if not (sp.relationships is Dictionary):
-		return ""
-	var raw: Variant = sp.relationships.get(String(subject.player_id), null)
-	if raw == null:
-		return ""
-	if raw is String:
-		return raw
-	if raw is int:
-		return _relation_int_to_string(raw)
-	return ""
-
-static func _relation_int_to_string(t: int) -> String:
-	# Aligné sur SocialDynamics.RelationType (NEUTRAL=0, FRIEND, MENTOR, STUDENT, RIVAL, ENEMY).
-	match t:
-		1: return "friend"
-		2: return "mentor"
-		3: return "student"
-		4: return "rival"
-		5: return "enemy"
-		_: return "neutral"

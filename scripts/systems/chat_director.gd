@@ -15,11 +15,14 @@ extends Node
 signal line_emitted(speaker_name: String, text: String, channel: String)
 
 const AMBIENT_LINES_PATH: String = "res://data/chat/lines/ambient_banter.json"
+const REACTIVE_LINES_PATH: String = "res://data/chat/lines/reactive.json"
 
 # Moteur de scoring d'utilité (référencé par preload pour éviter le cache de classes périmé).
 const ChatScoring = preload("res://scripts/systems/chat/chat_scoring.gd")
 # Température du tirage ambient : haute = variété/surprise (temps mort).
 const AMBIENT_TEMPERATURE: float = 0.7
+# Température du tirage réactif : plus basse = on reste sur le sujet de l'événement.
+const REACTIVE_TEMPERATURE: float = 0.45
 
 # Cadence ambient (en minutes de JEU).
 const BASE_INTERVAL_MIN: float = 22.0   # avant division par sqrt(online) × bavardise
@@ -37,19 +40,23 @@ var _last_emit_ms: int = 0
 var _line_cooldowns: Dictionary = {}   # id -> minute de jeu absolue de dernière utilisation
 var _last_speaker_id: String = ""
 var _emitted_count: int = 0            # total de lignes émises (debug / test)
+var _blackboard: Array = []            # stimuli réactifs en attente {kind,salience,subject,vars,ttl,born}
 
 func _ready() -> void:
 	_load_corpus()
 	if GameTime and not GameTime.minute_changed.is_connected(_on_minute_changed):
 		GameTime.minute_changed.connect(_on_minute_changed)
+	_connect_event_signals()
 	_next_interval = _compute_interval()
 
 # ==================== CORPUS ====================
 
 func _load_corpus() -> void:
-	_lines = _load_lines(AMBIENT_LINES_PATH)
+	_lines = []
+	_lines.append_array(_load_lines(AMBIENT_LINES_PATH))
+	_lines.append_array(_load_lines(REACTIVE_LINES_PATH))
 	if _lines.is_empty():
-		push_warning("ChatDirector : corpus ambient vide ou introuvable (%s)" % AMBIENT_LINES_PATH)
+		push_warning("ChatDirector : corpus vide ou introuvable (%s / %s)" % [AMBIENT_LINES_PATH, REACTIVE_LINES_PATH])
 
 func _load_lines(path: String) -> Array:
 	if not FileAccess.file_exists(path):
@@ -69,6 +76,8 @@ func _load_lines(path: String) -> Array:
 func _on_minute_changed(_minute: int, _hour: int) -> void:
 	if not enabled:
 		return
+	# Réactif d'abord : un stimulus en attente passe avant le banter.
+	_process_blackboard()
 	if GameTime and GameTime.is_paused:
 		return
 	_ig_minutes_since_last += 1.0
@@ -101,8 +110,8 @@ func _try_ambient(ignore_floor: bool = false) -> void:
 		return
 	_emit_line(speaker, line)
 
-func _emit_line(speaker: Variant, line: Variant) -> void:
-	var text: String = _expand(String(line.get("text", "")))
+func _emit_line(speaker: Variant, line: Variant, vars: Dictionary = {}) -> void:
+	var text: String = _expand(String(line.get("text", "")), vars)
 	if text.strip_edges() == "":
 		return
 	_line_cooldowns[String(line.get("id", ""))] = _now_total_minutes()
@@ -124,10 +133,10 @@ func _pick_speaker(online: Array) -> Variant:
 		weights.append(w)
 	return GameRandom.weighted_pick(opts, weights)
 
-func _pick_line(speaker: Variant, pool: String, subject: Variant = null) -> Variant:
-	# Moteur de scoring (Phase B) : chaque ligne éligible est scorée (gates × Σbonus),
+func _pick_line(speaker: Variant, pool: String, subject: Variant = null, temperature: float = AMBIENT_TEMPERATURE, salience: float = 0.0) -> Variant:
+	# Moteur de scoring : chaque ligne éligible est scorée (gates × Σbonus),
 	# puis tirage softmax à température (variété sans répétition).
-	var ctx: Dictionary = _build_ctx(speaker, subject)
+	var ctx: Dictionary = _build_ctx(speaker, subject, salience)
 	var lines: Array = []
 	var scores: Array = []
 	var now: int = _now_total_minutes()
@@ -143,7 +152,7 @@ func _pick_line(speaker: Variant, pool: String, subject: Variant = null) -> Vari
 			continue
 		lines.append(line)
 		scores.append(r["score"])
-	return ChatScoring.softmax_sample(lines, scores, AMBIENT_TEMPERATURE)
+	return ChatScoring.softmax_sample(lines, scores, temperature)
 
 func _on_cooldown(line: Variant, now: int) -> bool:
 	var cd: float = float(line.get("cooldown_min", 0))
@@ -152,12 +161,13 @@ func _on_cooldown(line: Variant, now: int) -> bool:
 	var last: float = float(_line_cooldowns.get(String(line.get("id", "")), -1000000))
 	return float(now) - last < cd
 
-func _build_ctx(speaker: Variant, subject: Variant) -> Dictionary:
+func _build_ctx(speaker: Variant, subject: Variant, salience: float = 0.0) -> Dictionary:
 	# Contexte de scoring : valeurs lues une fois ici (le moteur reste pur/testable).
 	return {
 		"speaker": speaker,
 		"subject": subject,
-		"salience": 0.0,
+		"relation": _relation_between(speaker, subject),
+		"salience": salience,
 		"hour": GameTime.current_hour if GameTime else 0,
 		"guild_morale": GuildCultureManager.guild_morale if GuildCultureManager else 50.0,
 		"phase": int(PhaseManager.current_phase) if PhaseManager else 0,
@@ -208,8 +218,12 @@ func _talkativeness(m: Variant) -> float:
 
 # ==================== GRAMMAIRE (inline {a|b|c} — étendue en Phase B/F) ====================
 
-func _expand(s: String) -> String:
+func _expand(s: String, vars: Dictionary = {}) -> String:
 	var result: String = s
+	# 1) Injection des variables réelles du stimulus : #token# -> valeur.
+	for key in vars:
+		result = result.replace("#" + String(key) + "#", String(vars[key]))
+	# 2) Choix inline {a|b|c}.
 	var guard: int = 0
 	while result.find("{") != -1 and result.find("}") != -1 and guard < 16:
 		guard += 1
@@ -245,6 +259,175 @@ func _now_total_minutes() -> int:
 		return GameTime.get_total_days_elapsed() * 24 * 60 + GameTime.current_hour * 60 + GameTime.current_minute
 	return 0
 
+func _behavior_system() -> Variant:
+	if GuildManager and GuildManager.behavior_system:
+		return GuildManager.behavior_system
+	return null
+
+func _social_dynamics() -> Variant:
+	var bs: Variant = _behavior_system()
+	if bs and bs.social_dynamics:
+		return bs.social_dynamics
+	return null
+
+func _relation_between(a: Variant, b: Variant) -> String:
+	# Relation a→b via le vrai graphe social (SocialDynamics). "" si pas de sujet / pas de relation.
+	if a == null or b == null or a == b:
+		return ""
+	var sd: Variant = _social_dynamics()
+	if sd == null or not sd.has_method("get_relationship"):
+		return ""
+	var rel: Variant = sd.get_relationship(a, b)
+	if rel == null:
+		return ""
+	return _relation_int_to_string(int(rel.type))
+
+func _relation_int_to_string(t: int) -> String:
+	match t:
+		SocialDynamics.RelationType.FRIEND: return "friend"
+		SocialDynamics.RelationType.MENTOR: return "mentor"
+		SocialDynamics.RelationType.STUDENT: return "student"
+		SocialDynamics.RelationType.RIVAL: return "rival"
+		SocialDynamics.RelationType.ENEMY: return "enemy"
+		_: return "neutral"
+
+# ==================== STIMULI RÉACTIFS (blackboard) ====================
+
+func _connect_event_signals() -> void:
+	if GuildManager:
+		_safe_connect(GuildManager, "member_leveled_up", _on_member_leveled_up)
+		_safe_connect(GuildManager, "member_recruited", _on_member_recruited)
+		_safe_connect(GuildManager, "member_left", _on_member_left)
+	if ActivityManager:
+		_safe_connect(ActivityManager, "dungeon_started", _on_dungeon_started)
+	if DramaManager:
+		_safe_connect(DramaManager, "drama_occurred", _on_drama_occurred)
+	if GuildCultureManager:
+		_safe_connect(GuildCultureManager, "tension_detected", _on_tension_detected)
+	# behavior_system est créé en différé → on s'y abonne après une frame.
+	call_deferred("_connect_deferred_signals")
+
+func _connect_deferred_signals() -> void:
+	var bs: Variant = _behavior_system()
+	if bs:
+		_safe_connect(bs, "burnout_level_changed", _on_burnout_changed)
+
+func _safe_connect(obj: Variant, sig_name: String, callable: Callable) -> void:
+	if obj and obj.has_signal(sig_name) and not obj.is_connected(sig_name, callable):
+		obj.connect(sig_name, callable)
+
+func _push_stimulus(kind: String, salience: float, subject: Variant = null, vars: Dictionary = {}, ttl_min: float = 30.0) -> void:
+	if not enabled:
+		return
+	_blackboard.append({
+		"kind": kind, "salience": salience, "subject": subject,
+		"vars": vars, "ttl": ttl_min, "born": _now_total_minutes(),
+	})
+	_process_blackboard()
+
+func _process_blackboard() -> void:
+	_expire_stimuli()
+	if _blackboard.is_empty():
+		return
+	# Plancher temps-réel : on diffère (sans perdre le stimulus) si on vient d'émettre.
+	if Time.get_ticks_msec() - _last_emit_ms < REALTIME_FLOOR_MS:
+		return
+	var best: int = 0
+	for i in range(1, _blackboard.size()):
+		if float(_blackboard[i]["salience"]) > float(_blackboard[best]["salience"]):
+			best = i
+	var stim: Dictionary = _blackboard[best]
+	_blackboard.remove_at(best)
+	_emit_reactive(stim)
+
+func _expire_stimuli() -> void:
+	var now: int = _now_total_minutes()
+	var kept: Array = []
+	for s in _blackboard:
+		if float(now) - float(s["born"]) <= float(s["ttl"]):
+			kept.append(s)
+	_blackboard = kept
+
+func _emit_reactive(stim: Dictionary) -> void:
+	var subject: Variant = stim.get("subject")
+	var speaker: Variant = _pick_reactive_speaker(subject)
+	if speaker == null:
+		return
+	var line: Variant = _pick_line(speaker, String(stim["kind"]), subject, REACTIVE_TEMPERATURE, float(stim["salience"]))
+	if line == null:
+		return
+	_emit_line(speaker, line, stim.get("vars", {}))
+
+func _pick_reactive_speaker(subject: Variant) -> Variant:
+	# Les AUTRES réagissent au sujet. Un proche (ami/rival/ennemi...) chambre ou félicite plus.
+	var online: Array = _online_members()
+	var opts: Array = []
+	var weights: Array = []
+	for m in online:
+		if subject != null and m == subject:
+			continue
+		var w: float = _talkativeness(m)
+		if subject != null:
+			var rel: String = _relation_between(m, subject)
+			if rel != "" and rel != "neutral":
+				w *= 1.7
+		if String(m.player_id) == _last_speaker_id:
+			w *= 0.4
+		opts.append(m)
+		weights.append(w)
+	return GameRandom.weighted_pick(opts, weights)
+
+# ==================== HANDLERS DE SIGNAUX ====================
+
+func _on_member_leveled_up(player: Variant, new_level: int) -> void:
+	var sal: float = 1.0 if new_level >= 60 else 0.35
+	_push_stimulus("level_up", sal, player, {"subject": String(player.nom), "lvl": str(new_level)})
+
+func _on_member_recruited(player: Variant) -> void:
+	_push_stimulus("recruit", 0.5, player, {"subject": String(player.nom)})
+
+func _on_member_left(player: Variant) -> void:
+	_push_stimulus("member_left", 0.8, player, {"subject": String(player.nom)})
+
+func _on_dungeon_started(dungeon_instance: Variant) -> void:
+	if dungeon_instance == null:
+		return
+	_safe_connect(dungeon_instance, "loot_distributed", _on_loot_distributed)
+	_safe_connect(dungeon_instance, "boss_failed", _on_boss_failed)
+	_safe_connect(dungeon_instance, "boss_defeated", _on_boss_defeated)
+
+func _on_loot_distributed(member: Variant, item: Variant) -> void:
+	if member == null or item == null:
+		return
+	var is_epic: bool = false
+	var item_name: String = str(item)
+	if item is Resource:
+		if "rarity" in item:
+			is_epic = int(item.rarity) >= 2   # >= RARE (COMMON0, UNCOMMON1, RARE2, EPIC3)
+		if "name" in item:
+			item_name = String(item.name)
+	var kind: String = "loot_epic" if is_epic else "loot"
+	var sal: float = 0.9 if is_epic else 0.4
+	_push_stimulus(kind, sal, member, {"subject": String(member.nom), "item": item_name})
+
+func _on_boss_failed(_boss_index: int, boss_name: String, wipe_count: int) -> void:
+	var sal: float = clampf(0.5 + 0.05 * float(wipe_count), 0.5, 0.85)
+	_push_stimulus("wipe", sal, null, {"boss": boss_name, "wipes": str(wipe_count)})
+
+func _on_boss_defeated(_boss_index: int, boss_name: String, _loot_winner: Variant) -> void:
+	_push_stimulus("boss_kill", 0.5, null, {"boss": boss_name})
+
+func _on_drama_occurred(_drama: Variant) -> void:
+	_push_stimulus("drama", 1.0, null, {})
+
+func _on_tension_detected(player1_name: String, player2_name: String, _reason: String) -> void:
+	_push_stimulus("tension", 0.7, null, {"p1": player1_name, "p2": player2_name})
+
+func _on_burnout_changed(player: Variant, new_level: int) -> void:
+	if new_level <= 0:
+		return
+	_push_stimulus("burnout", 0.6, player, {"subject": String(player.nom)})
+
 # ==================== API DEBUG / TEST ====================
 
 func debug_force_ambient() -> bool:
@@ -254,8 +437,22 @@ func debug_force_ambient() -> bool:
 	_try_ambient(true)
 	return _emitted_count > before
 
+func debug_force_reactive(kind: String, subject: Variant = null, vars: Dictionary = {}, salience: float = 0.7) -> bool:
+	## Force l'émission d'une réaction pour un type d'événement donné (ignore le plancher).
+	## Utilisé par le harnais de test et le menu debug.
+	var before: int = _emitted_count
+	_emit_reactive({"kind": kind, "salience": salience, "subject": subject, "vars": vars})
+	return _emitted_count > before
+
 func get_corpus_size() -> int:
 	return _lines.size()
+
+func debug_count_pool(pool: String) -> int:
+	var c: int = 0
+	for line in _lines:
+		if _line_in_pool(line, pool):
+			c += 1
+	return c
 
 func debug_explain_ambient(top_n: int = 5) -> Dictionary:
 	## Pour un locuteur plausible (le plus bavard tiré), renvoie le top-N des répliques

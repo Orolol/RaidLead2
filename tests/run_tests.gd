@@ -38,6 +38,7 @@ func _run_all() -> void:
 	_suite_ui_smoke(tf)
 	_suite_chat_director(tf)
 	_suite_chat_scoring(tf)
+	_suite_chat_reactive(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
 	print(tf.summary())
@@ -790,7 +791,8 @@ func _suite_chat_director(tf) -> void:
 	tf.suite("ChatDirector (Phase A)")
 
 	# Corpus chargé
-	tf.eq(ChatDirector.get_corpus_size(), 40, "corpus ambient = 40 lignes")
+	tf.eq(ChatDirector.debug_count_pool("ambient"), 40, "corpus ambient = 40 lignes")
+	tf.ok(ChatDirector.get_corpus_size() > 40, "corpus total inclut aussi le réactif")
 
 	# Grammaire inline {a|b|c}
 	var expanded: String = ChatDirector._expand("{alpha|beta|gamma}")
@@ -902,3 +904,41 @@ func _suite_chat_scoring(tf) -> void:
 		tf.ok(explain["rows"][0]["score"] >= explain["rows"][1]["score"], "explain trie par score desc")
 		tf.ok(explain["rows"][0]["breakdown"] is Array, "explain expose le breakdown")
 	GuildManager.guild_members.erase(ex)
+
+func _suite_chat_reactive(tf) -> void:
+	tf.suite("ChatDirector réactif (Phase C)")
+
+	# Injection des variables du stimulus dans la grammaire
+	tf.eq(ChatDirector._expand("gz #subject# niveau #lvl#", {"subject": "Bob", "lvl": "42"}), "gz Bob niveau 42", "injection #subject#/#lvl#")
+	tf.eq(ChatDirector._expand("wipe sur #boss#", {"boss": "Onyxia"}), "wipe sur Onyxia", "injection #boss#")
+
+	# Pools réactifs chargés
+	tf.ok(ChatDirector.debug_count_pool("level_up") >= 3, "pool level_up charge")
+	tf.ok(ChatDirector.debug_count_pool("wipe") >= 3, "pool wipe charge")
+	tf.ok(ChatDirector.debug_count_pool("loot_epic") >= 3, "pool loot_epic charge")
+
+	# Emission reactive avec injection de variable
+	var emitted: Array = []
+	var cb: Callable = func(_n, text, _c): emitted.append(text)
+	ChatDirector.line_emitted.connect(cb)
+
+	var subject := SimulatedPlayer.new()
+	subject.nom = "Subjekt"
+	subject.player_id = "react_subj"
+	subject.is_online = true
+	var reactor := SimulatedPlayer.new()
+	reactor.nom = "Reactor"
+	reactor.player_id = "react_a"
+	reactor.is_online = true
+	reactor.mood = 80.0
+	reactor.personnage_classe = "Guerrier"
+	GuildManager.guild_members.append(subject)
+	GuildManager.guild_members.append(reactor)
+
+	var ok_lvl: bool = ChatDirector.debug_force_reactive("level_up", subject, {"subject": "Subjekt", "lvl": "60"}, 1.0)
+	tf.ok(ok_lvl, "reaction level_up emise")
+	tf.ok(emitted.size() >= 1 and ("Subjekt" in String(emitted[-1]) or "60" in String(emitted[-1])), "variable injectee dans la reaction")
+
+	GuildManager.guild_members.erase(subject)
+	GuildManager.guild_members.erase(reactor)
+	ChatDirector.line_emitted.disconnect(cb)
