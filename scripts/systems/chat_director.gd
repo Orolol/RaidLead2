@@ -13,6 +13,7 @@ extends Node
 ## Phases suivantes : moteur de scoring complet (B), stimuli réactifs (C), scènes (D).
 
 signal line_emitted(speaker_name: String, text: String, channel: String)
+signal typing_changed(speaker_name: String)   # "" = personne ne tape (indicateur de scène)
 
 const AMBIENT_LINES_PATH: String = "res://data/chat/lines/ambient_banter.json"
 const REACTIVE_LINES_PATH: String = "res://data/chat/lines/reactive.json"
@@ -539,7 +540,11 @@ func emit_scene_line(speaker: Variant, text: String) -> void:
 	_last_speaker_id = String(speaker.player_id)
 	_last_emit_ms = Time.get_ticks_msec()
 	_emitted_count += 1
+	typing_changed.emit("")   # la réplique apparaît → fin de "est en train d'écrire"
 	line_emitted.emit(String(speaker.nom), text, "guild")
+
+func notify_typing(speaker_name: String) -> void:
+	typing_changed.emit(speaker_name)
 
 func expand_public(text: String, vars: Dictionary = {}) -> String:
 	return _expand(text, vars)

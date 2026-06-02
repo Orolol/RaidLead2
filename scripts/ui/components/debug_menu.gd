@@ -44,6 +44,11 @@ func setup(window_manager: Node) -> void:
 	popup.add_item("Test notification WARNING")
 	popup.add_item("Test notification ERROR")
 	popup.add_item("Test notification ACHIEVEMENT")
+	popup.add_separator()
+	popup.add_item("Chat : banter ambient", 100)
+	popup.add_item("Chat : scène rickroll", 101)
+	popup.add_item("Chat : scène tribunal du ninja", 102)
+	popup.add_item("Chat : expliquer le score (console)", 103)
 
 	popup.id_pressed.connect(_on_menu_pressed)
 
@@ -138,6 +143,26 @@ func _on_menu_pressed(id: int) -> void:
 		14: # Test notification ACHIEVEMENT
 			if NotificationManager:
 				NotificationManager.show_achievement("Ceci est un test de notification achievement", "Test Achievement")
+
+		100: # Chat : banter ambient
+			if ChatDirector:
+				ChatDirector.debug_force_ambient()
+
+		101: # Chat : scène rickroll
+			if ChatDirector:
+				ChatDirector.debug_play_scene("rickroll")
+
+		102: # Chat : scène tribunal du ninja
+			if ChatDirector:
+				ChatDirector.debug_play_scene("tribunal_ninja", null, {"item": "Lame Bénie de Tonnerre"})
+
+		103: # Chat : expliquer le score (console)
+			if ChatDirector:
+				var ex: Dictionary = ChatDirector.debug_explain_ambient(6)
+				GameLog.d("=== CHAT EXPLAIN (locuteur: %s) ===" % str(ex.get("speaker", "?")))
+				for row in ex.get("rows", []):
+					GameLog.d("  %5.2f  %s" % [float(row.get("score", 0.0)), str(row.get("id", ""))])
+				GameLog.d("===================================")
 
 	# Rafraîchir la fenêtre guilde si elle est ouverte
 	if not _window_manager:

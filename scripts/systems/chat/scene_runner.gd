@@ -118,12 +118,16 @@ func _run_beats(scene: Dictionary) -> void:
 				break
 			var delay: float = float(beat.get("delay", DEFAULT_BEAT_DELAY))
 			if delay > 0.0:
+				var actor: Variant = _cast.get(String(beat.get("actor", "")))
+				if actor != null and director:
+					director.notify_typing(String(actor.nom))   # "X est en train d'écrire…"
 				await get_tree().create_timer(delay).timeout
 			if not active:
 				break
 			_play_beat(beat)
 	active = false
 	if director:
+		director.notify_typing("")
 		director.set_scene_active(false)
 
 func _play_beat(beat: Dictionary) -> void:

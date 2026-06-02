@@ -21,6 +21,7 @@ const MESSAGE_COLORS = {
 
 var messages: Array = []
 var auto_scroll: bool = true
+var _typing_speaker: String = ""   # indicateur "X est en train d'écrire…" (scènes)
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(400, 200)
@@ -117,9 +118,15 @@ func _connect_to_chat_director() -> void:
 	# Le ChatPanel est une vue passive : il se contente de les afficher.
 	if ChatDirector and not ChatDirector.line_emitted.is_connected(_on_chat_line):
 		ChatDirector.line_emitted.connect(_on_chat_line)
+	if ChatDirector and not ChatDirector.typing_changed.is_connected(_on_typing_changed):
+		ChatDirector.typing_changed.connect(_on_typing_changed)
 
 func _on_chat_line(speaker_name: String, text: String, _channel: String) -> void:
 	add_chat_line(speaker_name, text)
+
+func _on_typing_changed(speaker_name: String) -> void:
+	_typing_speaker = speaker_name
+	_update_display()
 
 func add_chat_line(speaker_name: String, text: String) -> void:
 	# Ligne de chat en personnage : "[HH:MM] Nom: texte" (nom mis en évidence).
@@ -168,7 +175,9 @@ func _update_display() -> void:
 	chat_display.clear()
 	for msg in messages:
 		chat_display.append_text(msg + "\n")
-	
+	if _typing_speaker != "":
+		chat_display.append_text("[color=#666666][i]%s est en train d'écrire…[/i][/color]\n" % _typing_speaker)
+
 	# Auto-scroll vers le bas si activé
 	if auto_scroll:
 		await get_tree().process_frame
