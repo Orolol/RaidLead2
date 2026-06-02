@@ -73,6 +73,10 @@ func _setup_energy_display(parent: VBoxContainer) -> void:
 	# Barre de progression personnalisée
 	energy_progress = CustomProgressBarScript.new()
 	energy_progress.custom_minimum_size = Vector2(0, 25)
+	# Pas d'animation : l'énergie est mise à jour très souvent (chaque tick d'activité,
+	# et en rafale à haute vitesse) ; une barre animée verrait ses tweens tués en
+	# boucle et resterait figée. Mise à jour immédiate = robuste à toutes les vitesses.
+	energy_progress.animate_changes = false
 	energy_progress.set_range(0, 100)
 	energy_progress.set_value_immediate(100)
 	energy_progress.set_colors(Color.GREEN, Color.ORANGE, Color.RED)

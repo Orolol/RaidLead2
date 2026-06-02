@@ -201,7 +201,10 @@ func _animate_to_value(target_value: float) -> void:
 		tween.kill()
 
 	tween = create_tween()
-	tween.tween_property(self, "displayed_value", target_value, animation_duration)
+	# tween_method (et non tween_property) : passe par _set_displayed_value, qui
+	# déclenche queue_redraw() + _update_text() à chaque frame. Sans ça, la variable
+	# animée change mais la barre n'est jamais repeinte → visuel figé (bug).
+	tween.tween_method(_set_displayed_value, displayed_value, target_value, animation_duration)
 	tween.tween_callback(_on_animation_finished)
 
 func _on_animation_finished() -> void:
