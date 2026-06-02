@@ -23,13 +23,14 @@ const NOTIFICATION_HEIGHT = 80
 const NOTIFICATION_MARGIN_RIGHT = 20
 const NOTIFICATION_MARGIN_TOP = 60
 
-# Couleurs par type de notification
+# Couleurs par type de notification (dérivées de la palette canonique
+# UIConstants, alpha 0.95 réappliqué)
 const NOTIFICATION_COLORS = {
-	NotificationType.INFO: Color(0.2, 0.6, 0.9, 0.95),
-	NotificationType.SUCCESS: Color(0.3, 0.8, 0.3, 0.95),
-	NotificationType.WARNING: Color(0.9, 0.7, 0.2, 0.95),
-	NotificationType.ERROR: Color(0.9, 0.3, 0.3, 0.95),
-	NotificationType.ACHIEVEMENT: Color(0.8, 0.4, 0.9, 0.95)
+	NotificationType.INFO: Color(UIConstants.COLOR_INFO, 0.95),
+	NotificationType.SUCCESS: Color(UIConstants.COLOR_SUCCESS, 0.95),
+	NotificationType.WARNING: Color(UIConstants.COLOR_WARNING, 0.95),
+	NotificationType.ERROR: Color(UIConstants.COLOR_ERROR, 0.95),
+	NotificationType.ACHIEVEMENT: Color(UIConstants.COLOR_ACHIEVEMENT, 0.95)
 }
 
 # Icônes par type (utilisation de caractères Unicode pour simplicité)
@@ -137,7 +138,8 @@ func show_notification(text: String, type: NotificationType = NotificationType.I
 	notification_history.append(notification_data)
 	if notification_history.size() > 100:  # Limiter l'historique
 		notification_history.pop_front()
-	
+	history_updated.emit()
+
 	# Si on a déjà trop de notifications visibles, ajouter à la queue
 	if active_notifications.size() >= MAX_VISIBLE_NOTIFICATIONS:
 		notification_queue.append(notification_data)
@@ -230,9 +232,9 @@ func _create_notification_toast(notification_data: Dictionary) -> Control:
 	# Charger la scène NotificationToast
 	var toast_scene = load("res://scenes/NotificationToast.tscn")
 	if toast_scene:
-		var toast = toast_scene.instantiate()
-		toast.setup(notification_data)
-		return toast
+		var scene_toast = toast_scene.instantiate()
+		scene_toast.setup(notification_data)
+		return scene_toast
 	
 	# Fallback si la scène n'existe pas
 	var toast = PanelContainer.new()

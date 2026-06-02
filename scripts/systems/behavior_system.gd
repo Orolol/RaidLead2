@@ -4,7 +4,6 @@ class_name BehaviorSystem
 signal behavior_changed(player, change_type)
 signal personal_event_triggered(player, event)
 signal burnout_level_changed(player, new_level)
-signal relationship_formed(player1, player2, relationship_type)
 
 const PersonalEventsScript = preload("res://scripts/data/personal_events.gd")
 const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.gd")
@@ -46,7 +45,7 @@ func _init_social_dynamics():
 	social_dynamics.name = "SocialDynamics"
 	add_child(social_dynamics)
 
-func _on_minute_changed(minute: int, hour: int):
+func _on_minute_changed(minute: int, _hour: int):
 	"""Appelé chaque minute pour des comportements plus granulaires"""
 	
 	# Vérifier seulement toutes les 5 minutes pour optimiser les performances
@@ -170,9 +169,9 @@ func should_disconnect_dynamic(player) -> bool:
 		# Peut rester plus longtemps si activité intéressante
 		if player.current_activity:
 			match player.current_activity.type:
-				"DUNGEON", "RAID":
+				Activity.ActivityType.DUNGEON, Activity.ActivityType.RAID:
 					stay_probability = 0.7  # 70% chance de finir l'activité
-				"FUN":
+				Activity.ActivityType.FUN:
 					if player.mood > 70:
 						stay_probability = 0.4  # 40% chance de rester si s'amuse
 		
@@ -458,17 +457,17 @@ func _update_fatigue_levels():
 			# Fatigue selon l'activité
 			if member.current_activity:
 				var fatigue_rate = 1.0
-				
+
 				match member.current_activity.type:
-					"RAID":
+					Activity.ActivityType.RAID:
 						fatigue_rate = 3.0
-					"DUNGEON":
+					Activity.ActivityType.DUNGEON:
 						fatigue_rate = 2.0
-					"FARMING":
+					Activity.ActivityType.FARMING:
 						fatigue_rate = 1.5
-					"LEVELING":
+					Activity.ActivityType.LEVELING:
 						fatigue_rate = 1.0
-					"FUN":
+					Activity.ActivityType.FUN:
 						fatigue_rate = -0.5  # Récupère en s'amusant
 				
 				if fatigue_rate > 0:

@@ -14,7 +14,7 @@ static var PERKS = {
 		"description": "Débloque l'activité Farming pour générer de l'or et des potions",
 		"effects": {
 			"unlock_farming": true,
-			"gold_storage": 1000
+			"gold_storage": 8000
 		}
 	},
 	4: {

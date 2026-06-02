@@ -34,13 +34,17 @@ enum BadgeSize {
 }
 
 # Couleurs par type
+# Les teintes sémantiques (succès/avertissement/erreur/info) dérivent de la
+# palette canonique UIConstants. Les teintes neutres/spéciales (DEFAULT,
+# PRIMARY, TAG, COUNTER, STATUS) n'ont pas d'équivalent sémantique et restent
+# littérales. L'alpha d'origine est réappliqué.
 const BADGE_COLORS = {
 	BadgeType.DEFAULT: Color(0.5, 0.5, 0.5, 0.9),
 	BadgeType.PRIMARY: Color(0.2, 0.6, 0.9, 0.9),
-	BadgeType.SUCCESS: Color(0.3, 0.8, 0.3, 0.9),
-	BadgeType.WARNING: Color(0.9, 0.7, 0.2, 0.9),
-	BadgeType.ERROR: Color(0.9, 0.3, 0.3, 0.9),
-	BadgeType.INFO: Color(0.4, 0.7, 1.0, 0.9),
+	BadgeType.SUCCESS: Color(UIConstants.COLOR_SUCCESS, 0.9),
+	BadgeType.WARNING: Color(UIConstants.COLOR_WARNING, 0.9),
+	BadgeType.ERROR: Color(UIConstants.COLOR_ERROR, 0.9),
+	BadgeType.INFO: Color(UIConstants.COLOR_INFO, 0.9),
 	BadgeType.TAG: Color(0.7, 0.4, 0.9, 0.9),
 	BadgeType.COUNTER: Color(0.6, 0.3, 0.3, 0.95),
 	BadgeType.STATUS: Color(0.3, 0.6, 0.3, 0.9)

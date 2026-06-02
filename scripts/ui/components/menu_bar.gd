@@ -115,10 +115,23 @@ func _on_monde_pressed():
 func _on_organisation_pressed():
 	organisation_button_pressed.emit()
 
+func _is_window_locked(window_name: String) -> bool:
+	"""Vrai si la fenêtre est verrouillée par la phase courante (source de vérité
+	partagée entre le clic bouton ET les raccourcis clavier — évite le contournement)."""
+	if not PHASE_LOCKS.has(window_name):
+		return false
+	if not PhaseManager:
+		return false
+	return PhaseManager.get_current_phase() < int(PHASE_LOCKS[window_name])
+
 func _on_national_pressed():
+	if _is_window_locked("national"):
+		return
 	national_button_pressed.emit()
 
 func _on_esport_pressed():
+	if _is_window_locked("esport"):
+		return
 	esport_button_pressed.emit()
 
 func _on_cohesion_pressed():

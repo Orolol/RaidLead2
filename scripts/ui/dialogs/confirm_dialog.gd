@@ -37,13 +37,14 @@ const ICON_SYMBOLS = {
 	IconType.SUCCESS: "✅"
 }
 
-# Couleurs par type
+# Couleurs par type (sémantiques dérivées de la palette canonique UIConstants ;
+# QUESTION garde sa teinte propre, sans équivalent sémantique)
 const ICON_COLORS = {
 	IconType.QUESTION: Color(0.4, 0.7, 1.0),
-	IconType.WARNING: Color(0.9, 0.7, 0.2),
-	IconType.DANGER: Color(0.9, 0.3, 0.3),
-	IconType.INFO: Color(0.4, 0.7, 1.0),
-	IconType.SUCCESS: Color(0.3, 0.8, 0.3)
+	IconType.WARNING: UIConstants.COLOR_WARNING,
+	IconType.DANGER: UIConstants.COLOR_ERROR,
+	IconType.INFO: UIConstants.COLOR_INFO,
+	IconType.SUCCESS: UIConstants.COLOR_SUCCESS
 }
 
 # Éléments UI

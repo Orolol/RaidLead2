@@ -127,11 +127,11 @@ func _suite_player_flow(tf) -> void:
 	tf.eq(pc.last_activity_choice, "LEVELING", "dernière activité mémorisée")
 	tf.ok(not pc.needs_activity_choice(), "avec une activité, plus en attente")
 
-	# Drain d'énergie sur 1h de leveling (15/h)
+	# Drain d'énergie sur 1h de leveling (9/h, adouci C4)
 	var before_energy: float = pc.player_energy_pool
 	pc.update_player_energy(60.0)
 	tf.ok(pc.player_energy_pool < before_energy, "l'énergie baisse pendant l'activité")
-	tf.approx(pc.player_energy_pool, before_energy - 15.0, "drain leveling = 15/h", 0.5)
+	tf.approx(pc.player_energy_pool, before_energy - 9.0, "drain leveling = 9/h", 0.5)
 
 	# Déconnexion : conserve la dernière activité pour la reprise auto
 	pc.disconnect_player("Test")
@@ -677,8 +677,10 @@ func _suite_ui_smoke(tf) -> void:
 
 func _suite_economy(tf) -> void:
 	tf.suite("Économie")
+	# C7 : le signal de départ de membre doit exister (NotificationManager s'y abonne).
+	tf.ok(GuildManager.has_signal("member_left"), "GuildManager déclare le signal member_left (C7)")
 	var GuildPerks = load("res://scripts/data/guild_perks_data.gd")
-	tf.eq(int(GuildPerks.get_combined_effects(3).get("gold_storage", 0)), 1000, "stockage d'or niv 3 = 1000")
+	tf.eq(int(GuildPerks.get_combined_effects(3).get("gold_storage", 0)), 8000, "stockage d'or niv 3 = 8000")
 	tf.ok(int(GuildPerks.get_combined_effects(10).get("gold_storage", 0)) >= 100000, "stockage d'or croît fortement au niv 10")
 	if not (GuildManager and GuildManager.guild):
 		return
@@ -686,11 +688,11 @@ func _suite_economy(tf) -> void:
 	var saved_xp: int = g.xp
 	var saved_gold: int = g.gold
 
-	# Le cap de trésorerie est respecté au niveau 3 (stockage 1000).
+	# Le cap de trésorerie est respecté au niveau 3 (stockage 8000).
 	g.xp = GuildPerks.get_xp_for_level(3)
 	g.gold = 500
-	g.add_gold(5000)
-	tf.eq(g.gold, 1000, "add_gold plafonne au stockage (niv 3)")
+	g.add_gold(10000)
+	tf.eq(g.gold, 8000, "add_gold plafonne au stockage (niv 3)")
 
 	# Un clear de donjon crédite la trésorerie de guilde (revenu PvE).
 	g.xp = 0  # niveau 1 -> stockage 0 -> non plafonné

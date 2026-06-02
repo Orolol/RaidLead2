@@ -6,6 +6,9 @@ const EffectInstanceResource = preload("res://scripts/resources/effect_instance.
 const EffectResource = preload("res://scripts/resources/effect.gd")
 
 var active_effects: Dictionary = {}  # target_id -> Array[EffectInstanceResource]
+# Callables des lambdas connectées par instance, pour pouvoir déconnecter
+# exactement le même Callable. instance -> { "expired": Callable, "stack_changed": Callable }
+var _effect_callables: Dictionary = {}
 
 signal effect_applied(target, effect_instance: EffectInstanceResource)
 signal effect_removed(target, effect_instance: EffectInstanceResource)
@@ -64,8 +67,18 @@ func apply_effect(target, effect: EffectResource, source: String = "") -> Effect
 	
 	# Créer une nouvelle instance de l'effet
 	var effect_instance = EffectInstanceResource.new(effect, source, target)
-	effect_instance.expired.connect(_on_effect_expired.bind(target_id, effect_instance))
-	effect_instance.stack_changed.connect(_on_effect_stack_changed.bind(target, effect_instance))
+	# Connexion via lambdas à signature exacte (le signal émet l'instance émettrice ;
+	# on capture target_id / target pour les handlers internes).
+	var expired_cb: Callable = func(emitted_inst: EffectInstanceResource) -> void:
+		_on_effect_expired(target_id, emitted_inst)
+	var stack_changed_cb: Callable = func(emitted_inst: EffectInstanceResource, new_count: int) -> void:
+		_on_effect_stack_changed(target, emitted_inst, new_count)
+	effect_instance.expired.connect(expired_cb)
+	effect_instance.stack_changed.connect(stack_changed_cb)
+	_effect_callables[effect_instance] = {
+		"expired": expired_cb,
+		"stack_changed": stack_changed_cb,
+	}
 	
 	# Ajouter à la liste des effets actifs
 	if not active_effects.has(target_id):
@@ -115,11 +128,17 @@ func _remove_effect_internal(target_id: String, effect_instance: EffectInstanceR
 	if effects_list.is_empty():
 		active_effects.erase(target_id)
 	
-	# Déconnecter les signaux
-	if effect_instance.expired.is_connected(_on_effect_expired):
-		effect_instance.expired.disconnect(_on_effect_expired)
-	if effect_instance.stack_changed.is_connected(_on_effect_stack_changed):
-		effect_instance.stack_changed.disconnect(_on_effect_stack_changed)
+	# Déconnecter les signaux : on déconnecte exactement les Callables stockés
+	# à la connexion (les lambdas), sinon la déconnexion échoue silencieusement.
+	if _effect_callables.has(effect_instance):
+		var callables: Dictionary = _effect_callables[effect_instance]
+		var expired_cb: Callable = callables["expired"]
+		var stack_changed_cb: Callable = callables["stack_changed"]
+		if effect_instance.expired.is_connected(expired_cb):
+			effect_instance.expired.disconnect(expired_cb)
+		if effect_instance.stack_changed.is_connected(stack_changed_cb):
+			effect_instance.stack_changed.disconnect(stack_changed_cb)
+		_effect_callables.erase(effect_instance)
 	
 	# Notifier la suppression
 	var target = effect_instance.target

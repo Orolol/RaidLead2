@@ -3,7 +3,7 @@ extends Node
 # Système de classement des guildes
 # Gère la compétition entre la guilde du joueur et les guildes IA
 
-const AIGuild = preload("res://scripts/resources/ai_guild.gd")
+# AIGuild est disponible globalement via son `class_name` (pas besoin de preload qui masque l'identifiant global).
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
 
 signal ranking_updated(rankings: Array)
@@ -27,6 +27,11 @@ var world_rankings: Array = []     # Pour Phase 3
 # Historique des positions
 var ranking_history: Dictionary = {}
 var last_ranking_update: Dictionary = {}
+
+# Recalcul du classement différé (debounce) : les fins de donjon/recrutements posent
+# ce flag plutôt que de relancer un tri complet (~100 guildes) à chaque fois. Le flag
+# est consommé une seule fois par jour/semaine pour éviter l'empilement à haute vitesse.
+var _ranking_dirty: bool = false
 
 # Configuration du système de scores
 const SCORE_WEIGHTS = {
@@ -55,7 +60,8 @@ func _ready() -> void:
 		
 	if GameTime:
 		GameTime.connect("week_changed", _on_week_changed)
-		
+		GameTime.connect("day_changed", _on_day_changed)
+
 	# Se connecter au PhaseManager s'il existe
 	if PhaseManager:
 		PhaseManager.connect("phase_changed", _on_phase_changed)
@@ -80,7 +86,7 @@ func _initialize_rankings() -> void:
 	if GuildManager and GuildManager.guild:
 		ranking_history[GuildManager.guild.name] = []
 
-func register_guild(guild_name: String, is_player_guild: bool = false) -> void:
+func register_guild(guild_name: String, _is_player_guild: bool = false) -> void:
 	"""Enregistre une guilde dans le système de classement"""
 	if not ranking_history.has(guild_name):
 		ranking_history[guild_name] = []
@@ -154,7 +160,7 @@ func _calculate_activity_score(guild_data: Dictionary) -> float:
 	
 	return activity_ratio * 300.0 + active_members * 10.0
 
-func _calculate_reputation_score(guild_name: String, guild_data: Dictionary) -> float:
+func _calculate_reputation_score(_guild_name: String, guild_data: Dictionary) -> float:
 	"""Calcule le score de réputation"""
 	var reputation = guild_data.get("reputation", 50.0)
 	
@@ -398,8 +404,9 @@ func _check_position_changes(old_rankings: Array, new_rankings: Array) -> void:
 		
 		if old_position != new_position:
 			guild_position_changed.emit(guild_name, old_position, new_position)
-			
-			if guild_name == GuildManager.guild.name if GuildManager and GuildManager.guild else "":
+
+			var is_player_guild: bool = (GuildManager != null and GuildManager.guild != null) and guild_name == GuildManager.guild.name
+			if is_player_guild:
 				if new_position < old_position:
 					GameLog.d("🎉 Notre guilde monte au classement ! Position %d -> %d" % [old_position, new_position])
 				else:
@@ -410,8 +417,9 @@ func register_server_first(guild_name: String, content_id: String) -> void:
 	server_firsts[content_id] = guild_name
 	
 	new_server_first.emit(guild_name, "Server First: %s" % content_id)
-	
-	if guild_name == GuildManager.guild.name if GuildManager and GuildManager.guild else "":
+
+	var is_player_guild: bool = (GuildManager != null and GuildManager.guild != null) and guild_name == GuildManager.guild.name
+	if is_player_guild:
 		GameLog.d("🏆 SERVER FIRST! Nous avons fait le premier clear de %s!" % content_id)
 	else:
 		GameLog.d("📢 %s a fait le server first de %s" % [guild_name, content_id])
@@ -563,32 +571,45 @@ func _trim_player_run_history(max_runs: int = 100) -> void:
 
 # Callbacks des signaux
 
-func _on_week_changed(week: int, year: int) -> void:
-	"""Met à jour les rankings chaque semaine"""
+func _mark_ranking_dirty() -> void:
+	"""Marque le classement comme à recalculer (consommé une fois par jour/semaine)."""
+	_ranking_dirty = true
+
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
+	"""Consomme le flag de recalcul différé une fois par jour (anti-empilement)."""
+	if _ranking_dirty:
+		_ranking_dirty = false
+		update_rankings()
+
+func _on_week_changed(_week: int, _year: int) -> void:
+	"""Met à jour les rankings chaque semaine (et consomme un éventuel flag différé)."""
+	_ranking_dirty = false
 	update_rankings()
 
-func _on_member_recruited(player) -> void:
-	"""Réagit au recrutement de nouveaux membres"""
-	# Attendre un peu avant de mettre à jour (laisser le temps à l'intégration)
-	get_tree().create_timer(1.0).timeout.connect(update_rankings)
+func _on_member_recruited(_player) -> void:
+	"""Réagit au recrutement de nouveaux membres (recalcul différé)."""
+	# Laisser le temps à l'intégration : recalcul au prochain changement de jour.
+	_mark_ranking_dirty()
 
-func _on_guild_level_changed(new_level: int) -> void:
+func _on_guild_level_changed(_new_level: int) -> void:
 	"""Réagit aux changements de niveau de guilde"""
 	# Mettre à jour immédiatement car c'est important pour le score
 	update_rankings()
 
-func _on_activity_completed(player, activity) -> void:
+func _on_activity_completed(_player, activity) -> void:
 	"""Réagit aux activités terminées"""
-	# Si c'est une activité de donjon/raid, ça peut affecter le ranking
+	# Si c'est une activité de donjon/raid, ça peut affecter le ranking : on marque
+	# le classement « dirty » plutôt que de relancer un tri complet à chaque fin de run
+	# (évite l'empilement de recalculs à haute vitesse).
 	if activity and activity.type in [activity.ActivityType.DUNGEON, activity.ActivityType.RAID]:
-		get_tree().create_timer(2.0).timeout.connect(update_rankings)
+		_mark_ranking_dirty()
 
-func _on_phase_changed(new_phase, old_phase) -> void:
+func _on_phase_changed(_new_phase, _old_phase) -> void:
 	"""Réagit aux changements de phase"""
 	GameLog.d("Changement de phase détecté : mise à jour du système de classement")
 	update_rankings()
 
-func _on_ai_simulation_completed(guilds_data: Array) -> void:
+func _on_ai_simulation_completed(_guilds_data: Array) -> void:
 	"""Appelé quand la simulation mensuelle des guildes IA est terminée"""
 	# Les données sont déjà intégrées dans les guildes IA
 	# On met juste à jour les rankings

@@ -3,9 +3,9 @@ extends Node
 # Gestionnaire central des événements aléatoires avec système MTTH
 
 const EventsDataResource = preload("res://scripts/data/events_data.gd")
-const RandomEventResource = preload("res://scripts/resources/random_event.gd")
-const EventChoiceResource = preload("res://scripts/resources/event_choice.gd")
 const EffectResource = preload("res://scripts/resources/effect.gd")
+# RandomEventResource / EventChoiceResource sont des class_name globaux (déclarés dans
+# random_event.gd / event_choice.gd) — pas de const redondant ici (évite SHADOWED_GLOBAL_IDENTIFIER).
 
 var event_pool: Array = []  # Array[RandomEventResource]
 var event_history: Dictionary = {}  # event_id -> {last_triggered, occurrence_count}
@@ -55,7 +55,7 @@ func _on_hour_changed(hour: int):
 	if OS.is_debug_build(): print("EventManager: Vérification horaire (heure %d)" % hour)
 	_check_for_events()
 
-func _on_day_changed(day: int, week: int, year: int):
+func _on_day_changed(day: int, _week: int, _year: int):
 	GameLog.d("EventManager: Nouveau jour, réinitialisation du compteur d'événements")
 	events_today = 0
 	last_day_count = day
@@ -80,7 +80,7 @@ func _check_for_events():
 		if selected_event:
 			_trigger_event(selected_event)
 
-func _should_trigger_event(delta_hours: float) -> bool:
+func _should_trigger_event(_delta_hours: float) -> bool:
 	# Système pour respecter l'objectif d'~1 événement par jour maximum
 	
 	# Si on a déjà eu notre quota d'événements aujourd'hui
@@ -222,13 +222,25 @@ func resolve_event(event: RandomEventResource, choice: EventChoiceResource) -> D
 	if pending_event != event:
 		GameLog.d("EventManager: Erreur - événement non pending")
 		return {}
-	
+
+	# Choix null = fermeture sans choix (croix / Échap / clic hors zone) : on résout
+	# l'événement sans appliquer d'effet pour libérer la file (sinon plus aucun
+	# nouvel événement n'est tiré tant que pending_event != null).
+	if choice == null:
+		GameLog.d("EventManager: Résolution sans choix (fermeture) de l'événement %s" % event.title)
+		if event.event_chain_id != "":
+			active_chains.erase(event.event_chain_id)
+			chain_ended.emit(event.event_chain_id)
+		pending_event = null
+		event_resolved.emit(event, null)
+		return {}
+
 	GameLog.d("EventManager: Résolution de l'événement %s avec le choix %s" % [event.title, choice.text])
-	
+
 	# Appliquer les conséquences du choix
 	var consequences = choice.apply_consequences()
 	_apply_consequences(consequences)
-	
+
 	# Gérer la suite de la chaîne
 	if choice.follow_up_event_id != "":
 		var next_event = _find_event_by_id(choice.follow_up_event_id)
@@ -244,11 +256,19 @@ func resolve_event(event: RandomEventResource, choice: EventChoiceResource) -> D
 		# Terminer la chaîne
 		active_chains.erase(event.event_chain_id)
 		chain_ended.emit(event.event_chain_id)
-	
+
 	pending_event = null
 	event_resolved.emit(event, choice)
-	
+
 	return consequences
+
+func dismiss_event() -> void:
+	"""Ferme l'événement courant sans appliquer d'effet (« Ignorer »).
+	Indispensable : fermer la popup (croix / Échap / clic hors zone) doit libérer
+	pending_event, sinon EventManager bloque tous les tirages suivants (C13)."""
+	if pending_event == null:
+		return
+	resolve_event(pending_event, null)
 
 func _trigger_follow_up_event(event: RandomEventResource, timer: Timer):
 	timer.queue_free()
@@ -306,7 +326,19 @@ func _apply_stat_change(stat: String, value, guild_manager):
 		
 		"random_member_leave":
 			if value and guild_manager.guild_members.size() > 0:
-				var member_to_remove = guild_manager.guild_members[randi() % guild_manager.guild_members.size()]
+				# Ne jamais piocher le personnage du joueur (marqueur posé dans
+				# guild_manager.gd) ni un membre explicitement protégé (C15).
+				var eligible: Array = []
+				for member in guild_manager.guild_members:
+					if member.get_meta("is_player", false):
+						continue
+					if member.get_meta("protected", false):
+						continue
+					eligible.append(member)
+				if eligible.is_empty():
+					GameLog.d("Événement: aucun membre éligible au départ (joueur exclu)")
+					return
+				var member_to_remove = eligible[randi() % eligible.size()]
 				guild_manager.remove_member(member_to_remove)
 				GameLog.d("Événement: %s a quitté la guilde" % member_to_remove.nom)
 

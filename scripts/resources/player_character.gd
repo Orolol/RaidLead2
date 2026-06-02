@@ -22,14 +22,16 @@ signal player_state_changed()
 @export var session_xp_gained: int = 0
 @export var session_gold_gained: int = 0
 @export var session_duration_minutes: int = 0
+@export var session_start_level: int = 1  # Niveau au début de la session (rapport correct)
 
-# Drain d'énergie par activité (par heure)
-var energy_drain_rates = {
-	"LEVELING": 15.0,
-	"FARMING": 10.0,
-	"FUN": 5.0,
-	"DUNGEON": 20.0,
-	"RAID": 25.0,
+# Drain d'énergie par activité (par heure) — adouci (C4) pour des sessions plus
+# longues entre deux repos.
+var energy_drain_rates: Dictionary = {
+	"LEVELING": 9.0,
+	"FARMING": 6.0,
+	"FUN": 3.0,
+	"DUNGEON": 12.0,
+	"RAID": 15.0,
 	"OFFLINE": -10.0  # Récupération
 }
 
@@ -88,6 +90,7 @@ func _initialize_session():
 	session_xp_gained = 0
 	session_gold_gained = 0
 	session_duration_minutes = 0
+	session_start_level = personnage_niveau
 	consecutive_hours = 0.0
 
 	if OS.is_debug_build():
@@ -156,9 +159,9 @@ func update_player_energy(delta_minutes: float):
 	# Calculer le drain pour les minutes écoulées
 	var energy_delta = -(drain_rate * delta_minutes / 60.0)
 	
-	# Appliquer les malus de fatigue
-	if consecutive_hours > 4.0:
-		energy_delta *= 1.5  # 50% plus de fatigue après 4h consécutives
+	# Appliquer les malus de fatigue (seuil relevé à 6h, C4)
+	if consecutive_hours > 6.0:
+		energy_delta *= 1.5  # 50% plus de fatigue après 6h consécutives
 	
 	# Mettre à jour l'énergie
 	player_energy_pool = max(0.0, player_energy_pool + energy_delta)
@@ -321,7 +324,7 @@ func get_session_report() -> Dictionary:
 		"gold_gained": session_gold_gained,
 		"duration_minutes": session_duration_minutes,
 		"energy_remaining": player_energy_pool,
-		"levels_gained": personnage_niveau - 1,  # Commence niveau 1
+		"levels_gained": personnage_niveau - session_start_level,  # Relatif au début de session
 		"activity_time": _get_activity_breakdown()
 	}
 

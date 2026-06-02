@@ -539,6 +539,19 @@ func _on_loot_conflict(conflict: Dictionary) -> void:
 		)
 		vbox.add_child(btn)
 
+	# Fermeture sans choix (Échap/croix) : attribue par défaut au 1er candidat pour
+	# éviter un soft-lock (jeu resté en pause + verrou _loot_dialog_active) (C14).
+	dialog.close_requested.connect(func():
+		if not _loot_dialog_active:
+			return
+		_resolve_loot_conflict(item, candidates[0], candidates, dungeon_name, boss_name)
+		dialog.queue_free()
+		if game_time_node and not was_paused:
+			game_time_node.toggle_pause()
+		_loot_dialog_active = false
+		_show_next_pending_event.call_deferred()
+	)
+
 	_loot_dialog_active = true
 	add_child(dialog)
 	dialog.popup_centered(Vector2(500, 300))
@@ -697,6 +710,20 @@ func _show_drama_popup(drama) -> void:
 		desc.modulate = Color(0.65, 0.67, 0.72)
 		vbox.add_child(desc)
 
+	# Fermeture sans choix (Échap/croix) : réponse « silence » par défaut pour éviter
+	# un soft-lock (jeu resté en pause + verrou _drama_popup_active) (C14).
+	dialog.close_requested.connect(func():
+		if not _drama_popup_active:
+			return
+		DramaManager.resolve_drama(drama, "silence")
+		dialog.queue_free()
+		if game_time_node and not was_paused:
+			game_time_node.toggle_pause()
+		_drama_popup_active = false
+		_process_next_drama()
+		_show_next_pending_event.call_deferred()
+	)
+
 	add_child(dialog)
 	dialog.popup_centered(Vector2(540, 380))
 
@@ -830,12 +857,49 @@ func _connect_player_systems() -> void:
 		if player_character.has_signal("player_state_changed"):
 			player_character.player_state_changed.connect(_on_player_state_changed)
 
+	# Après un chargement de save, SaveManager reconstruit le personnage joueur :
+	# il faut re-pointer l'UI vers ce nouvel objet (bug C1).
+	if SaveManager and not SaveManager.load_completed.is_connected(_on_save_loaded):
+		SaveManager.load_completed.connect(_on_save_loaded)
+
 	if OS.is_debug_build():
 		GameLog.d("Systèmes joueur configurés")
 
 	# Au démarrage, si le joueur n'a aucune activité, on bloque le temps et on
 	# demande un ordre (sauf en mode test sans save autoload).
 	call_deferred("_on_player_state_changed")
+
+func _on_save_loaded(success: bool) -> void:
+	"""Une sauvegarde vient d'être chargée : re-synchronise l'UI joueur (C1)."""
+	if success:
+		_rewire_player_after_load()
+
+func _rewire_player_after_load() -> void:
+	"""Après un chargement, SaveManager remplace GuildManager.player_character par un
+	NOUVEL objet. Sans re-wiring, main + le panneau de contrôle continueraient de
+	piloter l'ancien objet (orphelin, hors guilde) pendant que la simulation/UI lit
+	le nouveau → niveau/énergie/activité désynchronisés (bug C1)."""
+	var gm: Node = GuildManager
+	if not gm:
+		return
+	var new_pc = gm.get_player_character()
+	if not new_pc or new_pc == player_character:
+		return
+	# Déconnecte les signaux de l'ancien objet joueur (orphelin)
+	if player_character:
+		if player_character.forced_disconnect_requested.is_connected(_on_player_forced_disconnect):
+			player_character.forced_disconnect_requested.disconnect(_on_player_forced_disconnect)
+		if player_character.has_signal("player_state_changed") and player_character.player_state_changed.is_connected(_on_player_state_changed):
+			player_character.player_state_changed.disconnect(_on_player_state_changed)
+	# Re-pointe vers le personnage chargé
+	player_character = new_pc
+	if player_control_panel:
+		player_control_panel.set_player_character(new_pc)
+	if not new_pc.forced_disconnect_requested.is_connected(_on_player_forced_disconnect):
+		new_pc.forced_disconnect_requested.connect(_on_player_forced_disconnect)
+	if new_pc.has_signal("player_state_changed") and not new_pc.player_state_changed.is_connected(_on_player_state_changed):
+		new_pc.player_state_changed.connect(_on_player_state_changed)
+	_on_player_state_changed()
 
 func _on_player_disconnect_requested(_return_hour: int, _return_minute: int) -> void:
 	"""Bouton « Se reposer » : repos volontaire avec reprise auto de l'activité."""
@@ -846,8 +910,10 @@ func _on_player_forced_disconnect(recovery_hours: int) -> void:
 	_perform_rest(recovery_hours, true)
 
 func _perform_rest(recovery_hours: int, forced: bool) -> void:
-	"""Repos unifié (forcé ou volontaire) : pause → confirmation → avance le temps
-	instantanément → récupère l'énergie → reconnecte → reprend la dernière activité."""
+	"""Repos unifié (forcé ou volontaire), NON bloquant : avance le temps
+	instantanément, restaure l'énergie, reconnecte et reprend la dernière activité.
+	Un toast informe le joueur — plus de modale « Épuisement total » qui interrompt
+	la partie (C4)."""
 	if is_in_forced_rest:
 		return
 	is_in_forced_rest = true
@@ -861,32 +927,7 @@ func _perform_rest(recovery_hours: int, forced: bool) -> void:
 	if player_character and player_character.is_online:
 		player_character.disconnect_player("Repos")
 
-	# Bloque tout (sauf le dialog en PROCESS_MODE_ALWAYS) pendant la confirmation
-	get_tree().paused = true
-
-	var dialog := AcceptDialog.new()
-	if forced:
-		dialog.title = "Épuisement total"
-		dialog.dialog_text = "Votre personnage est complètement épuisé !\n\nUn repos de %dh est nécessaire.\n• Récupération complète de l'énergie\n• Vous reprendrez automatiquement votre activité" % recovery_hours
-		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
-	else:
-		dialog.title = "Repos"
-		dialog.dialog_text = "Votre personnage va se reposer %dh.\n• Récupération complète de l'énergie\n• Reprise automatique de l'activité au réveil" % recovery_hours
-		dialog.get_ok_button().text = "Se reposer (%dh)" % recovery_hours
-	dialog.process_mode = Node.PROCESS_MODE_ALWAYS  # Reste actif pendant la pause
-	dialog.exclusive = true
-	# Fermer via la croix doit aussi valider le repos, sinon le verrou de repos
-	# resterait actif et figerait le jeu.
-	dialog.close_requested.connect(func(): dialog.emit_signal("confirmed"))
-	get_tree().root.add_child(dialog)
-	dialog.popup_centered(Vector2(460, 220))
-
-	await dialog.confirmed
-	if is_instance_valid(dialog):
-		dialog.queue_free()
-
-	# Reprendre l'arbre, puis avancer le temps de jeu instantanément
-	get_tree().paused = false
+	# Avance le temps de jeu instantanément
 	if GameTime:
 		GameTime.fast_forward_hours(recovery_hours)
 
@@ -897,6 +938,15 @@ func _perform_rest(recovery_hours: int, forced: bool) -> void:
 		player_character.reconnect_player()
 
 	is_in_forced_rest = false
+
+	# Informe via un toast non bloquant (au lieu d'une modale)
+	if NotificationManager:
+		if forced:
+			NotificationManager.show_warning(
+				"Personnage épuisé : repos de %dh, énergie restaurée." % recovery_hours, "Repos")
+		else:
+			NotificationManager.show_info(
+				"Repos de %dh : énergie restaurée." % recovery_hours, "Repos")
 
 	# Reprise automatique de la dernière activité (sinon, demander un ordre)
 	if player_character and not player_character.resume_last_activity():

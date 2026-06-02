@@ -1,7 +1,6 @@
 extends PanelContainer
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
-const ActivityScript = preload("res://scripts/resources/activity.gd")
 const ItemScript = preload("res://scripts/resources/item.gd")
 const DraggableItem = preload("res://scripts/ui/components/draggable_item.gd")
 const DropZone = preload("res://scripts/ui/components/drop_zone.gd")
@@ -53,13 +52,12 @@ func refresh_window() -> void:
 	_refresh_available_members()
 
 func preselect_activity(kind: String) -> void:
-	"""Présélectionne un type de contenu (depuis le prompt/panneau joueur).
-	kind : 'dungeon' | 'raid' | 'fun'."""
+	"""Présélectionne un type de contenu de groupe (depuis le prompt/panneau joueur).
+	kind : 'dungeon' | 'raid'. (Fun = activité solo, non composable ici.)"""
 	var idx: int = 0
 	match kind:
 		"dungeon": idx = 1
 		"raid": idx = 2
-		"fun": idx = 3
 	if activity_option and idx > 0:
 		activity_option.select(idx)
 		_on_activity_selected(idx)
@@ -113,7 +111,8 @@ func _setup_activity_selection(parent: VBoxContainer):
 	activity_option.add_item("Sélectionner...")
 	activity_option.add_item("Donjon")
 	activity_option.add_item("Raid")
-	activity_option.add_item("Activité Fun")
+	# « Activité Fun » volontairement absente : c'est une activité solo/détente,
+	# pas du contenu de groupe — non composable ici (pas de slots de rôles).
 	activity_option.item_selected.connect(_on_activity_selected)
 	hbox.add_child(activity_option)
 	
@@ -206,9 +205,6 @@ func _on_activity_selected(index: int):
 		2:
 			selected_activity = "raid"
 			_populate_raid_list()
-		3:
-			selected_activity = "fun"
-			_populate_fun_list()
 		_:
 			selected_activity = ""
 	
@@ -218,47 +214,75 @@ func _on_activity_selected(index: int):
 
 func _populate_dungeon_list():
 	instance_option.add_item("Sélectionner un donjon...")
-	
+
+	var avg_level: int = _get_guild_average_level()
+
 	# Trie les donjons par niveau
 	var dungeons = []
 	for id in DungeonDataScript.DUNGEONS:
 		var dungeon = DungeonDataScript.DUNGEONS[id]
 		dungeons.append({"id": id, "data": dungeon})
-	
+
 	dungeons.sort_custom(func(a, b): return a.data.level_recommended < b.data.level_recommended)
-	
+
 	for dungeon in dungeons:
-		var text = "%s (Niv. %d-%d)" % [dungeon.data.name, dungeon.data.level_min, dungeon.data.level_max]
-		instance_option.add_item(text)
-		instance_option.set_item_metadata(instance_option.get_item_count() - 1, dungeon.id)
+		var base_text: String = "%s (Niv. %d-%d)" % [dungeon.data.name, dungeon.data.level_min, dungeon.data.level_max]
+		_add_instance_item(dungeon.id, base_text, int(dungeon.data.level_min), avg_level)
 
 	# Donjons héroïques (niveau 60) — requis pour progresser vers la Phase Serveur
 	var heroics = DungeonDataScript.get_heroic_dungeons()
 	for hid in heroics:
-		instance_option.add_item(heroics[hid].name)
-		instance_option.set_item_metadata(instance_option.get_item_count() - 1, hid)
+		var req_level: int = int(heroics[hid].get("requires_level", 60))
+		_add_instance_item(hid, str(heroics[hid].name), req_level, avg_level)
 
 func _populate_raid_list():
 	instance_option.add_item("Sélectionner un raid...")
-	
+
+	var avg_level: int = _get_guild_average_level()
+
 	for id in DungeonDataScript.RAIDS:
 		var raid = DungeonDataScript.RAIDS[id]
-		var text = "%s (%d joueurs)" % [raid.name, raid.group_size]
-		instance_option.add_item(text)
-		instance_option.set_item_metadata(instance_option.get_item_count() - 1, id)
+		var base_text: String = "%s (%d joueurs)" % [raid.name, raid.group_size]
+		_add_instance_item(id, base_text, int(raid.level_min), avg_level)
 
-func _populate_fun_list():
-	instance_option.add_item("Sélectionner une activité...")
-	instance_option.add_item("Duel amical devant Orgrimmar")
-	instance_option.add_item("Course de montures")
-	instance_option.add_item("Concours de pêche")
-	instance_option.add_item("Chasse aux pets rares")
+# Marge de tolérance : on autorise un contenu un peu au-dessus du niveau moyen
+# (le sous-niveau se paie en combat via la difficulté), mais on verrouille
+# le contenu nettement hors de portée (ex. endgame niv. 60 en début de partie).
+const LEVEL_REACH_GRACE: int = 3
+
+func _add_instance_item(instance_id: String, base_text: String, required_level: int, avg_level: int) -> void:
+	"""Ajoute une instance à la liste, verrouillée (🔒) si hors de portée du niveau moyen."""
+	var reachable: bool = avg_level + LEVEL_REACH_GRACE >= required_level
+	var idx: int = instance_option.get_item_count()
+	if reachable:
+		instance_option.add_item(base_text)
+		instance_option.set_item_metadata(idx, instance_id)
+	else:
+		instance_option.add_item("🔒 %s — niv. %d requis" % [base_text, required_level])
+		# Pas de métadonnée d'id : la sélection sera ignorée (selected_instance reste vide).
+		instance_option.set_item_metadata(idx, null)
+		instance_option.set_item_disabled(idx, true)
+
+func _get_guild_average_level() -> int:
+	"""Niveau moyen de la guilde (membres en ligne en priorité, sinon tous les membres)."""
+	var pool: Array = []
+	for member in guild_members:
+		if member.is_online:
+			pool.append(member)
+	if pool.is_empty():
+		pool = guild_members
+	if pool.is_empty():
+		return 1
+	var total: int = 0
+	for member in pool:
+		total += member.personnage_niveau
+	return int(round(float(total) / float(pool.size())))
 
 func _on_instance_selected(index: int):
 	if index > 0:  # Ignorer "Sélectionner..."
-		selected_instance = instance_option.get_item_metadata(index)
-		if selected_instance == null:
-			selected_instance = instance_option.get_item_text(index)
+		var meta: Variant = instance_option.get_item_metadata(index)
+		# Métadonnée nulle = item verrouillé (hors de portée) : pas de sélection valide.
+		selected_instance = str(meta) if meta != null else ""
 	else:
 		selected_instance = ""
 	_update_group_composition()
@@ -278,25 +302,20 @@ func _update_group_composition():
 	composition_label.add_theme_font_size_override("font_size", 14)
 	group_composition.add_child(composition_label)
 	
-	if selected_activity == "fun":
-		var participants_label = Label.new()
-		participants_label.text = "Participants (illimité)"
-		group_composition.add_child(participants_label)
+	# Récupère la composition depuis DungeonData (donjon/raid uniquement)
+	var composition = DungeonDataScript.get_group_composition(selected_instance)
+	if not composition.is_empty():
+		for role in composition:
+			_add_role_slot(role, composition[role])
 	else:
-		# Récupère la composition depuis DungeonData
-		var composition = DungeonDataScript.get_group_composition(selected_instance)
-		if not composition.is_empty():
-			for role in composition:
-				_add_role_slot(role, composition[role])
-		else:
-			# Fallback pour activités non définies
-			match selected_activity:
-				"dungeon":
-					_add_role_slot("Tank", 1)
-					_add_role_slot("Healer", 1)
-					_add_role_slot("DPS", 3)
-	
-		_setup_run_preview()
+		# Fallback pour activités non définies
+		match selected_activity:
+			"dungeon":
+				_add_role_slot("Tank", 1)
+				_add_role_slot("Healer", 1)
+				_add_role_slot("DPS", 3)
+
+	_setup_run_preview()
 	_check_launch_button()
 
 func _add_role_slot(role: String, count: int):
@@ -439,11 +458,6 @@ func _unassign_member_from_slot(slot_id: String):
 		_check_launch_button()
 
 func _check_launch_button():
-	if selected_activity == "fun":
-		launch_button.disabled = false
-		_update_run_preview()
-		return
-	
 	var total: int = group_slots.size()
 	var filled: int = 0
 	for slot_id in group_slots:
@@ -470,7 +484,7 @@ func _setup_run_preview() -> void:
 	group_composition.add_child(run_preview_label)
 
 func _update_run_preview() -> void:
-	if not is_instance_valid(run_preview_label) or selected_instance == "" or selected_activity == "fun":
+	if not is_instance_valid(run_preview_label) or selected_instance == "":
 		return
 	
 	var instance_data: Dictionary = DungeonDataScript.get_instance_data(selected_instance)
@@ -605,41 +619,8 @@ func _refresh_available_members():
 				_create_draggable_member(member)
 
 func _on_launch_pressed():
-	# Utiliser une approche simple sans ProgressDialog pour l'instant
-	if selected_activity == "fun":
-		_launch_fun_activity()
-	else:
-		_launch_dungeon_or_raid()
-
-func _launch_fun_activity():
-	var participants = []
-	for slot_id in group_slots:
-		var slot = group_slots[slot_id]
-		if slot.member != null:
-			participants.append(slot.member)
-	
-	if participants.is_empty():
-		var dialog = AcceptDialog.new()
-		dialog.dialog_text = "Aucun participant sélectionné!"
-		get_tree().root.add_child(dialog)
-		dialog.popup_centered()
-		return
-	
-	# Lance l'activité fun via l'ActivityManager
-	var guild_manager = GuildManager
-	if guild_manager and guild_manager.activity_manager:
-		for member in participants:
-			guild_manager.activity_manager.start_activity(
-				member, 
-				ActivityScript.ActivityType.FUN,
-				{"name": selected_instance, "participants": participants}
-			)
-	
-	var dialog = AcceptDialog.new()
-	dialog.dialog_text = "Activité '%s' lancée avec %d participants!" % [selected_instance, participants.size()]
-	get_tree().root.add_child(dialog)
-	dialog.popup_centered()
-	hide()
+	# Seul du contenu de groupe (donjon/raid) est composable ici.
+	_launch_dungeon_or_raid()
 
 func _launch_dungeon_or_raid():
 	# Construit le groupe à partir des slots assignés (effectif partiel autorisé pour les raids).
@@ -720,15 +701,6 @@ func _simulate_dungeon_run(dungeon_run):
 	
 	hide()
 
-func _on_boss_defeated(boss_name: String, loot_dropped: bool):
-	print("Boss vaincu: ", boss_name, " Loot: ", loot_dropped)
-
-func _on_run_completed(success: bool, _loot_gained: Dictionary):
-	print("Run terminé. Succès: ", success)
-
-func _on_player_wiped(reason: String):
-	print("Wipe! Raison: ", reason)
-
 func _open_dungeon_window(dungeon_instance):
 	# Charger et afficher la fenêtre de donjon
 	var dungeon_window_scene = load("res://scenes/Fenetre_Donjon.tscn")
@@ -745,8 +717,11 @@ func _open_dungeon_window(dungeon_instance):
 	dungeon_window.position = (Vector2(get_viewport().size) - dungeon_window.size) / 2
 	
 	# Connecter le signal de fermeture
-	dungeon_window.close_requested.connect(func(): dungeon_window.queue_free())
-	dungeon_window.abandon_requested.connect(func(): 
+	dungeon_window.close_requested.connect(func() -> void: dungeon_window.queue_free())
+	# Propriétaire unique de l'abandon (C14) : la fenêtre de donjon se contente
+	# d'émettre `abandon_requested` ; c'est ici qu'on exécute réellement l'abandon.
+	# Le garde `is_active` rend l'opération idempotente (pas de double conséquence).
+	dungeon_window.abandon_requested.connect(func() -> void:
 		if dungeon_instance.is_active:
 			dungeon_instance._abandon_dungeon("Abandonné par le joueur")
 		dungeon_window.queue_free()

@@ -2,7 +2,7 @@ extends Resource
 class_name DungeonInstance
 
 const DungeonDataScript = preload("res://scripts/data/dungeon_data.gd")
-const LootTables = preload("res://scripts/data/loot_tables.gd")
+# LootTables est un global (class_name LootTables) — pas besoin d'un const qui masque l'identifiant.
 const PveRunReportScript = preload("res://scripts/systems/pve_run_report.gd")
 
 signal boss_reached(boss_index: int, boss_name: String)
@@ -184,7 +184,6 @@ func _start_boss_fight(game_time_ref = null) -> void:
 	# et non plus via un timer temps-réel qui se désynchronisait à haute vitesse.
 
 func _simulate_boss_fight() -> void:
-	var boss_name = dungeon_data.bosses[current_boss_index]
 	var is_final_boss = current_boss_index == dungeon_data.bosses.size() - 1
 	
 	# Calculer la difficulté du boss
@@ -275,7 +274,9 @@ func _check_group_composition(required_comp: Dictionary) -> float:
 	var actual_comp = {"Tank": 0, "Healer": 0, "DPS": 0}
 	
 	for member in group_members:
-		var role = member.personnage_role
+		# Rôle de COMBAT : get_role() est fiable (fallback sur la classe) alors que
+		# personnage_role peut être vide/désynchronisé avec l'organisation du groupe.
+		var role: String = member.get_role()
 		if actual_comp.has(role):
 			actual_comp[role] += 1
 			
@@ -445,6 +446,9 @@ func _complete_dungeon() -> void:
 
 	# Part personnelle (flavor) + bonus de moral pour les participants.
 	var member_count: int = max(1, group_members.size())
+	# Part personnelle entière partagée entre les participants : la troncature est voulue
+	# (chacun touche un nombre entier d'or, le reste est négligé côté flavor).
+	@warning_ignore("integer_division")
 	var gold_per_member: int = int(gold_reward * 0.2) / member_count
 	for member in group_members:
 		member.or_actuel += gold_per_member

@@ -264,7 +264,7 @@ func _on_dungeon_abandoned(reason: String) -> void:
 		elapsed = current_instance.get_elapsed_time(current_instance.game_time_node)
 	_show_loot_window(false, elapsed, 0, reason)
 
-func _on_progress_updated(progress_percent: float) -> void:
+func _on_progress_updated(_progress_percent: float) -> void:
 	# Peut être utilisé pour une barre de progression globale
 	pass
 
@@ -295,9 +295,11 @@ func _on_abandon_button_pressed() -> void:
 		dialog.dialog_type = dialog.DialogType.WARNING
 		dialog.title_text = "Abandonner le donjon"
 		dialog.message_text = "Êtes-vous sûr de vouloir abandonner le donjon?\nTous les membres perdront de l'énergie et le moral baissera."
-		dialog.confirmed.connect(func(): 
+		# Propriétaire unique de l'abandon : on se contente d'émettre le signal.
+		# Le parent (Fenetre_OrganisationGroupe) est l'unique exécutant de
+		# l'abandon réel — éviter d'appliquer les conséquences deux fois (C14).
+		dialog.confirmed.connect(func() -> void:
 			abandon_requested.emit()
-			current_instance._abandon_dungeon("Abandonné par le joueur")
 		)
 		get_tree().root.add_child(dialog)
 		dialog.show_dialog()

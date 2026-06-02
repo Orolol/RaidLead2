@@ -27,10 +27,11 @@ func _ready():
 	server_version = ServerVersion
 	
 	if game_time:
-		# Connecte les signaux
+		# Connecte les signaux (event-driven, plus de polling dans _process)
+		game_time.minute_changed.connect(_on_minute_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 		game_time.day_changed.connect(_on_day_changed)
-		
+
 		# Configure les contrôles
 		pause_button.pressed.connect(_on_pause_button_pressed)
 		debug_version_button.visible = OS.is_debug_build()
@@ -44,28 +45,33 @@ func _ready():
 		_setup_speed_presets()
 
 		# Mise à jour initiale
+		_update_time_label()
 		_update_display()
 		_update_speed_label()
-	
+
 	if server_version:
 		server_version.version_updated.connect(_on_server_version_updated)
 		_update_server_version_display()
 
-func _process(_delta):
-	if game_time:
-		time_label.text = game_time.get_current_time_string()
-		# Ajouter un indicateur de pause
-		if game_time.is_paused:
-			time_label.text += " [PAUSE]"
-			time_label.modulate = Color(1, 1, 0.5)  # Jaune pâle
-		else:
-			time_label.modulate = Color.WHITE
+func _on_minute_changed(_minute: int, _hour: int):
+	_update_time_label()
 
 func _on_hour_changed(_hour: int):
 	_update_display()
 
 func _on_day_changed(_day: int, _week: int, _year: int):
 	_update_display()
+
+func _update_time_label() -> void:
+	if not game_time:
+		return
+	time_label.text = game_time.get_current_time_string()
+	# Indicateur de pause (mis à jour aussi depuis le callback du bouton)
+	if game_time.is_paused:
+		time_label.text += " [PAUSE]"
+		time_label.modulate = Color(1, 1, 0.5)  # Jaune pâle
+	else:
+		time_label.modulate = Color.WHITE
 
 func _update_display():
 	if game_time:
@@ -75,6 +81,9 @@ func _on_pause_button_pressed():
 	if game_time:
 		game_time.toggle_pause()
 		pause_button.text = "Reprendre" if game_time.is_paused else "Pause"
+		# Le label [PAUSE] est rafraîchi immédiatement (sinon il attendrait
+		# le prochain tick de minute, qui est figé pendant la pause).
+		_update_time_label()
 
 func _on_debug_version_button_pressed():
 	if server_version:

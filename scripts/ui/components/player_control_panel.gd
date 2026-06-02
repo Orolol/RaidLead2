@@ -19,20 +19,13 @@ var disconnect_button: Button
 var status_label: Label
 var session_info_label: Label
 
-# Informations de session
-var update_timer: Timer
-
 func _ready():
 	custom_minimum_size = Vector2(300, 200)
 	_setup_ui()
 	_connect_signals()
-	
-	# Timer pour mettre à jour l'interface régulièrement
-	update_timer = Timer.new()
-	update_timer.wait_time = 5.0  # Mise à jour toutes les 5 secondes
-	update_timer.timeout.connect(_update_display)
-	update_timer.autostart = true
-	add_child(update_timer)
+	# Rafraîchissement event-driven : piloté par player_character.player_state_changed
+	# (connecté dans set_player_character) + appel direct sur set_player_character.
+	# Plus de Timer 5 s.
 
 func _setup_ui():
 	var main_vbox = VBoxContainer.new()
@@ -259,8 +252,10 @@ func _format_duration(minutes: int) -> String:
 	if minutes < 60:
 		return "%dmin" % minutes
 	else:
-		var hours = minutes / 60
-		var mins = minutes % 60
+		# Division entière voulue : heures pleines + minutes restantes.
+		@warning_ignore("integer_division")
+		var hours: int = minutes / 60
+		var mins: int = minutes % 60
 		return "%dh%02dmin" % [hours, mins]
 
 func _on_activity_selected(index: int):

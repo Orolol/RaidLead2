@@ -200,6 +200,8 @@ func bring_to_front(window_name: String, instance_id: String = ""):
 	
 	# Afficher si cachée
 	instance_data.instance.show()
+	# Garder la fenêtre dans l'écran (au cas où le viewport a été redimensionné)
+	_keep_window_on_screen(instance_data.instance)
 
 	# Mettre comme active
 	active_window = window_name
@@ -232,7 +234,7 @@ func close_all_instances(window_name: String):
 
 # ==================== MÉTHODES UTILITAIRES PRIVÉES ====================
 
-func _setup_window_instance(instance: Control, window_name: String, instance_id: String, config: Dictionary):
+func _setup_window_instance(instance: Control, window_name: String, instance_id: String, _config: Dictionary):
 	"""Configure une instance de fenêtre"""
 	# Z-index
 	instance.z_index = max_z_index
@@ -269,11 +271,28 @@ func _apply_window_layout(instance: Control, window_name: String, config: Dictio
 	else:
 		_center_window(instance)
 
+	# Borne la fenêtre dans l'écran courant (évite une position/taille restaurée hors champ)
+	_keep_window_on_screen(instance)
+
 	# S'assurer que la fenêtre est visible et déclencher l'animation
 	instance.visible = true
 	instance.show()
 	if use_animations:
 		_animate_window_open(instance)
+
+func _keep_window_on_screen(win: Control) -> void:
+	"""Borne la position et la taille d'une fenêtre dans le viewport courant.
+	Protège contre une fenêtre restaurée (ou déplacée) hors écran."""
+	if not is_instance_valid(win):
+		return
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var margin: float = 8.0
+	# La taille ne doit pas dépasser l'écran (en gardant une marge minimale).
+	var max_size: Vector2 = (viewport_size - Vector2(margin, margin) * 2.0).max(Vector2(100, 100))
+	win.size = win.size.min(max_size)
+	# La position doit garder la fenêtre entièrement visible.
+	var max_pos: Vector2 = (viewport_size - win.size - Vector2(margin, margin)).max(Vector2(margin, margin))
+	win.position = win.position.clamp(Vector2(margin, margin), max_pos)
 
 func _connect_window_signals(instance: Control, window_name: String, instance_id: String):
 	"""Connecte les signaux d'une fenêtre"""
@@ -356,10 +375,10 @@ func _apply_z_order():
 	for i in range(window_z_order.size()):
 		var key = window_z_order[i]
 		var parts = key.split(":")
-		var name = parts[0]
+		var win_name = parts[0]
 		var instance_id = parts[1]
-		
-		var inst_data = _find_instance(name, instance_id)
+
+		var inst_data = _find_instance(win_name, instance_id)
 		if inst_data and inst_data.instance:
 			inst_data.instance.z_index = max_z_index - i
 

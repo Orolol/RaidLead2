@@ -660,6 +660,18 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Correctifs d'audit — vague 1 : bugs critiques UI/Gameplay/Code (2 juin 2026)
+*172 assertions vertes (Godot 4.6.2 headless) + validation runtime MCP. Implémentation de `AuditAmeliorations2.md` via 8 sous-agents (modules isolés) + correctifs cœur. Codes C* = entrées de la synthèse de l'audit.*
+
+- 🔴 **C1 — Désync du perso-joueur après chargement (root cause trouvée en live)** : après un load, `SaveManager` reconstruit le joueur et remplace `GuildManager.player_character`, mais `main` + le panneau de contrôle continuaient de piloter l'**ancien** objet orphelin (hors guilde) → le joueur « montait niveau 17 au chat » tout en restant « Niv.1 » dans l'UI/guilde, objectif Phase 0 inatteignable. **Fix** : re-wiring sur `SaveManager.load_completed` (`_rewire_player_after_load` dans `main.gd`) qui re-pointe main + panneau + signaux vers le personnage chargé. Vérifié en jeu : niveau 1→19, toutes les références cohérentes.
+- 🔴 **C3 — Or détruit + spam de toasts** : `gold_storage` niv 3 relevé 1000→8000 (`guild_perks_data.gd`) ; `Guild.add_gold` ne notifie qu'**une fois** à la transition « trésorerie pleine » (fin du spam).
+- 🔴 **C4 — Boucle énergie/épuisement intrusive** : `_perform_rest` rendu **non bloquant** (plus de modale « Épuisement total » → repos instantané + toast) ; drains d'énergie adoucis (LEVELING 15→9/h, etc.), seuil de fatigue 4h→6h.
+- 🟠 **C5** : recalcul de classement débouncé sur `day_changed` (flag « dirty » au lieu de `create_timer` empilés) ; graphe social ré-indexé (`id→membre` + adjacence) → O(degré) au lieu de O(M⁴).
+- 🔴 **C6** : ternaire à précédence piégeuse corrigé (`guild_ranking.gd`).
+- 🟠 **C7** : signal `member_left` déclaré + émis dans `remove_member` (la notif de départ se déclenche enfin).
+- ✅ **C9** : déjà câblé (`main._process` → `update_dungeons`). **C10** : l'activité ne produit plus de gains hors-ligne (garde `is_online`). **C11** : rôles de combat lus via `get_role()`. **C12** : binding de signaux d'`EffectSystem` réparé (lambdas à signature exacte + disconnect symétrique). **C13** : fermer un événement le résout (plus de file figée). **C14** : popups loot/drama résolus par défaut à la fermeture (plus de soft-lock) + abandon de donjon idempotent à propriétaire unique. **C15** : le perso-joueur protégé des départs aléatoires. **C16** : raccourcis clavier respectent les verrous de phase.
+- 🧹 **Propreté** : ~couleurs sémantiques dérivées de `UIConstants` (source unique), polling UI supprimé (`time_display`/`player_control_panel` → signaux), clamp des fenêtres au viewport, activité « Fun » retirée de l'organisation de groupe, contenu de donjon gaté par phase/niveau, nombreux warnings éditeur réglés (params/signaux/shadowing/division entière).
+
 ### Banque de guilde + drag&drop d'équipement (2 juin 2026)
 *171 assertions vertes + E2E drag&drop 5/5 (Godot 4.6.2). Dernier lot « reporté » de l'audit livré.*
 - ✅ **Banque de guilde** : `Guild.bank_items` devient une vraie banque d'`Item` (`add_to_bank`/`remove_from_bank`/`get_bank_items`, plafonnée à 60 avec trim par rareté/iLvl). Sérialisée dans `SaveManager` (rétrocompatible).

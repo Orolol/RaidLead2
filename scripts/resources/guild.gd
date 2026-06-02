@@ -81,8 +81,12 @@ func add_gold(amount: int) -> void:
 	if max_gold > 0:
 		var new_gold: int = gold + amount
 		if new_gold > max_gold:
-			_notify_gold_overflow(new_gold - max_gold, max_gold)
+			# Ne notifie qu'à la transition vers « trésorerie pleine » pour éviter
+			# le spam de toasts (add_gold est appelé très fréquemment via le farming).
+			var was_full: bool = gold >= max_gold
 			gold = max_gold
+			if not was_full:
+				_notify_gold_overflow(new_gold - max_gold, max_gold)
 		else:
 			gold = new_gold
 	else:
