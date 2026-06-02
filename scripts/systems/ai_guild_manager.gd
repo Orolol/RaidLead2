@@ -10,10 +10,13 @@ signal poaching_attempt(target_member, source_guild: AIGuild, success: bool)
 var ai_guilds: Array[AIGuild] = []
 
 # Configuration par phase
+# Échelle volontairement resserrée : un top 10 reste crédible avec ~10-15 concurrents,
+# sans le coût/bruit de dizaines de guildes simulées (ex-49/99). On garde les 9 de la
+# Phase 0/Serveur et on monte légèrement en National/Esport pour densifier la compétition.
 const GUILD_COUNT_BY_PHASE = {
-	PhaseManager.GamePhase.SERVEUR: 9,    # 9 guildes concurrentes + 1 joueur
-	PhaseManager.GamePhase.NATIONAL: 49,  # 49 guildes + 1 joueur pour top 50
-	PhaseManager.GamePhase.ESPORT: 99     # 99 guildes + 1 joueur pour top 100
+	PhaseManager.GamePhase.SERVEUR: 9,     # 9 guildes concurrentes + 1 joueur
+	PhaseManager.GamePhase.NATIONAL: 13,   # 13 guildes + 1 joueur (top 10 disputé)
+	PhaseManager.GamePhase.ESPORT: 15      # 15 guildes + 1 joueur (élite resserrée)
 }
 
 # Noms de guildes prédéfinis
@@ -118,24 +121,39 @@ func get_top_guilds(count: int = 5) -> Array[AIGuild]:
 	sorted_guilds.sort_custom(func(a, b): return a.reputation > b.reputation)
 	return sorted_guilds.slice(0, min(count, sorted_guilds.size()))
 
+func _run_weekly_progression() -> void:
+	"""Progression PvE hebdomadaire lissée des guildes IA (cadence découplée du mensuel).
+
+	Fait avancer les IA chaque semaine avec une amplitude réduite (~1/4 de l'ancien
+	rythme mensuel), pour un classement fluide plutôt qu'en marches d'escalier."""
+	for guild in ai_guilds:
+		guild.simulate_weekly_progress()
+
+	# Recalcul différé du classement (consommé une fois par semaine côté GuildRanking).
+	if GuildRanking:
+		var guilds_data: Array = []
+		for guild in ai_guilds:
+			guilds_data.append(guild.get_guild_data_for_ranking())
+		call_deferred("_update_guild_rankings", guilds_data)
+
 func _run_monthly_simulation():
-	"""Exécute la simulation mensuelle de toutes les guildes"""
+	"""Exécute la simulation mensuelle de toutes les guildes (turnover/recrutement/réputation)."""
 	GameLog.d("🎯 Début de la simulation mensuelle des guildes IA")
-	
+
 	var guilds_data = []
-	
-	# Simuler la progression de chaque guilde
+
+	# Simuler les aspects réellement mensuels de chaque guilde (recrutement, turnover, etc.)
 	for guild in ai_guilds:
 		guild.simulate_monthly_progress()
 		guilds_data.append(guild.get_guild_data_for_ranking())
-	
+
 	# Simuler les interactions entre guildes
 	_simulate_inter_guild_interactions()
-	
+
 	# Mettre à jour le système de classement
 	if GuildRanking:
 		call_deferred("_update_guild_rankings", guilds_data)
-	
+
 	monthly_simulation_completed.emit(guilds_data)
 	GameLog.d("✅ Simulation mensuelle terminée")
 
@@ -297,7 +315,11 @@ func _on_day_changed(day: int, week: int, year: int):
 	_run_daily_checks()
 
 func _on_week_changed(week: int, year: int):
-	"""Simulation mensuelle toutes les 4 semaines de jeu."""
+	"""Cadence IA : progression PvE chaque semaine (lissée), logique mensuelle toutes les 4 semaines.
+
+	Découpler les deux évite le classement « en marches d'escalier » à haute vitesse tout en
+	gardant le turnover/recrutement/réputation sur un rythme mensuel crédible."""
+	_run_weekly_progression()
 	if week % 4 == 0:
 		_run_monthly_simulation()
 

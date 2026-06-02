@@ -1,5 +1,10 @@
 extends PanelContainer
 
+## Émis quand l'utilisateur ferme la fenêtre. Le WindowManager s'y connecte
+## (window_manager.gd:300) pour effectuer un teardown propre (sauvegarde
+## position + queue_free) et garder son état synchronisé.
+signal close_requested
+
 var close_button: Button
 var title_label: Label
 var content_container: VBoxContainer
@@ -33,9 +38,6 @@ var mood_label: Label
 var session_label: Label
 var _state_signal_connected: bool = false
 
-# Timer pour mise à jour automatique
-var update_timer: Timer
-
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(800, 600)
@@ -52,27 +54,16 @@ func _ready():
 		PhaseManager.connect("phase_changed", _on_phase_changed)
 		PhaseManager.connect("progression_updated", _on_progression_updated)
 		PhaseManager.connect("phase_requirements_met", _on_requirements_met)
-	
+
+	# Rafraîchir immédiatement à chaque montée de niveau (gain_experience n'émet pas
+	# player_state_changed, donc le niveau affiché serait sinon périmé).
+	if GuildManager and not GuildManager.member_leveled_up.is_connected(_on_member_leveled_up):
+		GuildManager.member_leveled_up.connect(_on_member_leveled_up)
+
 	# Actualiser la progression initiale
 	call_deferred("_refresh_phase_progression")
-	
-	# Configurer le timer de mise à jour des infos joueur
-	_setup_update_timer()
-	
+
 	hide()
-
-func _setup_update_timer():
-	"""Configure le timer pour mettre à jour les informations du joueur"""
-	update_timer = Timer.new()
-	update_timer.wait_time = 3.0  # Mise à jour toutes les 3 secondes
-	update_timer.timeout.connect(_on_update_timer_timeout)
-	update_timer.autostart = false
-	add_child(update_timer)
-
-func _on_update_timer_timeout():
-	"""Met à jour les informations du joueur périodiquement"""
-	if visible:  # Seulement si la fenêtre est visible
-		update_character_info()
 
 func _setup_header(parent: VBoxContainer):
 	var header = HBoxContainer.new()
@@ -367,18 +358,27 @@ func _setup_achievements_section(parent: HSplitContainer):
 	pve_run_history_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	achievements_panel.add_child(pve_run_history_list)
 
-func _on_close_pressed():
-	hide()
+func _on_close_pressed() -> void:
+	# Déléguer au WindowManager (teardown propre : sauvegarde position + queue_free).
+	# Un simple hide() laisserait le WindowManager croire la fenêtre ouverte (désync
+	# d'état + bouton de menu actif incorrect).
+	close_requested.emit()
 
-func _notification(what: int):
-	match what:
-		NOTIFICATION_VISIBILITY_CHANGED:
-			if visible and update_timer:
-				update_timer.start()
-				# Mise à jour immédiate
-				update_character_info()
-			elif not visible and update_timer:
-				update_timer.stop()
+func _notification(what: int) -> void:
+	# Le niveau et l'état du joueur sont désormais couverts par des signaux
+	# (member_leveled_up + player_state_changed) : plus de polling périodique.
+	# On rafraîchit seulement à l'ouverture/apparition de la fenêtre.
+	if what == NOTIFICATION_VISIBILITY_CHANGED and visible:
+		update_character_info()
+
+func _on_member_leveled_up(player: SimulatedPlayer, _new_level: int) -> void:
+	"""Rafraîchit l'affichage dès qu'un membre monte de niveau (joueur compris)."""
+	var guild_manager := GuildManager
+	if not guild_manager:
+		return
+	# Ne rafraîchir que pour le personnage joueur (le seul affiché ici).
+	if player == guild_manager.get_player_character():
+		update_character_info()
 
 func update_character_info():
 	"""Met à jour les informations du personnage joueur"""
@@ -631,12 +631,11 @@ func _update_achievements_display():
 	)
 	
 	for achievement in all_achievements:
-		var name = achievement.get("name", "Achievement inconnu")
+		var achievement_name = achievement.get("name", "Achievement inconnu")
 		var description = achievement.get("description", "")
-		var date = achievement.get("date", {})
 		var phase = achievement.get("phase", PhaseManager.GamePhase.SERVEUR)
-		
-		var item_text = "🏆 %s" % name
+
+		var item_text = "🏆 %s" % achievement_name
 		if description != "":
 			item_text += "\n   %s" % description
 		
@@ -739,7 +738,9 @@ func _format_duration_seconds(seconds: float) -> String:
 	if seconds <= 0.0:
 		return ""
 	var total_seconds: int = int(seconds)
-	var minutes: int = int(total_seconds / 60)
+	# Division entière voulue : on veut le nombre entier de minutes.
+	@warning_ignore("integer_division")
+	var minutes: int = total_seconds / 60
 	var remaining_seconds: int = total_seconds % 60
 	return "%02d:%02d" % [minutes, remaining_seconds]
 
@@ -766,28 +767,28 @@ func _compare_dates(date_a: Dictionary, date_b: Dictionary) -> int:
 
 # Callbacks des signaux PhaseManager
 
-func _on_phase_changed(new_phase, old_phase):
+func _on_phase_changed(new_phase, _old_phase):
 	"""Réagit aux changements de phase"""
 	if visible:
 		_refresh_phase_progression()
-		
+
 		# Afficher une notification si la fenêtre est ouverte
-		var notification = Label.new()
-		notification.text = "🎉 NOUVELLE PHASE DÉBLOQUÉE: %s" % PhaseManager.get_phase_name(new_phase)
-		notification.add_theme_font_size_override("font_size", 18)
-		notification.modulate = Color(0.2, 1.0, 0.2)
-		notification.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		
+		var phase_notif = Label.new()
+		phase_notif.text = "🎉 NOUVELLE PHASE DÉBLOQUÉE: %s" % PhaseManager.get_phase_name(new_phase)
+		phase_notif.add_theme_font_size_override("font_size", 18)
+		phase_notif.modulate = Color(0.2, 1.0, 0.2)
+		phase_notif.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
 		# Ajouter temporairement en haut de la fenêtre
 		var vbox = get_children()[0] as VBoxContainer
 		if vbox:
-			vbox.add_child(notification)
-			vbox.move_child(notification, 1)  # Après le header
-			
-			# Supprimer après 5 secondes
-			get_tree().create_timer(5.0).timeout.connect(notification.queue_free)
+			vbox.add_child(phase_notif)
+			vbox.move_child(phase_notif, 1)  # Après le header
 
-func _on_progression_updated(phase, progress: Dictionary):
+			# Supprimer après 5 secondes
+			get_tree().create_timer(5.0).timeout.connect(phase_notif.queue_free)
+
+func _on_progression_updated(_phase, _progress: Dictionary):
 	"""Réagit à la mise à jour de progression"""
 	if visible and advanced_tabs.get_current_tab_index() == 1:  # Onglet Progression
 		_update_requirements_display()

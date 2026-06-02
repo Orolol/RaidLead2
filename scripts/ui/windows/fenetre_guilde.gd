@@ -1,5 +1,7 @@
 extends PanelContainer
 
+signal close_requested
+
 const PlayerTagsData = preload("res://scripts/data/player_tags.gd")
 const EquipmentWindow = preload("res://scenes/Fenetre_Equipement.tscn")
 
@@ -53,6 +55,9 @@ func _ready():
 		guild_manager.member_disconnected.connect(_on_member_status_changed)
 		guild_manager.guild_level_changed.connect(_on_guild_level_changed)
 		guild_manager.guild_perk_unlocked.connect(_on_guild_perk_unlocked)
+		guild_manager.member_leveled_up.connect(_on_member_leveled_up)
+		guild_manager.member_recruited.connect(_on_member_recruited)
+		guild_manager.member_left.connect(_on_member_left)
 	
 	hide()
 	_load_test_members()
@@ -480,7 +485,7 @@ func _add_detail_row(parent: GridContainer, label_text: String, value_text: Stri
 	parent.add_child(value)
 
 func _on_close_pressed():
-	hide()
+	close_requested.emit()
 
 func add_member(player):
 	guild_members.append(player)
@@ -500,6 +505,19 @@ func _on_member_status_changed(player):
 		_refresh_member_list()
 		if selected_member == player:
 			_update_member_details()
+
+func _on_member_leveled_up(player, _new_level: int):
+	_refresh_member_list()
+	if selected_member == player:
+		_update_member_details()
+
+func _on_member_recruited(_player):
+	_refresh_member_list()
+	_update_guild_info()
+
+func _on_member_left(_player):
+	_refresh_member_list()
+	_update_guild_info()
 
 # Gestion du drag de la fenêtre
 func _on_title_bar_input(event: InputEvent):
@@ -621,7 +639,7 @@ func _update_guild_info():
 func _on_guild_level_changed(_new_level: int):
 	_update_guild_info()
 	
-func _on_guild_perk_unlocked(perk_name: String, _level: int):
+func _on_guild_perk_unlocked(_perk_name: String, _level: int):
 	_update_guild_info()
 	# On pourrait afficher une notification ici
 
@@ -710,6 +728,6 @@ func _on_members_list_gui_input(event: InputEvent):
 				_on_member_selected(item_index)
 				
 				# Afficher le menu contextuel à la position du clic
-				var global_position = members_list.global_position + event.position
-				context_menu.position = Vector2i(global_position)
+				var menu_position: Vector2 = members_list.global_position + event.position
+				context_menu.position = Vector2i(menu_position)
 				context_menu.popup()

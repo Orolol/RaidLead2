@@ -18,6 +18,7 @@ var guild_manager: Node
 var guild_ranking: Node
 
 signal player_recruited(player)
+signal close_requested
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -37,14 +38,19 @@ func _ready():
 	
 	# Connecte aux signaux du RecruitmentPool
 	if recruitment_pool:
-		recruitment_pool.pool_refreshed.connect(_on_pool_refreshed)
-		recruitment_pool.player_lost_to_competition.connect(_on_player_lost_to_competition)
-		
-	# Connecte aux signaux du GuildRanking
+		if not recruitment_pool.pool_refreshed.is_connected(_on_pool_refreshed):
+			recruitment_pool.pool_refreshed.connect(_on_pool_refreshed)
+		if not recruitment_pool.player_lost_to_competition.is_connected(_on_player_lost_to_competition):
+			recruitment_pool.player_lost_to_competition.connect(_on_player_lost_to_competition)
+
+	# Connecte aux signaux du GuildRanking (rafraîchit le classement quand il change)
 	if guild_ranking:
-		guild_ranking.ranking_updated.connect(_on_ranking_updated)
-		guild_ranking.guild_position_changed.connect(_on_guild_position_changed)
-		guild_ranking.new_server_first.connect(_on_server_first)
+		if not guild_ranking.ranking_updated.is_connected(_on_ranking_updated):
+			guild_ranking.ranking_updated.connect(_on_ranking_updated)
+		if not guild_ranking.guild_position_changed.is_connected(_on_guild_position_changed):
+			guild_ranking.guild_position_changed.connect(_on_guild_position_changed)
+		if not guild_ranking.new_server_first.is_connected(_on_server_first):
+			guild_ranking.new_server_first.connect(_on_server_first)
 	
 	hide()
 	_generate_competing_guilds()
@@ -369,11 +375,11 @@ func _refresh_guild_ranking():
 	# Afficher les rankings
 	for guild_data in rankings:
 		var rank = guild_data.get("position", 1)
-		var name = guild_data.get("name", "Guilde Inconnue")
+		var guild_name = guild_data.get("name", "Guilde Inconnue")
 		var score = guild_data.get("score", 0.0)
 		var rank_change = guild_data.get("rank_change", 0)
 		var is_player = guild_data.get("is_player", false)
-		
+
 		# Icône de changement de rang
 		var rank_icon = ""
 		if rank_change > 0:
@@ -382,18 +388,18 @@ func _refresh_guild_ranking():
 			rank_icon = "▼"
 		else:
 			rank_icon = "▬"
-		
+
 		# Couleur selon si c'est notre guilde
-		var text = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, name, score]
+		var text = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, guild_name, score]
 		if is_player:
 			text += " ⭐"
-		
+
 		guild_ranking_list.add_item(text)
-		
+
 		# Colorer différemment notre guilde
 		if is_player:
 			guild_ranking_list.set_item_custom_bg_color(guild_ranking_list.get_item_count() - 1, Color(0.2, 0.3, 0.5, 0.3))
-	
+
 	# Mettre à jour les informations sur notre position
 	_update_our_position_info()
 
@@ -563,10 +569,15 @@ func _update_recruit_details():
 			motivation_label.text = "Motivation:"
 			recruit_details.add_child(motivation_label)
 			
-			var motivation_text = Label.new()
+			# RichTextLabel : la motivation peut contenir du BBCode (mise en forme),
+			# sinon les balises s'afficheraient en texte littéral dans un Label.
+			var motivation_text = RichTextLabel.new()
+			motivation_text.bbcode_enabled = true
+			motivation_text.fit_content = true
+			motivation_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			motivation_text.scroll_active = false
 			motivation_text.text = motivation
 			motivation_text.modulate = Color(0.9, 0.9, 0.7)
-			motivation_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			recruit_details.add_child(motivation_text)
 	
 	var planning_label = Label.new()
@@ -842,7 +853,7 @@ func _update_our_position_info():
 
 # Nouveaux callbacks pour le système de ranking
 
-func _on_ranking_updated(rankings: Array):
+func _on_ranking_updated(_rankings: Array):
 	"""Appelé quand le classement est mis à jour"""
 	if visible and advanced_tabs and advanced_tabs.get_current_tab_index() == 0:  # Si on est sur l'onglet classement
 		_refresh_guild_ranking()
@@ -948,11 +959,11 @@ func _display_filtered_rankings(filtered_rankings: Array):
 	
 	for guild_data in filtered_rankings:
 		var rank = guild_data.get("position", 1)
-		var name = guild_data.get("name", "Guilde Inconnue")
+		var guild_name = guild_data.get("name", "Guilde Inconnue")
 		var score = guild_data.get("score", 0.0)
 		var rank_change = guild_data.get("rank_change", 0)
 		var is_player = guild_data.get("is_player", false)
-		
+
 		# Icône de changement de rang
 		var rank_icon = ""
 		if rank_change > 0:
@@ -961,9 +972,9 @@ func _display_filtered_rankings(filtered_rankings: Array):
 			rank_icon = "▼"
 		else:
 			rank_icon = "▬"
-		
+
 		# Couleur selon si c'est notre guilde
-		var text = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, name, score]
+		var text = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, guild_name, score]
 		if is_player:
 			text += " ⭐"
 		
@@ -994,12 +1005,12 @@ func _display_guild_details(guild_data: Dictionary):
 	var title_container = HBoxContainer.new()
 	details_container.add_child(title_container)
 	
-	var title_label = Label.new()
-	title_label.text = "#%d - %s" % [rank, guild_name]
-	title_label.add_theme_font_size_override("font_size", 18)
+	var guild_title_label = Label.new()
+	guild_title_label.text = "#%d - %s" % [rank, guild_name]
+	guild_title_label.add_theme_font_size_override("font_size", 18)
 	if is_player:
-		title_label.modulate = Color(1.0, 0.8, 0.2)
-	title_container.add_child(title_label)
+		guild_title_label.modulate = Color(1.0, 0.8, 0.2)
+	title_container.add_child(guild_title_label)
 	
 	if is_player:
 		title_container.add_spacer(false)
@@ -1064,9 +1075,14 @@ func _display_guild_details(guild_data: Dictionary):
 	strengths_title.add_theme_font_size_override("font_size", 14)
 	details_container.add_child(strengths_title)
 	
-	var strengths_label = Label.new()
-	strengths_label.text = _get_guild_strengths(guild_data)
+	# RichTextLabel : la description des points forts peut contenir du BBCode
+	# (ex. [b]…[/b], [color=gray]…[/color]) qui doit être rendu, pas affiché en texte brut.
+	var strengths_label = RichTextLabel.new()
+	strengths_label.bbcode_enabled = true
+	strengths_label.fit_content = true
 	strengths_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	strengths_label.scroll_active = false
+	strengths_label.text = _get_guild_strengths(guild_data)
 	strengths_label.modulate = Color(0.8, 0.9, 1.0)
 	details_container.add_child(strengths_label)
 
@@ -1201,4 +1217,5 @@ func _get_guild_strengths(guild_data: Dictionary) -> String:
 	return ", ".join(strengths)
 
 func _on_close_pressed():
-	hide()
+	# Délègue la fermeture au WindowManager (qui synchronise son état) au lieu d'un hide() local.
+	close_requested.emit()

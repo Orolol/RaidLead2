@@ -201,35 +201,53 @@ func get_star_players() -> Array:
 			stars.append(member)
 	return stars
 
-func simulate_monthly_progress():
-	"""Simule la progression mensuelle de la guilde IA"""
+func simulate_weekly_progress() -> void:
+	"""Simule la progression PvE hebdomadaire (lissée, ~1/4 du rythme mensuel d'origine).
+
+	Découplée du mensuel (recrutement/turnover/réputation) pour que le classement avance
+	chaque semaine plutôt que par à-coups tous les 4 weeks."""
+	# Progression PvE à amplitude réduite (les tentatives sont divisées par ~4 dans la méthode).
+	_simulate_pve_progression(true)
+
+	# Le focus peut évoluer chaque semaine (suit le niveau moyen de la guilde).
+	_update_current_focus()
+
+	# XP de niveau lissé : ~1/4 de l'ex-gain mensuel pour conserver le rythme global.
 	var config = STRATEGY_CONFIG[ai_strategy]
-	
-	# Simulation de progression PvE
-	_simulate_pve_progression()
-	
+	var weekly_xp: int = int((120 + reputation * 4.0 + config.raid_focus * 200.0) / 4.0)
+	gain_xp(weekly_xp, "Progression hebdomadaire")
+
+func simulate_monthly_progress():
+	"""Simule la progression mensuelle de la guilde IA (recrutement, turnover, réputation).
+
+	La progression PvE et l'XP de niveau sont désormais hebdomadaires
+	(voir simulate_weekly_progress)."""
+	var config = STRATEGY_CONFIG[ai_strategy]
+
 	# Simulation de recrutement
 	if randf() < config.recruitment_frequency:
 		_attempt_recruitment()
-	
+
 	# Simulation du turnover
 	_simulate_member_turnover()
-	
+
 	# Mise à jour de la réputation
 	_update_reputation()
-	
+
 	# Mise à jour du focus
 	_update_current_focus()
 
-	# Progression de niveau crédible : XP mensuel adossé à la réputation/stratégie, pour que
-	# le score de niveau (20% du classement) reste disputé face au joueur.
-	var monthly_xp: int = int(120 + reputation * 4.0 + config.raid_focus * 200.0)
+	# Petit bonus d'XP mensuel passif (réputation/effectif), distinct de la progression PvE
+	# hebdomadaire : garde une progression de niveau crédible sur le rythme mensuel.
+	var monthly_xp: int = int(40 + reputation * 1.0)
 	gain_xp(monthly_xp, "Progression mensuelle")
 
 	GameLog.d("Progression mensuelle simulée pour %s - Membres: %d, Réputation: %.1f" % [name, members.size(), reputation])
 
-func _simulate_pve_progression():
-	"""Simule la progression PvE de la guilde"""
+func _simulate_pve_progression(weekly: bool = false):
+	"""Simule la progression PvE de la guilde.
+
+	weekly=true lisse l'amplitude (~1/4 des tentatives) pour une cadence hebdomadaire."""
 	var config = STRATEGY_CONFIG[ai_strategy]
 	var success_chance = success_rate * config.raid_focus
 
@@ -244,7 +262,15 @@ func _simulate_pve_progression():
 		progression_attempts = 3
 	elif current_focus == "dungeons":
 		progression_attempts = 2
-	
+
+	# Cadence hebdomadaire lissée : on réduit l'amplitude (~1/4) via une probabilité d'essai.
+	# 1 tentative -> ~25% de chance d'avoir 1 essai cette semaine ; 2/3 -> proportionnel.
+	if weekly:
+		var expected_attempts: float = progression_attempts / 4.0
+		progression_attempts = int(expected_attempts)
+		if randf() < (expected_attempts - float(progression_attempts)):
+			progression_attempts += 1
+
 	for i in range(progression_attempts):
 		if randf() < success_chance:
 			_achieve_pve_success()
