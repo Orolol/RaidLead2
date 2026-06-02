@@ -1,0 +1,59 @@
+{
+  "_comment": "Corpus réactif (Phase C). Lignes déclenchées par les vrais événements de la sim. Tokens injectés depuis le stimulus : #subject# #item# #boss# #wipes# #lvl# #p1# #p2#. pools = type d'événement (kind du stimulus).",
+  "lines": [
+    { "id": "lvl_gz", "pools": ["level_up"], "weight": 1.0, "text": "{gg|gz|gratz} #subject# niveau #lvl# 🎉" },
+    { "id": "lvl_ding", "pools": ["level_up"], "weight": 1.0, "text": "#subject# ding ! niveau #lvl#" },
+    { "id": "lvl_slow", "pools": ["level_up"], "weight": 0.6, "text": "#subject# enfin niveau #lvl#, t'en as mis du temps 😏" },
+    { "id": "lvl_60", "pools": ["level_up"], "weight": 1.4, "cooldown_min": 60, "text": "#subject# ROXOR niveau #lvl# !! GG 🔥", "considerations": [ { "axis": "context.event_magnitude", "curve": "threshold", "t": 0.9, "kind": "veto" } ] },
+
+    { "id": "rec_welcome", "pools": ["recruit"], "weight": 1.0, "text": "bienvenue #subject# ! 🎉" },
+    { "id": "rec_inv", "pools": ["recruit"], "weight": 0.9, "text": "salut #subject#, /ginvite envoyé, fais comme chez toi" },
+    { "id": "rec_haze", "pools": ["recruit"], "weight": 0.7, "text": "encore un nouveau... bon courage #subject# 😏", "considerations": [ { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.0 } ] },
+
+    { "id": "left_sad", "pools": ["member_left"], "weight": 1.0, "text": "#subject# nous quitte... 😢" },
+    { "id": "left_wave", "pools": ["member_left"], "weight": 0.9, "text": "/wave #subject#, bon vent" },
+    { "id": "left_rip", "pools": ["member_left"], "weight": 0.9, "text": "rip #subject#, c'était un bon" },
+    { "id": "left_good", "pools": ["member_left"], "weight": 0.6, "text": "bon débarras franchement", "considerations": [ { "axis": "relation", "value": "rival", "curve": "boolean", "kind": "bonus", "weight": 1.5 } ] },
+
+    { "id": "loot_gz", "pools": ["loot", "loot_epic"], "weight": 1.0, "text": "{gz|gg} #subject# pour #item#" },
+    { "id": "loot_nice", "pools": ["loot"], "weight": 0.9, "text": "#subject# loot #item#, sympa" },
+    { "id": "loot_meh", "pools": ["loot"], "weight": 0.6, "text": "#item#... bon c'est toujours ça #subject#" },
+
+    { "id": "ep_rafle", "pools": ["loot_epic"], "weight": 1.2, "text": "#subject# RAFLE #item# 😱" },
+    { "id": "ep_grats", "pools": ["loot_epic"], "weight": 1.1, "text": "GRZ #subject# #item# !!! 🎉", "considerations": [ { "axis": "relation", "value": "friend", "curve": "boolean", "kind": "bonus", "weight": 1.5 } ] },
+    { "id": "ep_rival", "pools": ["loot_epic"], "weight": 1.0, "text": "encore #subject# sur #item#... comme par hasard 🙄", "considerations": [ { "axis": "relation", "value": "rival", "curve": "boolean", "kind": "bonus", "weight": 1.8 } ] },
+    { "id": "ep_ninja", "pools": ["loot_epic"], "weight": 0.8, "text": "NINJA ?? ça fait 6 mois que je roll sur #item# moi", "considerations": [ { "axis": "speaker.has_trait", "param": "greedy", "curve": "boolean", "kind": "bonus", "weight": 1.2 }, { "axis": "relation", "value": "rival", "curve": "boolean", "kind": "bonus", "weight": 1.0 } ] },
+    { "id": "ep_dkp", "pools": ["loot_epic"], "weight": 0.7, "text": "j'espère que t'avais les DKP au moins #subject#" },
+
+    { "id": "wipe_who", "pools": ["wipe"], "weight": 1.1, "text": "qui a pull #boss# 😤" },
+    { "id": "wipe_count", "pools": ["wipe"], "weight": 1.0, "text": "wipe sur #boss#... #wipes#e tentative 💀" },
+    { "id": "wipe_dots", "pools": ["wipe"], "weight": 0.9, "text": "MORE DOTS sur #boss# bordel" },
+    { "id": "wipe_fire", "pools": ["wipe"], "weight": 0.9, "text": "sortez du feu sur #boss# c'est pas compliqué" },
+    { "id": "wipe_rage", "pools": ["wipe"], "weight": 0.7, "text": "#wipes# wipes sur #boss#, je vais péter un câble", "considerations": [ { "axis": "speaker.has_trait", "param": "rage_quitter", "curve": "boolean", "kind": "bonus", "weight": 1.5 }, { "axis": "speaker.mood", "curve": "inverse", "kind": "bonus", "weight": 0.6 } ] },
+    { "id": "wipe_chill", "pools": ["wipe"], "weight": 0.6, "text": "c'est rien on rerun #boss#, gardez le moral 💪", "considerations": [ { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.2 } ] },
+
+    { "id": "kill_down", "pools": ["boss_kill"], "weight": 1.1, "text": "#boss# DOWN 🎉" },
+    { "id": "kill_ez", "pools": ["boss_kill"], "weight": 0.9, "text": "ez #boss#, on enchaîne" },
+    { "id": "kill_finally", "pools": ["boss_kill"], "weight": 0.8, "text": "enfin #boss# par terre, depuis le temps" },
+    { "id": "kill_gg", "pools": ["boss_kill"], "weight": 1.0, "text": "GG sur #boss# les gars 👏" },
+
+    { "id": "drama_popcorn", "pools": ["drama"], "weight": 1.0, "text": "pop-corn 🍿" },
+    { "id": "drama_smell", "pools": ["drama"], "weight": 1.0, "text": "ça sent le drama là 👀" },
+    { "id": "drama_calm", "pools": ["drama"], "weight": 0.8, "text": "bon les gars on se calme svp", "considerations": [ { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.3 } ] },
+    { "id": "drama_fuel", "pools": ["drama"], "weight": 0.7, "text": "allez balance tout je veux savoir 😈", "considerations": [ { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.6 } ] },
+
+    { "id": "tension_clash", "pools": ["tension"], "weight": 1.0, "text": "#p1# et #p2# encore en train de se clasher..." },
+    { "id": "tension_ambiance", "pools": ["tension"], "weight": 0.9, "text": "l'ambiance entre #p1# et #p2# 😬" },
+    { "id": "tension_mediate", "pools": ["tension"], "weight": 0.7, "text": "#p1# #p2# vous voulez qu'on en parle au calme ?", "considerations": [ { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.3 } ] },
+
+    { "id": "burn_rest", "pools": ["burnout"], "weight": 1.0, "text": "#subject# a l'air cramé, faut qu'il souffle" },
+    { "id": "burn_serious", "pools": ["burnout"], "weight": 0.9, "text": "#subject# go te reposer sérieux, on gère" },
+    { "id": "burn_care", "pools": ["burnout"], "weight": 0.8, "text": "ça va #subject# ? prends une pause si besoin 💙", "considerations": [ { "axis": "relation", "value": "friend", "curve": "boolean", "kind": "bonus", "weight": 1.4 } ] },
+
+    { "id": "ninja_accuse", "pools": ["ninja"], "weight": 1.0, "text": "alors comme ça on ninja #item# ? 👀" },
+    { "id": "ninja_council", "pools": ["ninja"], "weight": 0.9, "text": "le loot council va adorer ça tiens 🙄", "considerations": [ { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.2 } ] },
+    { "id": "ninja_vanish", "pools": ["ninja"], "weight": 0.9, "text": "#item# qui disparaît mystérieusement... encore une fois" },
+    { "id": "ninja_dkp", "pools": ["ninja"], "weight": 0.8, "text": "DKP minus à vie pour le ninja de #item#" },
+    { "id": "ninja_greedy", "pools": ["ninja"], "weight": 0.7, "text": "j'avais les DKP pour #item# moi, c'est un scandale", "considerations": [ { "axis": "speaker.has_trait", "param": "greedy", "curve": "boolean", "kind": "bonus", "weight": 1.4 } ] }
+  ]
+}

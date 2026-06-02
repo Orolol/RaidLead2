@@ -36,6 +36,12 @@ func _run_all() -> void:
 	_suite_economy(tf)
 	_suite_facades(tf)
 	_suite_ui_smoke(tf)
+	_suite_chat_director(tf)
+	_suite_chat_scoring(tf)
+	_suite_chat_reactive(tf)
+	_suite_chat_scenes(tf)
+	_suite_chat_robustness(tf)
+	_suite_chat_data_schema(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
 	print(tf.summary())
@@ -783,3 +789,351 @@ func _make_group(roles: Array, level: int, skill: int) -> Array:
 		p.mood = 80.0
 		group.append(p)
 	return group
+
+func _suite_chat_director(tf) -> void:
+	tf.suite("ChatDirector (Phase A)")
+
+	# Corpus chargé
+	tf.ok(ChatDirector.debug_count_pool("ambient") >= 80, "corpus ambient substantiel (>=80 lignes)")
+	tf.ok(ChatDirector.get_corpus_size() > ChatDirector.debug_count_pool("ambient"), "corpus total inclut aussi le réactif")
+
+	# Grammaire inline {a|b|c}
+	var expanded: String = ChatDirector._expand("{alpha|beta|gamma}")
+	tf.ok(expanded in ["alpha", "beta", "gamma"], "expand {a|b|c} -> un choix")
+	tf.eq(ChatDirector._expand("texte simple"), "texte simple", "expand sans accolades = identite")
+
+	# Veto de classe : la ligne 'eau' est reservee aux mages
+	var mage := SimulatedPlayer.new()
+	mage.personnage_classe = "Mage"
+	var warrior := SimulatedPlayer.new()
+	warrior.personnage_classe = "Guerrier"
+	var water_line := {"requires_class": "Mage", "text": "free water"}
+	tf.ok(ChatDirector._passes_vetos(water_line, mage), "veto classe : mage passe")
+	tf.ok(not ChatDirector._passes_vetos(water_line, warrior), "veto classe : non-mage bloque")
+
+	# Bavardise : social > solitaire (a humeur egale)
+	var chatty := SimulatedPlayer.new()
+	chatty.mood = 80.0
+	chatty.tags_comportement = ["social"]
+	var quiet := SimulatedPlayer.new()
+	quiet.mood = 80.0
+	quiet.tags_comportement = ["solitaire"]
+	tf.ok(ChatDirector._talkativeness(chatty) > ChatDirector._talkativeness(quiet), "social plus bavard que solitaire")
+
+	# Emission de bout en bout : 2 membres en ligne -> une ligne sort
+	var emitted: Array = []
+	var cb: Callable = func(_speaker_name, text, _channel): emitted.append(text)
+	ChatDirector.line_emitted.connect(cb)
+	var a := SimulatedPlayer.new()
+	a.nom = "TesteurA"
+	a.player_id = "chat_test_a"
+	a.is_online = true
+	a.mood = 80.0
+	a.personnage_classe = "Guerrier"
+	var b := SimulatedPlayer.new()
+	b.nom = "TesteurB"
+	b.player_id = "chat_test_b"
+	b.is_online = true
+	b.mood = 80.0
+	b.personnage_classe = "Guerrier"
+	GuildManager.guild_members.append(a)
+	GuildManager.guild_members.append(b)
+	var ok_emit: bool = ChatDirector.debug_force_ambient()
+	tf.ok(ok_emit, "debug_force_ambient emet une ligne avec des membres en ligne")
+	tf.ok(emitted.size() >= 1 and String(emitted[0]).strip_edges() != "", "ligne emise non vide")
+	GuildManager.guild_members.erase(a)
+	GuildManager.guild_members.erase(b)
+	ChatDirector.line_emitted.disconnect(cb)
+
+func _suite_chat_scoring(tf) -> void:
+	tf.suite("ChatScoring (Phase B)")
+	var CS = load("res://scripts/systems/chat/chat_scoring.gd")
+
+	# Courbes valeur -> [0,1]
+	tf.eq(CS.apply_curve(true, "boolean", {}), 1.0, "boolean true -> 1")
+	tf.eq(CS.apply_curve(false, "boolean", {}), 0.0, "boolean false -> 0")
+	tf.eq(CS.apply_curve(100.0, "linear", {}), 1.0, "linear 100/[0,100] -> 1")
+	tf.eq(CS.apply_curve(0.0, "linear", {}), 0.0, "linear 0 -> 0")
+	tf.ok(abs(CS.apply_curve(50.0, "linear", {}) - 0.5) < 0.001, "linear 50 -> 0.5")
+	tf.eq(CS.apply_curve(0.0, "inverse", {}), 1.0, "inverse 0 -> 1")
+	tf.ok(abs(CS.apply_curve(50.0, "gaussian", {"center": 50.0, "sigma": 20.0}) - 1.0) < 0.001, "gaussian au centre -> 1")
+	tf.eq(CS.apply_curve(60.0, "threshold", {"t": 50.0}), 1.0, "threshold >= t -> 1")
+	tf.eq(CS.apply_curve(40.0, "threshold", {"t": 50.0}), 0.0, "threshold < t -> 0")
+
+	# score_line : bonus de trait (base 1.0 + 1.5)
+	var dq := SimulatedPlayer.new()
+	dq.tags_comportement = ["drama_queen"]
+	dq.mood = 50.0
+	var calm := SimulatedPlayer.new()
+	calm.tags_comportement = []
+	calm.mood = 50.0
+	var line := {"weight": 1.0, "considerations": [{"axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.5}]}
+	var s_dq: float = CS.score_line(line, {"speaker": dq})["score"]
+	var s_calm: float = CS.score_line(line, {"speaker": calm})["score"]
+	tf.ok(s_dq > s_calm, "drama_queen score la ligne plus haut")
+	tf.ok(abs(s_dq - 2.5) < 0.001, "score = base 1.0 + bonus 1.5")
+	tf.ok(abs(s_calm - 1.0) < 0.001, "score sans trait = base 1.0")
+
+	# veto a 0 annule le score
+	var veto_line := {"weight": 2.0, "considerations": [{"axis": "speaker.has_trait", "param": "absent_xyz", "curve": "boolean", "kind": "veto"}]}
+	tf.eq(CS.score_line(veto_line, {"speaker": calm})["score"], 0.0, "veto a 0 annule le score")
+
+	# softmax : greedy a temperature basse
+	var items := ["a", "b", "c"]
+	var scores := [1.0, 5.0, 2.0]
+	GameRandom.seed_rng(123)
+	tf.eq(CS.softmax_sample(items, scores, 0.01), "b", "softmax T->0 choisit le meilleur score")
+
+	# determinisme : meme seed -> meme tirage
+	GameRandom.seed_rng(777)
+	var r1 = CS.softmax_sample(items, scores, 1.0)
+	GameRandom.seed_rng(777)
+	var r2 = CS.softmax_sample(items, scores, 1.0)
+	tf.eq(r1, r2, "softmax deterministe a seed fixe")
+	GameRandom.randomize_rng()
+
+	# explicateur de score : structure et tri
+	var ex := SimulatedPlayer.new()
+	ex.nom = "ExpA"
+	ex.player_id = "exp_a"
+	ex.is_online = true
+	ex.mood = 60.0
+	ex.personnage_classe = "Guerrier"
+	ex.tags_comportement = ["drama_queen"]
+	GuildManager.guild_members.append(ex)
+	var explain: Dictionary = ChatDirector.debug_explain_ambient(5)
+	tf.ok(explain.has("rows") and explain["rows"].size() > 0, "explain renvoie des lignes scorees")
+	if explain.has("rows") and explain["rows"].size() >= 2:
+		tf.ok(explain["rows"][0]["score"] >= explain["rows"][1]["score"], "explain trie par score desc")
+		tf.ok(explain["rows"][0]["breakdown"] is Array, "explain expose le breakdown")
+	GuildManager.guild_members.erase(ex)
+
+	# Vibe-space : une réplique salée colle mieux à un locuteur salé qu'à un membre posé
+	var toxic_line := {"weight": 1.0, "vibe": [-0.3, 0.8, 0.2]}
+	var grumpy := SimulatedPlayer.new()
+	grumpy.tags_comportement = ["drama_queen"]
+	grumpy.mood = 20.0
+	var sweet := SimulatedPlayer.new()
+	sweet.tags_comportement = ["serviable"]
+	sweet.mood = 90.0
+	var s_grumpy: float = CS.score_line(toxic_line, ChatDirector._build_ctx(grumpy, null))["score"]
+	var s_sweet: float = CS.score_line(toxic_line, ChatDirector._build_ctx(sweet, null))["score"]
+	tf.ok(s_grumpy > s_sweet, "vibe : réplique salée score plus haut pour un locuteur salé")
+
+func _suite_chat_reactive(tf) -> void:
+	tf.suite("ChatDirector réactif (Phase C)")
+
+	# Injection des variables du stimulus dans la grammaire
+	tf.eq(ChatDirector._expand("gz #subject# niveau #lvl#", {"subject": "Bob", "lvl": "42"}), "gz Bob niveau 42", "injection #subject#/#lvl#")
+	tf.eq(ChatDirector._expand("wipe sur #boss#", {"boss": "Onyxia"}), "wipe sur Onyxia", "injection #boss#")
+
+	# Pools réactifs chargés
+	tf.ok(ChatDirector.debug_count_pool("level_up") >= 3, "pool level_up charge")
+	tf.ok(ChatDirector.debug_count_pool("wipe") >= 3, "pool wipe charge")
+	tf.ok(ChatDirector.debug_count_pool("loot_epic") >= 3, "pool loot_epic charge")
+
+	# Emission reactive avec injection de variable
+	var emitted: Array = []
+	var cb: Callable = func(_n, text, _c): emitted.append(text)
+	ChatDirector.line_emitted.connect(cb)
+
+	var subject := SimulatedPlayer.new()
+	subject.nom = "Subjekt"
+	subject.player_id = "react_subj"
+	subject.is_online = true
+	var reactor := SimulatedPlayer.new()
+	reactor.nom = "Reactor"
+	reactor.player_id = "react_a"
+	reactor.is_online = true
+	reactor.mood = 80.0
+	reactor.personnage_classe = "Guerrier"
+	GuildManager.guild_members.append(subject)
+	GuildManager.guild_members.append(reactor)
+
+	var ok_lvl: bool = ChatDirector.debug_force_reactive("level_up", subject, {"subject": "Subjekt", "lvl": "60"}, 1.0)
+	tf.ok(ok_lvl, "reaction level_up emise")
+	tf.ok(emitted.size() >= 1 and ("Subjekt" in String(emitted[-1]) or "60" in String(emitted[-1])), "variable injectee dans la reaction")
+
+	GuildManager.guild_members.erase(subject)
+	GuildManager.guild_members.erase(reactor)
+	ChatDirector.line_emitted.disconnect(cb)
+
+func _suite_chat_scenes(tf) -> void:
+	tf.suite("ChatDirector scènes (Phase D)")
+	tf.ok(ChatDirector.get_scene_count() >= 6, "scènes chargées (>=6)")
+	tf.ok(not ChatDirector.debug_get_scene("rickroll").is_empty(), "scène rickroll trouvée")
+
+	# Résolution de branche : colle au trait/à l'humeur de l'acteur (le cœur "vivant")
+	var RunnerScript = load("res://scripts/systems/chat/scene_runner.gd")
+	var runner = RunnerScript.new()
+	runner.director = ChatDirector
+	runner._cast = {}
+	var branch := {"options": [
+		{"text": "calme", "considerations": [{"axis": "speaker.mood", "curve": "linear", "kind": "bonus", "weight": 2.0}]},
+		{"text": "RAGE", "considerations": [
+			{"axis": "speaker.has_trait", "param": "rage_quitter", "curve": "boolean", "kind": "bonus", "weight": 3.0},
+			{"axis": "speaker.mood", "curve": "inverse", "kind": "bonus", "weight": 1.0}]}
+	]}
+	var ragey := SimulatedPlayer.new()
+	ragey.tags_comportement = ["rage_quitter"]
+	ragey.mood = 20.0
+	GameRandom.seed_rng(1)
+	var chosen = runner._resolve_branch(branch, ragey)
+	tf.ok(chosen != null and String(chosen["text"]) == "RAGE", "branche = RAGE pour rage_quitter humeur basse")
+	var calm_guy := SimulatedPlayer.new()
+	calm_guy.tags_comportement = []
+	calm_guy.mood = 90.0
+	GameRandom.seed_rng(1)
+	var chosen2 = runner._resolve_branch(branch, calm_guy)
+	tf.ok(chosen2 != null and String(chosen2["text"]) == "calme", "branche = calme pour acteur posé")
+	GameRandom.randomize_rng()
+	runner.free()
+
+	# Jeu synchrone du rickroll : casting + beats + injection de #role#
+	var a := SimulatedPlayer.new()
+	a.nom = "Pranko"
+	a.player_id = "sc_a"
+	a.is_online = true
+	a.mood = 80.0
+	a.tags_comportement = ["drama_queen"]
+	var b := SimulatedPlayer.new()
+	b.nom = "Victimo"
+	b.player_id = "sc_b"
+	b.is_online = true
+	b.mood = 70.0
+	var c := SimulatedPlayer.new()
+	c.nom = "Temoin"
+	c.player_id = "sc_c"
+	c.is_online = true
+	c.mood = 75.0
+	GuildManager.guild_members.append(a)
+	GuildManager.guild_members.append(b)
+	GuildManager.guild_members.append(c)
+	var transcript: Array = ChatDirector.debug_play_scene_sync("rickroll")
+	tf.ok(transcript.size() >= 2, "rickroll joue au moins 2 répliques")
+	if transcript.size() >= 2:
+		tf.eq(String(transcript[0][0]), "prankster", "1er beat = prankster")
+		tf.ok("youtu" in String(transcript[0][1]) or "@" in String(transcript[0][1]), "le prankster envoie le lien")
+		var victim_line := String(transcript[1][1])
+		var valid := ["haha très drôle 🙄", "c'est un rickroll... tu crois vraiment que je vais cliquer ?", "MAIS BORDEL JE ME SUIS ENCORE FAIT AVOIR"]
+		tf.ok(victim_line in valid, "réponse de la victime = une des branches")
+	GuildManager.guild_members.erase(a)
+	GuildManager.guild_members.erase(b)
+	GuildManager.guild_members.erase(c)
+
+func _suite_chat_robustness(tf) -> void:
+	tf.suite("Chat anti-répétition (Phase E)")
+	var added: Array = []
+	for i in range(5):
+		var p := SimulatedPlayer.new()
+		p.nom = "Rob%d" % i
+		p.player_id = "rob_%d" % i
+		p.is_online = true
+		p.mood = 70.0
+		p.personnage_classe = "Guerrier"
+		GuildManager.guild_members.append(p)
+		added.append(p)
+
+	var texts: Array = []
+	var cb: Callable = func(_n, t, _c): texts.append(t)
+	ChatDirector.line_emitted.connect(cb)
+	ChatDirector.scenes_enabled = false
+	GameRandom.seed_rng(999)
+	for i in range(30):
+		ChatDirector.debug_force_ambient()
+	ChatDirector.scenes_enabled = true
+	GameRandom.randomize_rng()
+	ChatDirector.line_emitted.disconnect(cb)
+
+	var distinct: Dictionary = {}
+	var freq: Dictionary = {}
+	for t in texts:
+		distinct[t] = true
+		freq[t] = int(freq.get(t, 0)) + 1
+	var max_freq: int = 0
+	for k in freq:
+		max_freq = maxi(max_freq, int(freq[k]))
+	tf.ok(texts.size() >= 15, "le stream produit des émissions")
+	tf.ok(distinct.size() >= 10, "variété : >=10 répliques distinctes")
+	tf.ok(float(max_freq) / float(maxi(1, texts.size())) <= 0.5, "aucune réplique ne domine (anti-répétition)")
+
+	for p in added:
+		GuildManager.guild_members.erase(p)
+
+func _suite_chat_data_schema(tf) -> void:
+	tf.suite("Chat data schema (Phase E)")
+	var known_axes := ["speaker.class", "speaker.role", "speaker.has_trait", "speaker.mood", "speaker.energy", "speaker.stress", "speaker.burnout", "speaker.integration", "speaker.days_in_guild", "relation", "relation_to_role", "context.event_magnitude", "context.time_of_day", "context.guild_morale", "context.phase"]
+	var known_curves := ["boolean", "linear", "inverse", "gaussian", "threshold"]
+	var known_kinds := ["bonus", "veto"]
+
+	# Lignes
+	var line_errors: int = 0
+	var ids: Dictionary = {}
+	for path in ["res://data/chat/lines/ambient_banter.json", "res://data/chat/lines/reactive.json"]:
+		var data: Dictionary = _chat_load_json(path)
+		for line in data.get("lines", []):
+			var lid := String(line.get("id", ""))
+			if lid == "" or ids.has(lid):
+				line_errors += 1
+			ids[lid] = true
+			if String(line.get("text", "")).strip_edges() == "":
+				line_errors += 1
+			if not (line.get("pools", []) is Array):
+				line_errors += 1
+			line_errors += _chat_check_cons(line.get("considerations", []), known_axes, known_curves, known_kinds)
+	tf.eq(line_errors, 0, "lignes : schéma valide (ids uniques / text / pools / considérations)")
+
+	# Scènes
+	var scene_errors: int = 0
+	for sc in _chat_load_json("res://data/chat/scenes.json").get("scenes", []):
+		var roles: Variant = sc.get("cast", {})
+		if not (roles is Dictionary) or roles.is_empty():
+			scene_errors += 1
+			continue
+		var beats: Variant = sc.get("beats", [])
+		if not (beats is Array) or beats.is_empty():
+			scene_errors += 1
+			continue
+		for beat in beats:
+			if not roles.has(String(beat.get("actor", ""))):
+				scene_errors += 1   # l'acteur doit être un rôle casté
+			if beat.has("branch"):
+				var opts: Variant = beat["branch"].get("options", [])
+				if not (opts is Array) or opts.is_empty():
+					scene_errors += 1
+				else:
+					for opt in opts:
+						if String(opt.get("text", "")).strip_edges() == "":
+							scene_errors += 1
+						scene_errors += _chat_check_cons(opt.get("considerations", []), known_axes, known_curves, known_kinds)
+			elif String(beat.get("text", "")).strip_edges() == "":
+				scene_errors += 1
+		for rn in roles:
+			scene_errors += _chat_check_cons(roles[rn].get("considerations", []), known_axes, known_curves, known_kinds)
+	tf.eq(scene_errors, 0, "scènes : schéma valide (cast / beats / actor∈cast / branches)")
+
+func _chat_load_json(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	return d if d is Dictionary else {}
+
+func _chat_check_cons(cons: Variant, known_axes: Array, known_curves: Array, known_kinds: Array) -> int:
+	if not (cons is Array):
+		return 1
+	var errs: int = 0
+	for c in cons:
+		if not (c is Dictionary):
+			errs += 1
+			continue
+		if not (String(c.get("axis", "")) in known_axes):
+			errs += 1
+		if not (String(c.get("curve", "boolean")) in known_curves):
+			errs += 1
+		if not (String(c.get("kind", "bonus")) in known_kinds):
+			errs += 1
+	return errs
