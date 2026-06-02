@@ -20,6 +20,7 @@ func _run_all() -> void:
 	_suite_player(tf)
 	_suite_player_flow(tf)
 	_suite_simulation_depth(tf)
+	_suite_bank(tf)
 	_suite_balance(tf)
 	_suite_advisor(tf)
 	_suite_save(tf)
@@ -204,6 +205,64 @@ func _suite_simulation_depth(tf) -> void:
 		p4.is_online = true
 		bs.trigger_personal_event(p4, "great_news")  # mood_modifier +40
 		tf.ok(p4.mood > 50.0, "great_news (mood_modifier) améliore l'humeur")
+
+func _suite_bank(tf) -> void:
+	tf.suite("Banque & équipement")
+
+	# --- Modèle Guild (instance isolée) ---
+	var g = Guild.new()
+	var helm = Item.new("Heaume", Item.EquipmentSlot.HELMET, 20, Item.Rarity.RARE, 5, 0, 0)
+	g.add_to_bank(helm)
+	tf.eq(g.get_bank_items().size(), 1, "add_to_bank stocke un objet")
+	tf.ok(g.remove_from_bank(helm), "remove_from_bank trouve l'objet")
+	tf.eq(g.get_bank_items().size(), 0, "banque vide après retrait")
+	for i in range(Guild.BANK_MAX_ITEMS + 10):
+		g.add_to_bank(Item.new("It%d" % i, Item.EquipmentSlot.RING, 10 + i, Item.Rarity.UNCOMMON))
+	tf.ok(g.get_bank_items().size() <= Guild.BANK_MAX_ITEMS, "banque plafonnée à BANK_MAX_ITEMS")
+
+	# --- GuildManager : equip_from_bank (swap) + unequip_to_bank ---
+	var gm = GuildManager
+	gm.guild.bank_items.clear()
+	var m = SimulatedPlayer.new()
+	m.equipment = Equipment.new()
+	var weapon1 = Item.new("Épée A", Item.EquipmentSlot.WEAPON, 30, Item.Rarity.RARE, 8, 0, 0)
+	var weapon2 = Item.new("Épée B", Item.EquipmentSlot.WEAPON, 40, Item.Rarity.EPIC, 12, 0, 0)
+	m.equipment.equip_item(weapon1)
+	gm.guild.add_to_bank(weapon2)
+	tf.ok(gm.equip_from_bank(m, weapon2), "equip_from_bank réussit")
+	tf.eq(m.equipment.get_item_in_slot(Item.EquipmentSlot.WEAPON), weapon2, "le membre porte le nouvel objet")
+	tf.ok(weapon1 in gm.guild.get_bank_items(), "l'ancien objet retourne en banque (swap)")
+	tf.ok(not (weapon2 in gm.guild.get_bank_items()), "l'objet équipé n'est plus en banque")
+	tf.ok(gm.unequip_to_bank(m, Item.EquipmentSlot.WEAPON), "unequip_to_bank réussit")
+	tf.eq(m.equipment.get_item_in_slot(Item.EquipmentSlot.WEAPON), null, "slot vidé après déséquipement")
+	tf.ok(weapon2 in gm.guild.get_bank_items(), "objet déséquipé rangé en banque")
+
+	# --- route_loot : non-upgrade rare -> banque ; commun -> jeté ---
+	gm.guild.bank_items.clear()
+	var m2 = SimulatedPlayer.new()
+	m2.equipment = Equipment.new()
+	m2.equipment.equip_item(Item.new("Anneau fort", Item.EquipmentSlot.RING, 50, Item.Rarity.EPIC, 0, 0, 20))
+	var weak_rare = Item.new("Anneau faible", Item.EquipmentSlot.RING, 10, Item.Rarity.RARE, 1, 0, 0)
+	gm.route_loot(m2, weak_rare)
+	tf.ok(weak_rare in gm.guild.get_bank_items(), "loot non-upgrade (rare) déposé en banque")
+	var common_trash = Item.new("Bricole", Item.EquipmentSlot.RING, 5, Item.Rarity.COMMON, 0, 0, 0)
+	var size_before: int = gm.guild.get_bank_items().size()
+	gm.route_loot(m2, common_trash)
+	tf.eq(gm.guild.get_bank_items().size(), size_before, "loot commun non-upgrade jeté (pas en banque)")
+
+	# --- Persistance round-trip de la banque ---
+	gm.guild.bank_items.clear()
+	gm.guild.add_to_bank(Item.new("Persisté", Item.EquipmentSlot.CHEST, 33, Item.Rarity.EPIC, 7, 0, 0))
+	var gd: Dictionary = SaveManager._serialize_guild()
+	gm.guild.bank_items.clear()
+	SaveManager._deserialize_guild(gd)
+	tf.eq(gm.guild.get_bank_items().size(), 1, "banque round-trip : taille restaurée")
+	if gm.guild.get_bank_items().size() == 1:
+		tf.eq(gm.guild.get_bank_items()[0].name, "Persisté", "banque round-trip : nom")
+		tf.eq(gm.guild.get_bank_items()[0].ilvl, 33, "banque round-trip : iLvl")
+
+	# Nettoyage de l'état global (éviter de polluer les autres suites)
+	gm.guild.bank_items.clear()
 
 func _suite_balance(tf) -> void:
 	tf.suite("BalanceManager")

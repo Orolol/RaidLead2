@@ -283,6 +283,7 @@ func _serialize_guild() -> Dictionary:
 		"gold": g.gold,
 		"reputation": g.reputation,
 		"reputation_history": g.reputation_history,
+		"bank": _serialize_bank(g.bank_items),
 	}
 
 func _deserialize_guild(data: Dictionary) -> void:
@@ -294,6 +295,17 @@ func _deserialize_guild(data: Dictionary) -> void:
 	g.gold = data.get("gold", 0)
 	g.reputation = data.get("reputation", 50.0)
 	g.reputation_history = data.get("reputation_history", [])
+	g.bank_items = []
+	for entry in data.get("bank", []):
+		if entry is Dictionary:
+			g.bank_items.append(_deserialize_item(entry))
+
+func _serialize_bank(items: Array) -> Array:
+	var out: Array = []
+	for item in items:
+		if item:
+			out.append(_serialize_item(item))
+	return out
 
 # --- Sérialisation Membres ---
 

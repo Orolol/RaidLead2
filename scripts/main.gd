@@ -545,8 +545,8 @@ func _on_loot_conflict(conflict: Dictionary) -> void:
 
 func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Array, dungeon_name: String, boss_name: String) -> void:
 	"""Résout un conflit de loot en attribuant l'item au gagnant"""
-	# Équiper l'item au gagnant
-	winner.try_auto_equip(item)
+	# Équiper l'item au gagnant (sinon dépose en banque de guilde plutôt que jeter)
+	GuildManager.route_loot(winner, item)
 
 	# Ajouter à l'historique
 	GuildManager.add_loot_entry(item, winner.nom, dungeon_name, boss_name)

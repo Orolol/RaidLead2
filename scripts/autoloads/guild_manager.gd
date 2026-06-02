@@ -12,6 +12,7 @@ signal guild_perk_unlocked(perk_name)
 signal member_leveled_up(player, new_level)
 signal member_recruited(player)
 signal loot_conflict_occurred(conflict)
+signal bank_changed()
 
 var guild_members: Array = []
 var loot_history: Array = []
@@ -179,6 +180,56 @@ func _assign_default_activity(player) -> void:
 			activity_manager.start_activity(player, ActivityScript.ActivityType.FUN, {
 				"name": "Discute avec les autres membres"
 			})
+
+# ==================== BANQUE & ÉQUIPEMENT ====================
+
+func route_loot(member, item) -> void:
+	"""Distribue un loot à un membre : auto-équipe si c'est une amélioration,
+	sinon dépose en banque ; l'ancien objet remplacé va aussi en banque.
+	La camelote (commun) n'est pas banquée pour éviter le spam."""
+	if not member or not item:
+		return
+	var r: Dictionary = member.try_auto_equip(item)
+	if r.get("equipped", false):
+		var old_item = r.get("old_item", null)
+		if old_item:
+			_bank_loot(old_item)
+	else:
+		_bank_loot(item)
+
+func _bank_loot(item) -> void:
+	if not guild or item == null:
+		return
+	if item.rarity <= Item.Rarity.COMMON:
+		return  # la camelote commune est jetée
+	guild.add_to_bank(item)
+	bank_changed.emit()
+
+func equip_from_bank(member, item) -> bool:
+	"""Équipe un objet de la banque sur un membre. L'ancien objet retourne en
+	banque. Vrai si effectué."""
+	if not member or not item or not guild:
+		return false
+	if not guild.remove_from_bank(item):
+		return false
+	if not member.equipment:
+		member.equipment = Equipment.new()
+	var old_item = member.equipment.equip_item(item)
+	if old_item:
+		guild.add_to_bank(old_item)
+	bank_changed.emit()
+	return true
+
+func unequip_to_bank(member, slot: int) -> bool:
+	"""Retire l'objet d'un slot d'un membre vers la banque. Vrai si un objet retiré."""
+	if not member or not member.equipment or not guild:
+		return false
+	var item = member.equipment.remove_item(slot)
+	if item == null:
+		return false
+	guild.add_to_bank(item)
+	bank_changed.emit()
+	return true
 
 func add_member(player: SimulatedPlayer) -> bool:
 	if player not in guild_members:

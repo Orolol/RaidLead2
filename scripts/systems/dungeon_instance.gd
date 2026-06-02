@@ -348,7 +348,8 @@ func _on_boss_defeated() -> void:
 			loot_winner = _pick_loot_winner(looted_item)
 
 			if loot_winner and looted_item:
-				loot_winner.try_auto_equip(looted_item)
+				# Auto-équipe si upgrade, sinon dépose en banque de guilde (plus de loot perdu)
+				GuildManager.route_loot(loot_winner, looted_item)
 				GuildManager.add_loot_entry(looted_item, loot_winner.nom, d_name, boss_name)
 				# Émettre le signal de distribution de loot pour le chat
 				loot_distributed.emit(loot_winner, looted_item)

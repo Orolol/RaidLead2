@@ -103,8 +103,38 @@ func spend_gold(amount: int) -> bool:
 		return true
 	return false
 
-func add_item_to_bank(item: Dictionary) -> void:
+## --- Banque de guilde (objets d'équipement réutilisables) ---
+const BANK_MAX_ITEMS := 60
+
+func add_to_bank(item) -> void:
+	"""Stocke un Item dans la banque de guilde (toujours, même camelote : un
+	dépôt manuel doit être respecté). Le filtrage du loot auto se fait en amont."""
+	if item == null:
+		return
 	bank_items.append(item)
+	if bank_items.size() > BANK_MAX_ITEMS:
+		_trim_bank()
+
+func remove_from_bank(item) -> bool:
+	"""Retire un objet précis de la banque. Vrai si trouvé."""
+	var idx: int = bank_items.find(item)
+	if idx >= 0:
+		bank_items.remove_at(idx)
+		return true
+	return false
+
+func get_bank_items() -> Array:
+	return bank_items
+
+func _trim_bank() -> void:
+	"""Banque pleine : garde les meilleurs objets (rareté puis iLvl), jette le reste."""
+	bank_items.sort_custom(func(a, b):
+		if a.rarity != b.rarity:
+			return a.rarity > b.rarity
+		return a.ilvl > b.ilvl
+	)
+	while bank_items.size() > BANK_MAX_ITEMS:
+		bank_items.pop_back()
 
 # Méthodes pour le système d'effets
 func get_modified_stat(stat_name: String, base_value: float) -> float:

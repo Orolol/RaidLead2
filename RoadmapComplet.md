@@ -660,6 +660,13 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Banque de guilde + drag&drop d'équipement (2 juin 2026)
+*171 assertions vertes + E2E drag&drop 5/5 (Godot 4.6.2). Dernier lot « reporté » de l'audit livré.*
+- ✅ **Banque de guilde** : `Guild.bank_items` devient une vraie banque d'`Item` (`add_to_bank`/`remove_from_bank`/`get_bank_items`, plafonnée à 60 avec trim par rareté/iLvl). Sérialisée dans `SaveManager` (rétrocompatible).
+- ✅ **Plus de loot perdu** : le loot non auto-équipé **et** les objets remplacés (swap) vont à la banque au lieu d'être jetés (`GuildManager.route_loot` branché dans `DungeonInstance` et la résolution de conflit). Seule la camelote commune est jetée.
+- ✅ **Fenêtre « Banque & Équipement »** réécrite (de l'`AcceptDialog` lecture-seule vers un `PanelContainer` thémé) : sélecteur de membre, 5 slots, banque scrollable. **Drag & drop natif Godot** (`_get_drag_data`/`_can_drop_data`/`_drop_data`) via un composant `EquipDragCell` : glisser un objet de la banque sur un slot l'équipe (l'ancien retourne en banque, validation du type de slot) ; glisser un objet équipé sur la banque le range. `GuildManager.equip_from_bank`/`unequip_to_bank` opèrent sur le modèle, signal `bank_changed` pour le rafraîchissement live.
+- ✅ **Validation** : suite `Banque & équipement` (modèle, swap, route_loot, round-trip de save) + `e2e_equipment.gd` (banque→slot→banque vérifié) + screenshot.
+
 ### Reprise des améliorations de l'audit — santé/simulation/UI (2 juin 2026)
 *155 assertions vertes + 2 E2E (Godot 4.6.2). Lots « volontairement reportés » de l'audit repris.*
 - ✅ **Santé du code** : 38 `get_node("/root/X")` remplacés par les identifiants globaux d'autoload ; nouveau `GameLog` (debug gardé par `OS.is_debug_build()`) avec 132 `print()` de boucle migrés. `singletons.gd` laissé intact (résolveur dynamique).

@@ -888,6 +888,8 @@ Restent volontairement reportés (à faire avec validation **visuelle** via l'é
 
 Suite de tests **131 → 155 assertions** vertes, + E2E. Reste uniquement le **drag&drop d'équipement** (= construire un inventaire/banque, vraie feature).
 
+> **MàJ 2 juin 2026 — drag&drop d'équipement LIVRÉ** (171 assertions vertes + E2E 5/5). `Guild.bank_items` est une vraie banque d'`Item` (cap + trim, sérialisée) ; le loot non-équipé et les swaps vont en banque (`GuildManager.route_loot`) au lieu d'être jetés ; la fenêtre « Banque & Équipement » est réécrite en `PanelContainer` thémé avec **drag&drop natif** (composant `EquipDragCell`, `equip_from_bank`/`unequip_to_bank`). **Tous les lots de l'audit sont désormais traités.**
+
 - ✅ **Connexion dynamique (C1)** : `_connection_state_modifier()` (fatigue/burnout/humeur/amis) injecté dans `_check_scheduled_connections` (chance de connexion + proba de déconnexion) ; déconnexion forcée sur épuisement/burnout sévère. Présence enfin pilotée par l'état.
 - ✅ **PersonalEvents** : `_check_personal_events` route via `should_trigger_event()` + `get_event_for_player()` (toute la base) ; `player.has(...)` (crash Resource) corrigé ; `trigger_personal_event` applique humeur/énergie + tous les types d'effet ; **temps bonus consommé** (rallonge la session).
 - ✅ **`get_node("/root/..")` → autoloads** : 38 sites migrés (managers/systèmes/UI/resources) ; `singletons.gd` intact.
