@@ -16,6 +16,11 @@ signal line_emitted(speaker_name: String, text: String, channel: String)
 
 const AMBIENT_LINES_PATH: String = "res://data/chat/lines/ambient_banter.json"
 
+# Moteur de scoring d'utilité (référencé par preload pour éviter le cache de classes périmé).
+const ChatScoring = preload("res://scripts/systems/chat/chat_scoring.gd")
+# Température du tirage ambient : haute = variété/surprise (temps mort).
+const AMBIENT_TEMPERATURE: float = 0.7
+
 # Cadence ambient (en minutes de JEU).
 const BASE_INTERVAL_MIN: float = 22.0   # avant division par sqrt(online) × bavardise
 const MIN_GAP_MIN: float = 4.0
@@ -119,22 +124,44 @@ func _pick_speaker(online: Array) -> Variant:
 		weights.append(w)
 	return GameRandom.weighted_pick(opts, weights)
 
-func _pick_line(speaker: Variant, pool: String) -> Variant:
-	var opts: Array = []
-	var weights: Array = []
+func _pick_line(speaker: Variant, pool: String, subject: Variant = null) -> Variant:
+	# Moteur de scoring (Phase B) : chaque ligne éligible est scorée (gates × Σbonus),
+	# puis tirage softmax à température (variété sans répétition).
+	var ctx: Dictionary = _build_ctx(speaker, subject)
+	var lines: Array = []
+	var scores: Array = []
 	var now: int = _now_total_minutes()
 	for line in _lines:
 		if not _line_in_pool(line, pool):
 			continue
 		if not _passes_vetos(line, speaker):
 			continue
-		var cd: float = float(line.get("cooldown_min", 0))
-		var last: float = float(_line_cooldowns.get(String(line.get("id", "")), -1000000))
-		if float(now) - last < cd:
+		if _on_cooldown(line, now):
 			continue
-		opts.append(line)
-		weights.append(float(line.get("weight", 1.0)))
-	return GameRandom.weighted_pick(opts, weights)
+		var r: Dictionary = ChatScoring.score_line(line, ctx)
+		if r["score"] <= 0.0:
+			continue
+		lines.append(line)
+		scores.append(r["score"])
+	return ChatScoring.softmax_sample(lines, scores, AMBIENT_TEMPERATURE)
+
+func _on_cooldown(line: Variant, now: int) -> bool:
+	var cd: float = float(line.get("cooldown_min", 0))
+	if cd <= 0.0:
+		return false
+	var last: float = float(_line_cooldowns.get(String(line.get("id", "")), -1000000))
+	return float(now) - last < cd
+
+func _build_ctx(speaker: Variant, subject: Variant) -> Dictionary:
+	# Contexte de scoring : valeurs lues une fois ici (le moteur reste pur/testable).
+	return {
+		"speaker": speaker,
+		"subject": subject,
+		"salience": 0.0,
+		"hour": GameTime.current_hour if GameTime else 0,
+		"guild_morale": GuildCultureManager.guild_morale if GuildCultureManager else 50.0,
+		"phase": int(PhaseManager.current_phase) if PhaseManager else 0,
+	}
 
 func _line_in_pool(line: Variant, pool: String) -> bool:
 	var pools: Variant = line.get("pools", [])
@@ -229,3 +256,27 @@ func debug_force_ambient() -> bool:
 
 func get_corpus_size() -> int:
 	return _lines.size()
+
+func debug_explain_ambient(top_n: int = 5) -> Dictionary:
+	## Pour un locuteur plausible (le plus bavard tiré), renvoie le top-N des répliques
+	## ambient avec leur score et le détail par considération. Sert au menu debug et aux tests.
+	var online: Array = _online_members()
+	if online.is_empty():
+		return {}
+	var speaker: Variant = _pick_speaker(online)
+	if speaker == null:
+		return {}
+	var ctx: Dictionary = _build_ctx(speaker, null)
+	var now: int = _now_total_minutes()
+	var rows: Array = []
+	for line in _lines:
+		if not _line_in_pool(line, "ambient"):
+			continue
+		if not _passes_vetos(line, speaker):
+			continue
+		if _on_cooldown(line, now):
+			continue
+		var r: Dictionary = ChatScoring.score_line(line, ctx)
+		rows.append({"id": String(line.get("id", "")), "score": r["score"], "breakdown": r["breakdown"]})
+	rows.sort_custom(func(a, b): return a["score"] > b["score"])
+	return {"speaker": String(speaker.nom), "rows": rows.slice(0, top_n)}

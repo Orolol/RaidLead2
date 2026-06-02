@@ -37,6 +37,7 @@ func _run_all() -> void:
 	_suite_facades(tf)
 	_suite_ui_smoke(tf)
 	_suite_chat_director(tf)
+	_suite_chat_scoring(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
 	print(tf.summary())
@@ -838,3 +839,66 @@ func _suite_chat_director(tf) -> void:
 	GuildManager.guild_members.erase(a)
 	GuildManager.guild_members.erase(b)
 	ChatDirector.line_emitted.disconnect(cb)
+
+func _suite_chat_scoring(tf) -> void:
+	tf.suite("ChatScoring (Phase B)")
+	var CS = load("res://scripts/systems/chat/chat_scoring.gd")
+
+	# Courbes valeur -> [0,1]
+	tf.eq(CS.apply_curve(true, "boolean", {}), 1.0, "boolean true -> 1")
+	tf.eq(CS.apply_curve(false, "boolean", {}), 0.0, "boolean false -> 0")
+	tf.eq(CS.apply_curve(100.0, "linear", {}), 1.0, "linear 100/[0,100] -> 1")
+	tf.eq(CS.apply_curve(0.0, "linear", {}), 0.0, "linear 0 -> 0")
+	tf.ok(abs(CS.apply_curve(50.0, "linear", {}) - 0.5) < 0.001, "linear 50 -> 0.5")
+	tf.eq(CS.apply_curve(0.0, "inverse", {}), 1.0, "inverse 0 -> 1")
+	tf.ok(abs(CS.apply_curve(50.0, "gaussian", {"center": 50.0, "sigma": 20.0}) - 1.0) < 0.001, "gaussian au centre -> 1")
+	tf.eq(CS.apply_curve(60.0, "threshold", {"t": 50.0}), 1.0, "threshold >= t -> 1")
+	tf.eq(CS.apply_curve(40.0, "threshold", {"t": 50.0}), 0.0, "threshold < t -> 0")
+
+	# score_line : bonus de trait (base 1.0 + 1.5)
+	var dq := SimulatedPlayer.new()
+	dq.tags_comportement = ["drama_queen"]
+	dq.mood = 50.0
+	var calm := SimulatedPlayer.new()
+	calm.tags_comportement = []
+	calm.mood = 50.0
+	var line := {"weight": 1.0, "considerations": [{"axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.5}]}
+	var s_dq: float = CS.score_line(line, {"speaker": dq})["score"]
+	var s_calm: float = CS.score_line(line, {"speaker": calm})["score"]
+	tf.ok(s_dq > s_calm, "drama_queen score la ligne plus haut")
+	tf.ok(abs(s_dq - 2.5) < 0.001, "score = base 1.0 + bonus 1.5")
+	tf.ok(abs(s_calm - 1.0) < 0.001, "score sans trait = base 1.0")
+
+	# veto a 0 annule le score
+	var veto_line := {"weight": 2.0, "considerations": [{"axis": "speaker.has_trait", "param": "absent_xyz", "curve": "boolean", "kind": "veto"}]}
+	tf.eq(CS.score_line(veto_line, {"speaker": calm})["score"], 0.0, "veto a 0 annule le score")
+
+	# softmax : greedy a temperature basse
+	var items := ["a", "b", "c"]
+	var scores := [1.0, 5.0, 2.0]
+	GameRandom.seed_rng(123)
+	tf.eq(CS.softmax_sample(items, scores, 0.01), "b", "softmax T->0 choisit le meilleur score")
+
+	# determinisme : meme seed -> meme tirage
+	GameRandom.seed_rng(777)
+	var r1 = CS.softmax_sample(items, scores, 1.0)
+	GameRandom.seed_rng(777)
+	var r2 = CS.softmax_sample(items, scores, 1.0)
+	tf.eq(r1, r2, "softmax deterministe a seed fixe")
+	GameRandom.randomize_rng()
+
+	# explicateur de score : structure et tri
+	var ex := SimulatedPlayer.new()
+	ex.nom = "ExpA"
+	ex.player_id = "exp_a"
+	ex.is_online = true
+	ex.mood = 60.0
+	ex.personnage_classe = "Guerrier"
+	ex.tags_comportement = ["drama_queen"]
+	GuildManager.guild_members.append(ex)
+	var explain: Dictionary = ChatDirector.debug_explain_ambient(5)
+	tf.ok(explain.has("rows") and explain["rows"].size() > 0, "explain renvoie des lignes scorees")
+	if explain.has("rows") and explain["rows"].size() >= 2:
+		tf.ok(explain["rows"][0]["score"] >= explain["rows"][1]["score"], "explain trie par score desc")
+		tf.ok(explain["rows"][0]["breakdown"] is Array, "explain expose le breakdown")
+	GuildManager.guild_members.erase(ex)
