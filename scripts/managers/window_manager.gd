@@ -264,8 +264,8 @@ func _apply_window_layout(instance: Control, window_name: String, config: Dictio
 	# Position
 	if window_positions.has(window_name):
 		var saved: Dictionary = window_positions[window_name]
-		instance.position = saved.get("position", Vector2.ZERO)
-		instance.size = saved.get("size", config.default_size)
+		instance.position = _to_vec2(saved.get("position"), Vector2.ZERO)
+		instance.size = _to_vec2(saved.get("size"), config.default_size)
 	elif config.default_position != Vector2(-1, -1):
 		instance.position = config.default_position
 	else:
@@ -394,11 +394,23 @@ func _update_active_window():
 	window_focused.emit(active_window)
 
 func _save_window_position(window_name: String, instance: Control):
-	"""Sauvegarde la position d'une fenêtre"""
+	"""Sauvegarde la position d'une fenêtre (format JSON-safe : tableaux [x, y],
+	car JSON.stringify ne sérialise pas les Vector2 — ils deviendraient des String
+	illisibles au rechargement)."""
 	window_positions[window_name] = {
-		"position": instance.position,
-		"size": instance.size
+		"position": [instance.position.x, instance.position.y],
+		"size": [instance.size.x, instance.size.y]
 	}
+
+func _to_vec2(value, fallback: Vector2) -> Vector2:
+	"""Reconstruit un Vector2 depuis un tableau [x, y] (sauvegarde sur disque),
+	un Vector2 (même session), sinon renvoie le repli (anciennes sauvegardes
+	corrompues où le Vector2 avait été sérialisé en String)."""
+	if value is Array and value.size() >= 2:
+		return Vector2(value[0], value[1])
+	if value is Vector2:
+		return value
+	return fallback
 
 func _save_layouts():
 	"""Sauvegarde les positions/tailles des fenêtres sur disque."""

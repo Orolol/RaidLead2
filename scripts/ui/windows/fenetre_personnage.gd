@@ -390,6 +390,12 @@ func update_character_info():
 	if not player:
 		return
 
+	# Les labels sont construits dans _ready ; NOTIFICATION_VISIBILITY_CHANGED peut
+	# arriver AVANT (à l'insertion dans l'arbre). On ignore alors l'appel précoce
+	# pour éviter une assignation .text sur un label encore null.
+	if classe_label == null:
+		return
+
 	# Rafraîchissement temps réel piloté par le signal d'état du joueur (énergie/activité)
 	if not _state_signal_connected and player.has_signal("player_state_changed"):
 		player.player_state_changed.connect(update_character_info)
