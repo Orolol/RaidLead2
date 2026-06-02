@@ -660,6 +660,13 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Refactor god-object — main.gd dégonflé (2 juin 2026)
+*172/172 assertions vertes + boot live vérifié (MCP). Comportement identique.*
+- 🟠 **`main.gd` : ~1080 → ~720 lignes** via 2 extractions à comportement identique :
+  - **`DebugMenuPanel`** (`scripts/ui/components/debug_menu.gd`) : le menu de debug (debug-only) + ses actions, instancié par `main` (qui lui passe le `WindowManager`). F1/F2 → `trigger()`.
+  - **`SystemNotifier`** (`scripts/systems/system_notifier.gd`) : relais des signaux managers (National/Esport/Cohésion) → chat/toast. Le seul cas couplé (popup modal de drama, qui met le jeu en pause) reste dans `main`, re-signalé via `drama_response_needed`.
+- 📋 **`fenetre_monde.gd` (~1200 l.)** : découpe **non faite** — fenêtre interactive (classement + recrutement avec scouting/négociation) dont le split nécessite une vérification interactive dédiée (à traiter en session focalisée pour éviter une régression non détectée).
+
 ### Correctifs d'audit — vague 1 : bugs critiques UI/Gameplay/Code (2 juin 2026)
 *172 assertions vertes (Godot 4.6.2 headless) + validation runtime MCP. Implémentation de `AuditAmeliorations2.md` via 8 sous-agents (modules isolés) + correctifs cœur. Codes C* = entrées de la synthèse de l'audit.*
 
