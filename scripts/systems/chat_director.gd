@@ -28,6 +28,8 @@ const SCENES_PATH: String = "res://data/chat/scenes.json"
 const SceneRunnerScript = preload("res://scripts/systems/chat/scene_runner.gd")
 # Probabilité de jouer une SCÈNE multi-acteurs plutôt qu'un one-liner lors d'un tick ambient.
 const AMBIENT_SCENE_CHANCE: float = 0.25
+# Idem côté réactif : chance qu'un événement (avec scène castable) joue la scène vs un one-liner.
+const REACTIVE_SCENE_CHANCE: float = 0.6
 
 # Anti-répétition & équité de parole (Phase E).
 const RECENT_LINES_MAX: int = 8         # mémoire courte des dernières répliques
@@ -449,8 +451,8 @@ func _expire_stimuli() -> void:
 	_blackboard = kept
 
 func _emit_reactive(stim: Dictionary) -> void:
-	# Une scène réactive (plus riche) est préférée si elle peut être castée.
-	if not scene_active and _try_scene(String(stim["kind"]), stim.get("subject"), stim.get("vars", {})):
+	# Parfois une scène réactive (plus riche) plutôt qu'un one-liner.
+	if not scene_active and GameRandom.chance(REACTIVE_SCENE_CHANCE) and _try_scene(String(stim["kind"]), stim.get("subject"), stim.get("vars", {})):
 		return
 	_emit_reactive_line(stim)
 

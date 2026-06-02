@@ -74,7 +74,14 @@ func _run() -> void:
 		["tribunal_ninja", null, {"item": "Lame Bénie de Tonnerre"}],
 		["mankrik_gag", null, {}],
 		["worldbuff_panic", null, {}],
-		["recruit_haze", added[5], {}]
+		["recruit_haze", added[5], {}],
+		["leeroy_moment", null, {}],
+		["boss_kill_celebration", null, {"boss": "Onyxia"}],
+		["dkp_drama", added[1], {"item": "Lame Bénie de Tonnerre"}],
+		["departure_emotional", null, {"subject": "Soak07"}],
+		["afk_shaming", null, {}],
+		["tank_healer_blame", null, {"boss": "Ragnaros"}],
+		["fishing_idle", null, {}]
 	]
 	for spec in scene_specs:
 		var sc_transcript: Array = ChatDirector.debug_play_scene_sync(spec[0], spec[1], spec[2])
