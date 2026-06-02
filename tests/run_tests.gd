@@ -39,6 +39,7 @@ func _run_all() -> void:
 	_suite_chat_director(tf)
 	_suite_chat_scoring(tf)
 	_suite_chat_reactive(tf)
+	_suite_chat_scenes(tf)
 
 	print("\n========== RAIDLEAD - TESTS AUTOMATISES ==========")
 	print(tf.summary())
@@ -942,3 +943,66 @@ func _suite_chat_reactive(tf) -> void:
 	GuildManager.guild_members.erase(subject)
 	GuildManager.guild_members.erase(reactor)
 	ChatDirector.line_emitted.disconnect(cb)
+
+func _suite_chat_scenes(tf) -> void:
+	tf.suite("ChatDirector scènes (Phase D)")
+	tf.eq(ChatDirector.get_scene_count(), 3, "3 scènes chargées")
+	tf.ok(not ChatDirector.debug_get_scene("rickroll").is_empty(), "scène rickroll trouvée")
+
+	# Résolution de branche : colle au trait/à l'humeur de l'acteur (le cœur "vivant")
+	var RunnerScript = load("res://scripts/systems/chat/scene_runner.gd")
+	var runner = RunnerScript.new()
+	runner.director = ChatDirector
+	runner._cast = {}
+	var branch := {"options": [
+		{"text": "calme", "considerations": [{"axis": "speaker.mood", "curve": "linear", "kind": "bonus", "weight": 2.0}]},
+		{"text": "RAGE", "considerations": [
+			{"axis": "speaker.has_trait", "param": "rage_quitter", "curve": "boolean", "kind": "bonus", "weight": 3.0},
+			{"axis": "speaker.mood", "curve": "inverse", "kind": "bonus", "weight": 1.0}]}
+	]}
+	var ragey := SimulatedPlayer.new()
+	ragey.tags_comportement = ["rage_quitter"]
+	ragey.mood = 20.0
+	GameRandom.seed_rng(1)
+	var chosen = runner._resolve_branch(branch, ragey)
+	tf.ok(chosen != null and String(chosen["text"]) == "RAGE", "branche = RAGE pour rage_quitter humeur basse")
+	var calm_guy := SimulatedPlayer.new()
+	calm_guy.tags_comportement = []
+	calm_guy.mood = 90.0
+	GameRandom.seed_rng(1)
+	var chosen2 = runner._resolve_branch(branch, calm_guy)
+	tf.ok(chosen2 != null and String(chosen2["text"]) == "calme", "branche = calme pour acteur posé")
+	GameRandom.randomize_rng()
+	runner.free()
+
+	# Jeu synchrone du rickroll : casting + beats + injection de #role#
+	var a := SimulatedPlayer.new()
+	a.nom = "Pranko"
+	a.player_id = "sc_a"
+	a.is_online = true
+	a.mood = 80.0
+	a.tags_comportement = ["drama_queen"]
+	var b := SimulatedPlayer.new()
+	b.nom = "Victimo"
+	b.player_id = "sc_b"
+	b.is_online = true
+	b.mood = 70.0
+	var c := SimulatedPlayer.new()
+	c.nom = "Temoin"
+	c.player_id = "sc_c"
+	c.is_online = true
+	c.mood = 75.0
+	GuildManager.guild_members.append(a)
+	GuildManager.guild_members.append(b)
+	GuildManager.guild_members.append(c)
+	var transcript: Array = ChatDirector.debug_play_scene_sync("rickroll")
+	tf.ok(transcript.size() >= 2, "rickroll joue au moins 2 répliques")
+	if transcript.size() >= 2:
+		tf.eq(String(transcript[0][0]), "prankster", "1er beat = prankster")
+		tf.ok("youtu" in String(transcript[0][1]) or "@" in String(transcript[0][1]), "le prankster envoie le lien")
+		var victim_line := String(transcript[1][1])
+		var valid := ["haha très drôle 🙄", "c'est un rickroll... tu crois vraiment que je vais cliquer ?", "MAIS BORDEL JE ME SUIS ENCORE FAIT AVOIR"]
+		tf.ok(victim_line in valid, "réponse de la victime = une des branches")
+	GuildManager.guild_members.erase(a)
+	GuildManager.guild_members.erase(b)
+	GuildManager.guild_members.erase(c)

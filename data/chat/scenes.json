@@ -1,0 +1,96 @@
+{
+  "_comment": "Scènes scriptées à branches (Phase D). Jouées par le SceneRunner : casting (scoring) -> beats avec pauses -> branches (rolls pondérés sur les traits) -> effets. trigger.pools = 'ambient' (temps mort) ou un kind de stimulus (réactif).",
+  "scenes": [
+    {
+      "id": "rickroll",
+      "trigger": { "pools": ["ambient"], "min_online": 2, "weight": 1.0, "cooldown_min": 1440 },
+      "cast": {
+        "prankster": { "considerations": [
+          { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.2 },
+          { "axis": "speaker.has_trait", "param": "social", "curve": "boolean", "kind": "bonus", "weight": 0.6 }
+        ] },
+        "victim": { "exclude": ["prankster"], "considerations": [
+          { "axis": "speaker.integration", "curve": "inverse", "kind": "bonus", "weight": 0.8 },
+          { "axis": "relation_to_role", "param": "prankster", "value": "friend", "curve": "boolean", "kind": "bonus", "weight": 0.6 }
+        ] },
+        "bystander": { "optional": true, "exclude": ["prankster", "victim"] }
+      },
+      "beats": [
+        { "actor": "prankster", "delay": 0.0, "text": "@#victim# hé mate ça, un addon de fou : youtu.be/dQw4w9WgXcQ 👀" },
+        { "actor": "victim", "delay": 3.5, "branch": {
+          "axis_actor": "victim",
+          "options": [
+            { "text": "haha très drôle 🙄", "considerations": [
+              { "axis": "speaker.has_trait", "param": "solitaire", "curve": "boolean", "kind": "bonus", "weight": 1.0 },
+              { "axis": "speaker.mood", "curve": "linear", "kind": "bonus", "weight": 1.0 } ] },
+            { "text": "c'est un rickroll... tu crois vraiment que je vais cliquer ?", "considerations": [
+              { "axis": "speaker.has_trait", "param": "perfectionniste", "curve": "boolean", "kind": "bonus", "weight": 1.6 } ] },
+            { "text": "MAIS BORDEL JE ME SUIS ENCORE FAIT AVOIR", "considerations": [
+              { "axis": "speaker.mood", "curve": "inverse", "kind": "bonus", "weight": 1.0 },
+              { "axis": "speaker.has_trait", "param": "rage_quitter", "curve": "boolean", "kind": "bonus", "weight": 1.6 } ],
+              "effects": [ { "target": "victim", "mood": -5, "stress": 3 } ] }
+          ] } },
+        { "actor": "prankster", "delay": 2.0, "text": "{never gonna give you up 🎶|😂😂😂|gg ez bro}" },
+        { "actor": "bystander", "delay": 1.5, "text": "rip #victim# 😂" }
+      ]
+    },
+
+    {
+      "id": "duel_bank",
+      "trigger": { "pools": ["ambient"], "min_online": 2, "weight": 0.8, "cooldown_min": 720 },
+      "cast": {
+        "challenger": { "considerations": [
+          { "axis": "speaker.has_trait", "param": "tryhard", "curve": "boolean", "kind": "bonus", "weight": 1.0 },
+          { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 0.7 }
+        ] },
+        "opponent": { "exclude": ["challenger"] }
+      },
+      "beats": [
+        { "actor": "challenger", "delay": 0.0, "text": "@#opponent# duel devant la banque ? 🗡️" },
+        { "actor": "opponent", "delay": 2.5, "branch": {
+          "axis_actor": "opponent",
+          "options": [
+            { "text": "ez, prépare-toi à perdre 😏", "considerations": [
+              { "axis": "speaker.has_trait", "param": "tryhard", "curve": "boolean", "kind": "bonus", "weight": 1.4 } ] },
+            { "text": "j'ai pas que ça à faire désolé", "considerations": [
+              { "axis": "speaker.has_trait", "param": "solitaire", "curve": "boolean", "kind": "bonus", "weight": 1.2 },
+              { "axis": "speaker.has_trait", "param": "perfectionniste", "curve": "boolean", "kind": "bonus", "weight": 0.8 } ] },
+            { "text": "/duel accepté... et /afk juste avant 😎", "considerations": [
+              { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.3 } ] }
+          ] } },
+        { "actor": "challenger", "delay": 2.0, "text": "{gg|on verra ça|noté 👀}" }
+      ]
+    },
+
+    {
+      "id": "blame_pull",
+      "trigger": { "pools": ["wipe"], "min_online": 2, "weight": 1.0, "cooldown_min": 180 },
+      "cast": {
+        "accuser": { "considerations": [
+          { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.0 },
+          { "axis": "speaker.mood", "curve": "inverse", "kind": "bonus", "weight": 0.5 }
+        ] },
+        "culprit": { "exclude": ["accuser"] },
+        "defender": { "optional": true, "exclude": ["accuser", "culprit"], "considerations": [
+          { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.2 },
+          { "axis": "relation_to_role", "param": "culprit", "value": "friend", "curve": "boolean", "kind": "bonus", "weight": 0.8 }
+        ] }
+      },
+      "beats": [
+        { "actor": "accuser", "delay": 0.0, "text": "bon. QUI a pull #boss# ?? 😤" },
+        { "actor": "culprit", "delay": 3.0, "branch": {
+          "axis_actor": "culprit",
+          "options": [
+            { "text": "c'est PAS moi j'ai rien touché je jure", "considerations": [
+              { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.2 } ] },
+            { "text": "mea culpa... je rez et on recommence, désolé", "considerations": [
+              { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.0 },
+              { "axis": "speaker.has_trait", "param": "perfectionniste", "curve": "boolean", "kind": "bonus", "weight": 0.8 } ],
+              "effects": [ { "target": "culprit", "mood": -2 } ] },
+            { "text": "c'est le lag je vous jure 🙄", "considerations": [] }
+          ] } },
+        { "actor": "defender", "delay": 2.5, "text": "oh ça va on rerun #boss#, c'est pas la mort 💪" }
+      ]
+    }
+  ]
+}

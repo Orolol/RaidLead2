@@ -23,6 +23,10 @@ const ChatScoring = preload("res://scripts/systems/chat/chat_scoring.gd")
 const AMBIENT_TEMPERATURE: float = 0.7
 # Température du tirage réactif : plus basse = on reste sur le sujet de l'événement.
 const REACTIVE_TEMPERATURE: float = 0.45
+const SCENES_PATH: String = "res://data/chat/scenes.json"
+const SceneRunnerScript = preload("res://scripts/systems/chat/scene_runner.gd")
+# Probabilité de jouer une SCÈNE multi-acteurs plutôt qu'un one-liner lors d'un tick ambient.
+const AMBIENT_SCENE_CHANCE: float = 0.25
 
 # Cadence ambient (en minutes de JEU).
 const BASE_INTERVAL_MIN: float = 22.0   # avant division par sqrt(online) × bavardise
@@ -41,9 +45,18 @@ var _line_cooldowns: Dictionary = {}   # id -> minute de jeu absolue de dernièr
 var _last_speaker_id: String = ""
 var _emitted_count: int = 0            # total de lignes émises (debug / test)
 var _blackboard: Array = []            # stimuli réactifs en attente {kind,salience,subject,vars,ttl,born}
+var _scene_runner: Node = null
+var _scenes: Array = []
+var _scene_cooldowns: Dictionary = {}  # scene id -> minute de jeu de dernière utilisation
+var scene_active: bool = false         # une scène multi-acteurs occupe le chat
 
 func _ready() -> void:
 	_load_corpus()
+	_load_scenes()
+	_scene_runner = SceneRunnerScript.new()
+	_scene_runner.name = "SceneRunner"
+	_scene_runner.director = self
+	add_child(_scene_runner)
 	if GameTime and not GameTime.minute_changed.is_connected(_on_minute_changed):
 		GameTime.minute_changed.connect(_on_minute_changed)
 	_connect_event_signals()
@@ -71,6 +84,18 @@ func _load_lines(path: String) -> Array:
 		return data["lines"]
 	return []
 
+func _load_scenes() -> void:
+	_scenes = []
+	if not FileAccess.file_exists(SCENES_PATH):
+		return
+	var f: FileAccess = FileAccess.open(SCENES_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var data: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(data) == TYPE_DICTIONARY and data.has("scenes") and data["scenes"] is Array:
+		_scenes = data["scenes"]
+
 # ==================== TICK AMBIENT ====================
 
 func _on_minute_changed(_minute: int, _hour: int) -> void:
@@ -95,12 +120,17 @@ func _compute_interval() -> float:
 	return clampf(interval, MIN_GAP_MIN, MAX_GAP_MIN)
 
 func _try_ambient(ignore_floor: bool = false) -> void:
+	if scene_active:
+		return   # une scène occupe le chat
 	# Garde-fou temps-réel (anti-flood haute vitesse / fast-forward instantané).
 	var now_ms: int = Time.get_ticks_msec()
 	if not ignore_floor and now_ms - _last_emit_ms < REALTIME_FLOOR_MS:
 		return
 	var online: Array = _online_members()
 	if online.is_empty():
+		return
+	# Parfois, jouer une vraie scène multi-acteurs plutôt qu'un one-liner.
+	if GameRandom.chance(AMBIENT_SCENE_CHANCE) and _try_scene("ambient"):
 		return
 	var speaker: Variant = _pick_speaker(online)
 	if speaker == null:
@@ -350,6 +380,9 @@ func _expire_stimuli() -> void:
 
 func _emit_reactive(stim: Dictionary) -> void:
 	var subject: Variant = stim.get("subject")
+	# Une scène réactive (plus riche) est préférée si elle peut être castée.
+	if not scene_active and _try_scene(String(stim["kind"]), subject, stim.get("vars", {})):
+		return
 	var speaker: Variant = _pick_reactive_speaker(subject)
 	if speaker == null:
 		return
@@ -376,6 +409,70 @@ func _pick_reactive_speaker(subject: Variant) -> Variant:
 		opts.append(m)
 		weights.append(w)
 	return GameRandom.weighted_pick(opts, weights)
+
+# ==================== SCÈNES ====================
+
+func _try_scene(pool: String, subject: Variant = null, extra_vars: Dictionary = {}) -> bool:
+	if scene_active or _scene_runner == null:
+		return false
+	var online_count: int = _online_members().size()
+	var now: int = _now_total_minutes()
+	var candidates: Array = []
+	var weights: Array = []
+	for sc in _scenes:
+		var trig: Dictionary = sc.get("trigger", {})
+		var pools: Variant = trig.get("pools", [])
+		if not (pools is Array) or not (pool in pools):
+			continue
+		if online_count < int(trig.get("min_online", 1)):
+			continue
+		if _scene_on_cooldown(sc, now):
+			continue
+		candidates.append(sc)
+		weights.append(float(trig.get("weight", 1.0)))
+	# Essaie les scènes éligibles (ordre pondéré) jusqu'à ce qu'une caste avec succès.
+	while not candidates.is_empty():
+		var sc: Variant = GameRandom.weighted_pick(candidates, weights)
+		var idx: int = candidates.find(sc)
+		candidates.remove_at(idx)
+		weights.remove_at(idx)
+		if _scene_runner.try_play_scene(sc, subject, extra_vars):
+			_scene_cooldowns[String(sc.get("id", ""))] = now
+			return true
+	return false
+
+func _scene_on_cooldown(scene: Dictionary, now: int) -> bool:
+	var trig: Dictionary = scene.get("trigger", {})
+	var cd: float = float(trig.get("cooldown_min", 0))
+	if cd <= 0.0:
+		return false
+	var last: float = float(_scene_cooldowns.get(String(scene.get("id", "")), -1000000))
+	return float(now) - last < cd
+
+# Méthodes appelées par le SceneRunner (enfant du Director) — il s'appuie sur les
+# helpers du Director (online, relations, grammaire) plutôt que de les dupliquer.
+
+func build_cast_ctx(candidate: Variant, cast: Dictionary) -> Dictionary:
+	var ctx: Dictionary = _build_ctx(candidate, null, 0.0)
+	var role_relations: Dictionary = {}
+	for role_name in cast:
+		role_relations[role_name] = _relation_between(candidate, cast[role_name])
+	ctx["role_relations"] = role_relations
+	return ctx
+
+func emit_scene_line(speaker: Variant, text: String) -> void:
+	if text.strip_edges() == "":
+		return
+	_last_speaker_id = String(speaker.player_id)
+	_last_emit_ms = Time.get_ticks_msec()
+	_emitted_count += 1
+	line_emitted.emit(String(speaker.nom), text, "guild")
+
+func expand_public(text: String, vars: Dictionary = {}) -> String:
+	return _expand(text, vars)
+
+func set_scene_active(value: bool) -> void:
+	scene_active = value
 
 # ==================== HANDLERS DE SIGNAUX ====================
 
@@ -453,6 +550,29 @@ func debug_count_pool(pool: String) -> int:
 		if _line_in_pool(line, pool):
 			c += 1
 	return c
+
+func get_scene_count() -> int:
+	return _scenes.size()
+
+func debug_get_scene(scene_id: String) -> Dictionary:
+	for sc in _scenes:
+		if String(sc.get("id", "")) == scene_id:
+			return sc
+	return {}
+
+func debug_play_scene(scene_id: String, subject: Variant = null, extra_vars: Dictionary = {}) -> bool:
+	## Joue une scène précise (ignore pool/cooldown/chance). Pour le menu debug.
+	var sc: Dictionary = debug_get_scene(scene_id)
+	if sc.is_empty() or _scene_runner == null:
+		return false
+	return _scene_runner.try_play_scene(sc, subject, extra_vars)
+
+func debug_play_scene_sync(scene_id: String, subject: Variant = null, extra_vars: Dictionary = {}) -> Array:
+	## Joue une scène SANS délais ni lock et renvoie le transcript [[role, texte], ...] (tests).
+	var sc: Dictionary = debug_get_scene(scene_id)
+	if sc.is_empty() or _scene_runner == null:
+		return []
+	return _scene_runner.debug_play_sync(sc, subject, extra_vars)
 
 func debug_explain_ambient(top_n: int = 5) -> Dictionary:
 	## Pour un locuteur plausible (le plus bavard tiré), renvoie le top-N des répliques

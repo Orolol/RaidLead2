@@ -84,6 +84,12 @@ static func read_axis(axis: String, param: Variant, ctx: Dictionary) -> Variant:
 			# Relation locuteur→sujet, résolue en amont par le ChatDirector (accès SocialDynamics)
 			# et passée dans ctx pour garder ce moteur pur. "" pour l'ambient (pas de sujet).
 			return String(ctx.get("relation", ""))
+		"relation_to_role":
+			# Relation candidat→rôle déjà casté (scènes). ctx["role_relations"] = {role: relation}.
+			var rr: Variant = ctx.get("role_relations", {})
+			if rr is Dictionary:
+				return String(rr.get(String(param), ""))
+			return ""
 		"context.event_magnitude":
 			return float(ctx.get("salience", 0.0))
 		"context.time_of_day":
