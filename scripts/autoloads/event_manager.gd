@@ -27,7 +27,7 @@ signal chain_started(chain_id: String, event: RandomEventResource)
 signal chain_continued(chain_id: String, event: RandomEventResource)
 signal chain_ended(chain_id: String)
 
-func _ready():
+func _ready() -> void:
 	GameLog.d("EventManager démarré")
 	# S'arrête automatiquement avec get_tree().paused
 	process_mode = PROCESS_MODE_PAUSABLE
@@ -35,32 +35,32 @@ func _ready():
 	_connect_time_signals()
 	_initialize_system()
 
-func _load_events():
+func _load_events() -> void:
 	event_pool = EventsDataResource.get_all_events()
 	GameLog.d("Événements chargés: %d" % event_pool.size())
 
-func _connect_time_signals():
+func _connect_time_signals() -> void:
 	var game_time = GameTime
 	if game_time:
 		game_time.hour_changed.connect(_on_hour_changed)
 		game_time.day_changed.connect(_on_day_changed)
 
-func _initialize_system():
+func _initialize_system() -> void:
 	var game_time = GameTime
 	if game_time:
 		last_check = game_time.get_current_timestamp()
 		last_day_count = game_time.current_day
 
-func _on_hour_changed(hour: int):
+func _on_hour_changed(hour: int) -> void:
 	if OS.is_debug_build(): print("EventManager: Vérification horaire (heure %d)" % hour)
 	_check_for_events()
 
-func _on_day_changed(day: int, _week: int, _year: int):
+func _on_day_changed(day: int, _week: int, _year: int) -> void:
 	GameLog.d("EventManager: Nouveau jour, réinitialisation du compteur d'événements")
 	events_today = 0
 	last_day_count = day
 
-func _check_for_events():
+func _check_for_events() -> void:
 	# Le process_mode PAUSABLE s'occupe automatiquement de la pause
 	if pending_event:
 		GameLog.d("EventManager: Événement en attente, pas de nouveau tirage")
@@ -87,52 +87,52 @@ func _should_trigger_event(_delta_hours: float) -> bool:
 	if events_today >= daily_event_target:
 		GameLog.d("EventManager: Quota d'événements atteint pour aujourd'hui")
 		return false
-	
+
 	# Calculer la probabilité ajustée basée sur les événements restants dans la journée
-	var hours_remaining = 24 - (events_today * (24.0 / daily_event_target))
+	var hours_remaining: float = 24 - (events_today * (24.0 / daily_event_target))
 	if hours_remaining <= 0:
 		return false
-	
+
 	# Probabilité de base ajustée
-	var base_probability = daily_event_target / 24.0  # Probabilité par heure
-	var adjusted_probability = base_probability * (24.0 / hours_remaining)
-	
+	var base_probability: float = daily_event_target / 24.0  # Probabilité par heure
+	var adjusted_probability: float = base_probability * (24.0 / hours_remaining)
+
 	# Appliquer la probabilité
-	var random_roll = randf()
+	var random_roll: float = randf()
 	if OS.is_debug_build(): print("EventManager: Roll probabilité: %.3f vs %.3f" % [random_roll, adjusted_probability])
 	
 	return random_roll < adjusted_probability
 
 func _select_event():
-	var eligible_events = []
-	var game_state = _get_game_state()
-	
+	var eligible_events: Array = []
+	var game_state: Dictionary = _get_game_state()
+
 	# Filtrer les événements éligibles
 	for event in event_pool:
 		if _is_event_eligible(event, game_state):
 			eligible_events.append(event)
-	
+
 	if eligible_events.is_empty():
 		GameLog.d("EventManager: Aucun événement éligible trouvé")
 		return null
-	
+
 	# Sélection pondérée basée sur MTTH et poids
-	var weighted_events = []
-	var total_weight = 0.0
-	
+	var weighted_events: Array = []
+	var total_weight: float = 0.0
+
 	for event in eligible_events:
-		var weight = _calculate_event_weight(event)
+		var weight: float = _calculate_event_weight(event)
 		weighted_events.append({"event": event, "weight": weight})
 		total_weight += weight
-	
+
 	if total_weight <= 0:
 		GameLog.d("EventManager: Poids total nul")
 		return null
-	
+
 	# Tirage aléatoire pondéré
-	var random_value = randf() * total_weight
-	var cumulative_weight = 0.0
-	
+	var random_value: float = randf() * total_weight
+	var cumulative_weight: float = 0.0
+
 	for weighted_event in weighted_events:
 		cumulative_weight += weighted_event.weight
 		if random_value <= cumulative_weight:
@@ -170,23 +170,23 @@ func _is_event_eligible(event: RandomEventResource, game_state: Dictionary) -> b
 func _calculate_event_weight(event: RandomEventResource) -> float:
 	var base_weight = event.weight
 	var history = event_history.get(event.id, {"last_triggered": 0.0, "occurrence_count": 0})
-	
+
 	# Réduire le poids des événements récemment déclenchés
 	var game_time = GameTime
-	var time_since_last = (game_time.get_current_timestamp() - history.last_triggered) / 3600.0
-	
+	var time_since_last: float = (game_time.get_current_timestamp() - history.last_triggered) / 3600.0
+
 	if time_since_last < 24.0:  # Moins de 24h
 		base_weight *= 0.1
 	elif time_since_last < 168.0:  # Moins d'une semaine
 		base_weight *= 0.5
-	
+
 	# Ajuster selon MTTH
-	var mtth_factor = min(1.0, time_since_last / event.mtth)
+	var mtth_factor: float = min(1.0, time_since_last / event.mtth)
 	base_weight *= mtth_factor
-	
+
 	return base_weight
 
-func _trigger_event(event: RandomEventResource):
+func _trigger_event(event: RandomEventResource) -> void:
 	GameLog.d("EventManager: Déclenchement de l'événement: %s" % event.title)
 	GameLog.d("EventManager: ID de l'événement: %s" % event.id)
 	
@@ -270,27 +270,27 @@ func dismiss_event() -> void:
 		return
 	resolve_event(pending_event, null)
 
-func _trigger_follow_up_event(event: RandomEventResource, timer: Timer):
+func _trigger_follow_up_event(event: RandomEventResource, timer: Timer) -> void:
 	timer.queue_free()
 	pending_event = event
 	_trigger_event(event)
 
-func _apply_consequences(consequences: Dictionary):
+func _apply_consequences(consequences: Dictionary) -> void:
 	var guild_manager = GuildManager
 	var effect_system = EffectSystem
-	
+
 	if not guild_manager:
 		GameLog.d("EventManager: GuildManager non trouvé")
 		return
-	
+
 	# Appliquer les conséquences immédiates
-	var immediate = consequences.get("immediate", {})
+	var immediate: Dictionary = consequences.get("immediate", {})
 	for stat in immediate:
 		var value = immediate[stat]
 		_apply_stat_change(stat, value, guild_manager)
-	
+
 	# Appliquer les effets
-	var effects = consequences.get("effects", [])
+	var effects: Array = consequences.get("effects", [])
 	if effect_system:
 		for effect in effects:
 			if effect.target_type == EffectResource.TargetType.GUILD and guild_manager.guild:
@@ -306,7 +306,7 @@ func _apply_consequences(consequences: Dictionary):
 			var value = random_consequence[stat]
 			_apply_stat_change(stat, value, guild_manager)
 
-func _apply_stat_change(stat: String, value, guild_manager):
+func _apply_stat_change(stat: String, value, guild_manager) -> void:
 	match stat:
 		"guild_xp":
 			if guild_manager.guild:
@@ -351,9 +351,9 @@ func _find_event_by_id(event_id: String):
 func _get_game_state() -> Dictionary:
 	var guild_manager = GuildManager
 	var game_time = GameTime
-	
-	var state = {}
-	
+
+	var state: Dictionary = {}
+
 	if guild_manager and guild_manager.guild:
 		state["guild_level"] = guild_manager.guild.get_level()
 		state["guild_xp"] = guild_manager.guild.xp

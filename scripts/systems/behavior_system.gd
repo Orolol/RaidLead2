@@ -25,10 +25,10 @@ func forget_player(player) -> void:
 	player_scheduled_times.erase(player)
 	connection_probability_cache.erase(player)
 
-func _ready():
+func _ready() -> void:
 	game_time = GameTime
 	guild_manager = GuildManager
-	
+
 	# Le social_dynamics sera créé après
 	call_deferred("_init_social_dynamics")
 	
@@ -38,14 +38,14 @@ func _ready():
 		game_time.hour_changed.connect(_on_hour_changed)
 		game_time.day_changed.connect(_on_day_changed)
 
-func _init_social_dynamics():
+func _init_social_dynamics() -> void:
 	var social_dynamics_script = load("res://scripts/systems/social_dynamics.gd")
 	social_dynamics = Node.new()
 	social_dynamics.set_script(social_dynamics_script)
 	social_dynamics.name = "SocialDynamics"
 	add_child(social_dynamics)
 
-func _on_minute_changed(minute: int, _hour: int):
+func _on_minute_changed(minute: int, _hour: int) -> void:
 	"""Appelé chaque minute pour des comportements plus granulaires"""
 	
 	# Vérifier seulement toutes les 5 minutes pour optimiser les performances
@@ -59,7 +59,7 @@ func _on_minute_changed(minute: int, _hour: int):
 	if randf() < 0.1:  # 10% de chance toutes les 5 minutes
 		_check_spontaneous_events()
 
-func _on_hour_changed(hour: int):
+func _on_hour_changed(hour: int) -> void:
 	# Vider le cache chaque heure
 	if hour != last_cache_update:
 		connection_probability_cache.clear()
@@ -71,7 +71,7 @@ func _on_hour_changed(hour: int):
 	# Vérifier les événements personnels
 	_check_personal_events()
 
-func _on_day_changed(_day: int, _week: int, _year: int):
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	# Réinitialiser certains compteurs quotidiens
 	for member in guild_manager.guild_members:
 		# Réinitialiser le flag d'événement quotidien
@@ -241,7 +241,7 @@ func get_activity_preference(player, activity_type: String) -> float:
 	
 	return clamp(base_pref, 0.1, 2.0)
 
-func update_activity_preference(player, activity_type: String, experience_quality: float):
+func update_activity_preference(player, activity_type: String, experience_quality: float) -> void:
 	"""Met à jour les préférences selon l'expérience (quality: -1 à 1)"""
 	
 	if player.activity_preferences == null or player.activity_preferences.is_empty():
@@ -290,7 +290,7 @@ func apply_circadian_modifier(player, hour: int) -> float:
 	
 	return 1.0
 
-func trigger_personal_event(player, event_type: String):
+func trigger_personal_event(player, event_type: String) -> void:
 	"""Déclenche un événement personnel pour un joueur"""
 
 	var event = PersonalEventsScript.get_event(event_type)
@@ -341,7 +341,7 @@ func trigger_personal_event(player, event_type: String):
 		"day": _absolute_day()
 	})
 
-func update_burnout_level(player):
+func update_burnout_level(player) -> void:
 	"""Met à jour le niveau de burnout selon la fatigue accumulée"""
 	
 	var fatigue = player.fatigue_accumulated if player.fatigue_accumulated != null else 0
@@ -375,7 +375,7 @@ func update_burnout_level(player):
 				player.energy = min(player.energy, 50)
 				# Risque de départ augmenté (géré ailleurs)
 
-func add_fatigue(player, amount: float):
+func add_fatigue(player, amount: float) -> void:
 	"""Ajoute de la fatigue à un joueur"""
 	
 	var old_fatigue = player.fatigue_accumulated if player.fatigue_accumulated != null else 0
@@ -384,7 +384,7 @@ func add_fatigue(player, amount: float):
 	# Vérifier si le niveau de burnout change
 	update_burnout_level(player)
 
-func recover_fatigue(player, amount: float):
+func recover_fatigue(player, amount: float) -> void:
 	"""Réduit la fatigue d'un joueur"""
 	
 	var current_fatigue = player.fatigue_accumulated if player.fatigue_accumulated != null else 0
@@ -446,7 +446,7 @@ func _should_disconnect_by_schedule(player) -> bool:
 	
 	return not in_schedule
 
-func _update_fatigue_levels():
+func _update_fatigue_levels() -> void:
 	"""Met à jour la fatigue de tous les membres"""
 	
 	for member in guild_manager.guild_members:
@@ -475,7 +475,7 @@ func _update_fatigue_levels():
 				else:
 					recover_fatigue(member, abs(fatigue_rate))
 
-func _check_personal_events():
+func _check_personal_events() -> void:
 	"""Vérifie et déclenche les événements personnels"""
 	
 	for member in guild_manager.guild_members:
@@ -593,7 +593,7 @@ func _is_member_absent_today(member) -> bool:
 			return true
 	return false
 
-func _check_scheduled_connections():
+func _check_scheduled_connections() -> void:
 	"""Vérifie et exécute les connexions/déconnexions planifiées"""
 
 	var current_time = game_time.current_hour * 60 + game_time.current_minute
@@ -647,7 +647,7 @@ func _check_scheduled_connections():
 					behavior_changed.emit(member, "scheduled_disconnection")
 					_schedule_next_connection_time(member)
 
-func _schedule_next_connection_time(member):
+func _schedule_next_connection_time(member) -> void:
 	"""Planifie la prochaine heure de connexion avec variance"""
 	
 	var day_name = game_time.get_day_name().to_lower()
@@ -687,7 +687,7 @@ func _schedule_next_connection_time(member):
 			player_scheduled_times[member] = {}
 		player_scheduled_times[member]["next_connection"] = scheduled_time % (24 * 60)
 
-func _schedule_next_disconnection_time(member):
+func _schedule_next_disconnection_time(member) -> void:
 	"""Planifie la prochaine heure de déconnexion avec variance"""
 	
 	if not member.is_online:
@@ -737,7 +737,7 @@ func _schedule_next_disconnection_time(member):
 		player_scheduled_times[member] = {}
 	player_scheduled_times[member]["next_disconnection"] = disconnection_time % (24 * 60)
 
-func _check_spontaneous_events():
+func _check_spontaneous_events() -> void:
 	"""Vérifie les événements spontanés (connexions/déconnexions imprévues)"""
 	
 	for member in guild_manager.guild_members:

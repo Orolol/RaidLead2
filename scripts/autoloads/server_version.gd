@@ -67,18 +67,18 @@ var current_version: float = 1.0
 var server_start_date: Dictionary = {}
 var days_since_launch: int = 0
 
-func _ready():
+func _ready() -> void:
 	# Se connecter au signal de changement de jour de GameTime
 	if GameTime:
 		GameTime.day_changed.connect(_on_day_changed)
-	
+
 	# Initialiser la date de lancement du serveur
 	_initialize_server_launch_date()
-	
+
 	# Vérifier la version actuelle
 	_check_version_update()
 
-func _initialize_server_launch_date():
+func _initialize_server_launch_date() -> void:
 	"""Initialise la date de lancement du serveur avec la date actuelle de GameTime"""
 	if GameTime:
 		server_start_date = {
@@ -88,76 +88,76 @@ func _initialize_server_launch_date():
 		}
 		days_since_launch = 0
 
-func _on_day_changed(_day: int, _week: int, _year: int):
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	"""Appelé à chaque changement de jour pour calculer la progression"""
 	_calculate_days_since_launch()
 	_check_version_update()
 
-func _calculate_days_since_launch():
+func _calculate_days_since_launch() -> void:
 	"""Calcule le nombre de jours écoulés depuis le lancement du serveur"""
 	if not GameTime:
 		return
-	
-	var current_total_days = _get_total_days(GameTime.current_day, GameTime.current_week, GameTime.current_year)
-	var launch_total_days = _get_total_days(server_start_date.day, server_start_date.week, server_start_date.year)
-	
+
+	var current_total_days: int = _get_total_days(GameTime.current_day, GameTime.current_week, GameTime.current_year)
+	var launch_total_days: int = _get_total_days(server_start_date.day, server_start_date.week, server_start_date.year)
+
 	days_since_launch = current_total_days - launch_total_days
 
 func _get_total_days(day: int, week: int, year: int) -> int:
 	"""Convertit une date en nombre total de jours depuis l'année 1"""
 	return (year - 1) * GameTime.WEEKS_PER_YEAR * GameTime.DAYS_PER_WEEK + (week - 1) * GameTime.DAYS_PER_WEEK + (day - 1)
 
-func _check_version_update():
+func _check_version_update() -> void:
 	"""Vérifie si une mise à jour de version doit être déclenchée"""
-	var target_version = _get_target_version_for_days(days_since_launch)
-	
+	var target_version: float = _get_target_version_for_days(days_since_launch)
+
 	if target_version > current_version:
-		var old_version = current_version
+		var old_version: float = current_version
 		current_version = target_version
-		
-		var version_info = VERSION_DATA[current_version]
+
+		var version_info: Dictionary = VERSION_DATA[current_version]
 		version_updated.emit(current_version, version_info.name)
-		
+
 		# Émettre les signaux de contenu débloqué
 		_emit_content_unlocked_signals(old_version, current_version)
-		
+
 		GameLog.d("Serveur mis à jour vers la version %s: %s" % [current_version, version_info.name])
 
 func _get_target_version_for_days(days: int) -> float:
 	"""Retourne la version du serveur correspondant au nombre de jours écoulés"""
-	var target_version = 1.0
-	
+	var target_version: float = 1.0
+
 	for version in VERSION_DATA:
-		var version_info = VERSION_DATA[version]
+		var version_info: Dictionary = VERSION_DATA[version]
 		if days >= version_info.days_to_unlock:
 			target_version = version
-	
+
 	return target_version
 
-func _emit_content_unlocked_signals(old_version: float, new_version: float):
+func _emit_content_unlocked_signals(old_version: float, new_version: float) -> void:
 	"""Émet les signaux pour le nouveau contenu débloqué"""
-	var old_data = VERSION_DATA.get(old_version, {})
-	var new_data = VERSION_DATA[new_version]
-	
+	var old_data: Dictionary = VERSION_DATA.get(old_version, {})
+	var new_data: Dictionary = VERSION_DATA[new_version]
+
 	# Nouveaux donjons
-	var old_dungeons = old_data.get("available_dungeons", [])
-	var new_dungeons = new_data.get("available_dungeons", [])
-	var unlocked_dungeons = []
+	var old_dungeons: Array = old_data.get("available_dungeons", [])
+	var new_dungeons: Array = new_data.get("available_dungeons", [])
+	var unlocked_dungeons: Array = []
 	for dungeon in new_dungeons:
 		if not dungeon in old_dungeons:
 			unlocked_dungeons.append(dungeon)
-	
+
 	if unlocked_dungeons.size() > 0:
 		content_unlocked.emit("dungeons", unlocked_dungeons)
-	
+
 	# Nouveaux raids
-	var old_raids = old_data.get("available_raids", [])
-	var new_raids = new_data.get("available_raids", [])
-	var unlocked_raids = []
+	var old_raids: Array = old_data.get("available_raids", [])
+	var new_raids: Array = new_data.get("available_raids", [])
+	var unlocked_raids: Array = []
 	for raid in new_raids:
 		if not raid in old_raids:
 			unlocked_raids.append(raid)
-	
+
 	if unlocked_raids.size() > 0:
 		content_unlocked.emit("raids", unlocked_raids)
 
@@ -193,7 +193,7 @@ func get_available_raids() -> Array:
 
 func is_feature_available(feature: String) -> bool:
 	"""Vérifie si une fonctionnalité est disponible dans la version actuelle"""
-	var features = get_current_version_info().get("features", [])
+	var features: Array = get_current_version_info().get("features", [])
 	return feature in features
 
 func is_instance_available(instance_id: String) -> bool:
@@ -203,10 +203,10 @@ func is_instance_available(instance_id: String) -> bool:
 func get_days_until_next_version() -> int:
 	"""Retourne le nombre de jours avant la prochaine mise à jour (-1 si aucune)"""
 	var next_version = null
-	var next_days = -1
-	
+	var next_days: int = -1
+
 	for version in VERSION_DATA:
-		var version_info = VERSION_DATA[version]
+		var version_info: Dictionary = VERSION_DATA[version]
 		if version > current_version:
 			if next_version == null or version < next_version:
 				next_version = version
@@ -241,7 +241,7 @@ func save_server_data() -> Dictionary:
 		"days_since_launch": days_since_launch
 	}
 
-func load_server_data(data: Dictionary):
+func load_server_data(data: Dictionary) -> void:
 	"""Charge l'état du serveur"""
 	current_version = data.get("current_version", 1.0)
 	server_start_date = data.get("server_start_date", {})
@@ -253,20 +253,20 @@ func load_server_data(data: Dictionary):
 
 # Fonctions utilitaires pour le debug
 
-func force_version_update(target_version: float):
+func force_version_update(target_version: float) -> void:
 	"""Force une mise à jour vers une version spécifique (debug uniquement)"""
 	if target_version in VERSION_DATA and target_version != current_version:
-		var old_version = current_version
+		var old_version: float = current_version
 		current_version = target_version
-		
-		var version_info = VERSION_DATA[current_version]
+
+		var version_info: Dictionary = VERSION_DATA[current_version]
 		version_updated.emit(current_version, version_info.name)
 		_emit_content_unlocked_signals(old_version, current_version)
-		
+
 		GameLog.d("Version forcée vers %s: %s" % [current_version, version_info.name])
 
 func get_all_versions() -> Array:
 	"""Retourne toutes les versions disponibles (debug)"""
-	var versions = VERSION_DATA.keys()
+	var versions: Array = VERSION_DATA.keys()
 	versions.sort()
 	return versions

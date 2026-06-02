@@ -186,7 +186,7 @@ func participate(tournament) -> Dictionary:
 # --- Accesseurs ---
 
 func _notify_tournament_blocked(msg: String) -> void:
-	var nm = NotificationManager
+	var nm: Node = NotificationManager
 	if nm and nm.has_method("show_warning"):
 		nm.show_warning(msg, "Tournoi")
 

@@ -51,17 +51,17 @@ class Clique:
 	var cohesion: float = 0.5
 	var preferred_activities: Array = []
 
-func _ready():
+func _ready() -> void:
 	var game_time = GameTime
 	if game_time:
 		game_time.day_changed.connect(_on_day_changed)
 		game_time.week_changed.connect(_on_week_changed)
 
-func _on_day_changed(_day: int, _week: int, _year: int):
+func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	_decay_relationships()
 	_check_clique_cohesion()
 
-func _on_week_changed(_week: int, _year: int):
+func _on_week_changed(_week: int, _year: int) -> void:
 	_evaluate_clique_formations()
 
 # Gestion des relations
@@ -73,7 +73,7 @@ func get_relationship(player1, player2) -> RelationshipData:
 		return relationships[key]
 	return null
 
-func form_relationship(player1, player2, type: int, initial_strength: float = 0.3):
+func form_relationship(player1, player2, type: int, initial_strength: float = 0.3) -> void:
 	"""Forme une nouvelle relation entre deux joueurs"""
 	
 	if player1 == player2:
@@ -105,7 +105,7 @@ func form_relationship(player1, player2, type: int, initial_strength: float = 0.
 	# Invalider le cache
 	_invalidate_cache()
 
-func strengthen_relationship(player1, player2, amount: float = 0.1):
+func strengthen_relationship(player1, player2, amount: float = 0.1) -> void:
 	"""Renforce une relation existante"""
 	var rel = get_relationship(player1, player2)
 	if rel:
@@ -113,7 +113,7 @@ func strengthen_relationship(player1, player2, amount: float = 0.1):
 		rel.last_interaction_day = _get_current_day()
 		_add_interaction_history(rel, "strengthen", amount)
 
-func weaken_relationship(player1, player2, amount: float = 0.1):
+func weaken_relationship(player1, player2, amount: float = 0.1) -> void:
 	"""Affaiblit une relation existante"""
 	var rel = get_relationship(player1, player2)
 	if rel:
@@ -125,7 +125,7 @@ func weaken_relationship(player1, player2, amount: float = 0.1):
 		if rel.strength < 0.1:
 			break_relationship(player1, player2)
 
-func break_relationship(player1, player2):
+func break_relationship(player1, player2) -> void:
 	"""Brise une relation entre deux joueurs"""
 	var key = _get_relationship_key(player1, player2)
 	if relationships.has(key):
@@ -134,7 +134,7 @@ func break_relationship(player1, player2):
 		relationship_broken.emit(player1, player2)
 		_invalidate_cache()
 
-func transform_relationship(player1, player2, new_type: int):
+func transform_relationship(player1, player2, new_type: int) -> void:
 	"""Transforme une relation en un autre type"""
 	var rel = get_relationship(player1, player2)
 	if rel:
@@ -213,7 +213,7 @@ func are_rivals(player1, player2) -> bool:
 
 # Gestion des cliques
 
-func form_clique(members: Array, player_name: String = ""):
+func form_clique(members: Array, player_name: String = "") -> void:
 	"""Forme une nouvelle clique"""
 
 	if members.size() < 3:
@@ -260,7 +260,7 @@ func is_in_same_clique(player1, player2) -> bool:
 			return true
 	return false
 
-func update_clique_cohesion(clique: Clique, delta: float):
+func update_clique_cohesion(clique: Clique, delta: float) -> void:
 	"""Met à jour la cohésion d'une clique"""
 	clique.cohesion = clamp(clique.cohesion + delta, 0.0, 1.0)
 	
@@ -268,7 +268,7 @@ func update_clique_cohesion(clique: Clique, delta: float):
 	if clique.cohesion < 0.2:
 		dissolve_clique(clique)
 
-func dissolve_clique(clique: Clique):
+func dissolve_clique(clique: Clique) -> void:
 	"""Dissout une clique"""
 	
 	# Affaiblir les relations entre membres
@@ -280,7 +280,7 @@ func dissolve_clique(clique: Clique):
 
 # Conflits sociaux
 
-func trigger_social_conflict(player1, player2, reason: String):
+func trigger_social_conflict(player1, player2, reason: String) -> void:
 	"""Déclenche un conflit social entre deux joueurs"""
 	
 	social_conflict.emit(player1, player2, reason)
@@ -444,7 +444,7 @@ func _get_current_day() -> int:
 		return game_time.current_day
 	return 0
 
-func _add_interaction_history(rel: RelationshipData, interaction_type: String, value):
+func _add_interaction_history(rel: RelationshipData, interaction_type: String, value) -> void:
 	"""Ajoute une interaction à l'historique"""
 	rel.history.append({
 		"type": interaction_type,
@@ -456,7 +456,7 @@ func _add_interaction_history(rel: RelationshipData, interaction_type: String, v
 	if rel.history.size() > 50:
 		rel.history.pop_front()
 
-func _decay_relationships():
+func _decay_relationships() -> void:
 	"""Fait décroître les relations non entretenues"""
 	var current_day = _get_current_day()
 	
@@ -477,7 +477,7 @@ func _decay_relationships():
 				if player1 and player2:
 					break_relationship(player1, player2)
 
-func _check_clique_cohesion():
+func _check_clique_cohesion() -> void:
 	"""Vérifie la cohésion des cliques"""
 	for clique in cliques:
 		var total_strength = 0.0
@@ -496,7 +496,7 @@ func _check_clique_cohesion():
 			var new_cohesion = avg_strength * 0.8 + clique.cohesion * 0.2
 			update_clique_cohesion(clique, new_cohesion - clique.cohesion)
 
-func _evaluate_clique_formations():
+func _evaluate_clique_formations() -> void:
 	"""Évalue si de nouvelles cliques peuvent se former"""
 	var guild_manager = GuildManager
 	if not guild_manager:
@@ -545,7 +545,7 @@ func _generate_clique_name() -> String:
 	
 	return prefixes[randi() % prefixes.size()] + " " + suffixes[randi() % suffixes.size()]
 
-func _invalidate_cache():
+func _invalidate_cache() -> void:
 	"""Invalide le cache du graphe social"""
 	social_graph_cache.clear()
 

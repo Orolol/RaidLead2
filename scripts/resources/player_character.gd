@@ -339,7 +339,7 @@ func _get_activity_breakdown() -> Dictionary:
 
 func gain_experience(amount: int) -> void:
 	"""Override pour tracker l'XP de session"""
-	var old_level = personnage_niveau
+	var old_level: int = personnage_niveau
 	super.gain_experience(amount)
 	
 	# Tracker les gains de session
@@ -350,7 +350,7 @@ func gain_experience(amount: int) -> void:
 		mood = min(100.0, mood + 10.0)
 		print("LEVEL UP! %s est maintenant niveau %d" % [nom, personnage_niveau])
 
-func add_session_gold(amount: int):
+func add_session_gold(amount: int) -> void:
 	"""Ajoute de l'or gagné durant la session"""
 	session_gold_gained += amount
 	or_actuel += amount
