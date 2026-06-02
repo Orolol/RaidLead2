@@ -19,15 +19,15 @@ var guild_ranking: Node
 signal player_recruited(player)
 signal close_requested
 
-func _ready():
+func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(900, 600)
-	
+
 	# Récupère les références aux autoloads
 	guild_manager = GuildManager
 	guild_ranking = GuildRanking
 
-	var vbox = VBoxContainer.new()
+	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 10)
 	add_child(vbox)
 
@@ -53,10 +53,10 @@ func _on_header_drag(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and _drag_active:
 		position += event.relative
 
-func _setup_header(parent: VBoxContainer):
-	var header = HBoxContainer.new()
+func _setup_header(parent: VBoxContainer) -> void:
+	var header: HBoxContainer = HBoxContainer.new()
 	parent.add_child(header)
-	
+
 	title_label = Label.new()
 	title_label.text = "Vue du Monde"
 	title_label.add_theme_font_size_override("font_size", 20)
@@ -74,18 +74,18 @@ func _setup_header(parent: VBoxContainer):
 	close_button.pressed.connect(_on_close_pressed)
 	header.add_child(close_button)
 
-func _setup_content(parent: VBoxContainer):
+func _setup_content(parent: VBoxContainer) -> void:
 	advanced_tabs = AdvancedTabs.create_simple_tabs(parent)
-	
+
 	_setup_guild_ranking_tab()
 	_setup_recruitment_tab()
 
-func _setup_guild_ranking_tab():
-	var ranking_panel = PanelContainer.new()
+func _setup_guild_ranking_tab() -> void:
+	var ranking_panel: PanelContainer = PanelContainer.new()
 	ranking_panel.name = "Classement Guildes"
 	advanced_tabs.add_tab("Classement Guildes", ranking_panel, false)
-	
-	var main_split = HSplitContainer.new()
+
+	var main_split: HSplitContainer = HSplitContainer.new()
 	main_split.split_offset = 600
 	ranking_panel.add_child(main_split)
 	
@@ -95,24 +95,24 @@ func _setup_guild_ranking_tab():
 	# Côté droit : Détails de la guilde sélectionnée
 	_setup_guild_details_section(main_split)
 
-func _setup_guild_list_section(parent: HSplitContainer):
+func _setup_guild_list_section(parent: HSplitContainer) -> void:
 	"""Configure la section de liste des guildes"""
-	var left_vbox = VBoxContainer.new()
+	var left_vbox: VBoxContainer = VBoxContainer.new()
 	left_vbox.add_theme_constant_override("separation", 10)
 	parent.add_child(left_vbox)
-	
+
 	# Header avec phase actuelle et contrôles
-	var header_container = HBoxContainer.new()
+	var header_container: HBoxContainer = HBoxContainer.new()
 	left_vbox.add_child(header_container)
-	
-	var header_label = Label.new()
+
+	var header_label: Label = Label.new()
 	header_label.text = "🏆 Classement des Guildes"
 	header_label.add_theme_font_size_override("font_size", 18)
 	header_container.add_child(header_label)
-	
+
 	header_container.add_spacer(false)
-	
-	var phase_label = Label.new()
+
+	var phase_label: Label = Label.new()
 	var phase_manager = PhaseManager
 	if phase_manager:
 		phase_label.text = "Phase: %s" % phase_manager.get_phase_name(phase_manager.get_current_phase())
@@ -121,27 +121,27 @@ func _setup_guild_list_section(parent: HSplitContainer):
 	phase_label.add_theme_font_size_override("font_size", 14)
 	phase_label.modulate = Color(0.8, 0.8, 1.0)
 	header_container.add_child(phase_label)
-	
+
 	# Informations sur notre position avec style amélioré
-	var our_position_container = PanelContainer.new()
+	var our_position_container: PanelContainer = PanelContainer.new()
 	our_position_container.add_theme_stylebox_override("panel", _create_highlight_style())
 	left_vbox.add_child(our_position_container)
-	
-	var our_position_label = Label.new()
+
+	var our_position_label: Label = Label.new()
 	our_position_label.name = "OurPositionLabel"
 	our_position_label.add_theme_font_size_override("font_size", 16)
 	our_position_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	our_position_container.add_child(our_position_label)
-	
+
 	# Contrôles d'affichage
-	var controls_container = HBoxContainer.new()
+	var controls_container: HBoxContainer = HBoxContainer.new()
 	left_vbox.add_child(controls_container)
-	
-	var view_mode_label = Label.new()
+
+	var view_mode_label: Label = Label.new()
 	view_mode_label.text = "Affichage:"
 	controls_container.add_child(view_mode_label)
-	
-	var view_mode_option = OptionButton.new()
+
+	var view_mode_option: OptionButton = OptionButton.new()
 	view_mode_option.name = "ViewModeOption"
 	view_mode_option.add_item("Complet")
 	view_mode_option.add_item("Top 10")
@@ -149,11 +149,11 @@ func _setup_guild_list_section(parent: HSplitContainer):
 	view_mode_option.selected = 0
 	view_mode_option.item_selected.connect(_on_view_mode_changed)
 	controls_container.add_child(view_mode_option)
-	
+
 	controls_container.add_spacer(false)
-	
+
 	# Bouton pour rafraîchir
-	var refresh_button = Button.new()
+	var refresh_button: Button = Button.new()
 	refresh_button.text = "🔄 Actualiser"
 	refresh_button.pressed.connect(_on_refresh_ranking_pressed)
 	controls_container.add_child(refresh_button)
@@ -165,32 +165,32 @@ func _setup_guild_list_section(parent: HSplitContainer):
 	guild_ranking_list.allow_reselect = true
 	left_vbox.add_child(guild_ranking_list)
 
-func _setup_guild_details_section(parent: HSplitContainer):
+func _setup_guild_details_section(parent: HSplitContainer) -> void:
 	"""Configure la section de détails des guildes"""
-	var details_container = VBoxContainer.new()
+	var details_container: VBoxContainer = VBoxContainer.new()
 	details_container.add_theme_constant_override("separation", 10)
 	details_container.name = "GuildDetailsContainer"
 	parent.add_child(details_container)
-	
+
 	# Titre de la section
-	var details_title = Label.new()
+	var details_title: Label = Label.new()
 	details_title.text = "📊 Détails de la Guilde"
 	details_title.add_theme_font_size_override("font_size", 16)
 	details_title.name = "DetailsTitle"
 	details_container.add_child(details_title)
-	
+
 	# Container pour le contenu des détails
-	var content_scroll = ScrollContainer.new()
+	var content_scroll: ScrollContainer = ScrollContainer.new()
 	content_scroll.custom_minimum_size = Vector2(380, 500)
 	details_container.add_child(content_scroll)
-	
-	var details_content = VBoxContainer.new()
+
+	var details_content: VBoxContainer = VBoxContainer.new()
 	details_content.add_theme_constant_override("separation", 15)
 	details_content.name = "DetailsContent"
 	content_scroll.add_child(details_content)
-	
+
 	# Message initial
-	var initial_message = Label.new()
+	var initial_message: Label = Label.new()
 	initial_message.text = "Sélectionnez une guilde dans la liste\npour voir ses détails complets"
 	initial_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	initial_message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -217,14 +217,14 @@ func _create_highlight_style() -> StyleBox:
 	style.content_margin_right = 10
 	return style
 
-func _setup_recruitment_tab():
+func _setup_recruitment_tab() -> void:
 	var panel := RecruitmentPanelScript.new()
 	advanced_tabs.add_tab("Recrutement", panel, false)
 	recruitment_panel = panel
 	# Réémet le signal du panel pour que main.gd (branché sur la fenêtre) reste informé.
 	panel.player_recruited.connect(func(p): player_recruited.emit(p))
 
-func _generate_competing_guilds():
+func _generate_competing_guilds() -> void:
 	# Cette fonction ne génère plus les guildes - elles sont maintenant gérées par le système IA
 	# On force juste une mise à jour du classement
 	if guild_ranking:
@@ -282,19 +282,19 @@ func refresh_window() -> void:
 	if recruitment_panel:
 		recruitment_panel.refresh()
 
-func _refresh_guild_ranking():
+func _refresh_guild_ranking() -> void:
 	guild_ranking_list.clear()
-	
+
 	# Récupérer les rankings depuis le système GuildRanking
 	var rankings = []
 	if guild_ranking:
 		rankings = guild_ranking.get_current_rankings()
-	
+
 	# Si pas de données du système de ranking, utiliser un fallback
 	if rankings.is_empty():
 		_setup_fallback_ranking()
 		return
-	
+
 	# Afficher les rankings
 	for guild_data in rankings:
 		var rank = guild_data.get("position", 1)
@@ -304,7 +304,7 @@ func _refresh_guild_ranking():
 		var is_player = guild_data.get("is_player", false)
 
 		# Icône de changement de rang
-		var rank_icon = ""
+		var rank_icon: String = ""
 		if rank_change > 0:
 			rank_icon = "▲"
 		elif rank_change < 0:
@@ -313,7 +313,7 @@ func _refresh_guild_ranking():
 			rank_icon = "▬"
 
 		# Couleur selon si c'est notre guilde
-		var text = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, guild_name, score]
+		var text: String = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, guild_name, score]
 		if is_player:
 			text += " ⭐"
 
@@ -326,7 +326,7 @@ func _refresh_guild_ranking():
 	# Mettre à jour les informations sur notre position
 	_update_our_position_info()
 
-func _setup_fallback_ranking():
+func _setup_fallback_ranking() -> void:
 	"""Setup de ranking basique si le système principal n'est pas disponible"""
 	var fallback_guilds = [
 		{"name": "Les Vengeurs d'Azeroth", "score": 850.0},
@@ -351,17 +351,17 @@ func _setup_fallback_ranking():
 	# Afficher
 	for i in range(fallback_guilds.size()):
 		var guild = fallback_guilds[i]
-		var rank = i + 1
-		var text = "#%d - %s (Score: %.0f)" % [rank, guild.name, guild.score]
+		var rank: int = i + 1
+		var text: String = "#%d - %s (Score: %.0f)" % [rank, guild.name, guild.score]
 		if guild.get("is_player", false):
 			text += " ⭐"
-		
+
 		guild_ranking_list.add_item(text)
 		
 		if guild.get("is_player", false):
 			guild_ranking_list.set_item_custom_bg_color(guild_ranking_list.get_item_count() - 1, Color(0.2, 0.3, 0.5, 0.3))
 
-func _update_our_position_info():
+func _update_our_position_info() -> void:
 	"""Met à jour les informations sur notre position dans le classement"""
 	var position_label = null
 	
@@ -378,8 +378,8 @@ func _update_our_position_info():
 	
 	if not position_label:
 		return
-		
-	var our_position = -1
+
+	var our_position: int = -1
 	if guild_ranking and guild_manager and guild_manager.guild:
 		our_position = guild_ranking.get_player_guild_position()
 	
@@ -399,16 +399,16 @@ func _update_our_position_info():
 
 # Nouveaux callbacks pour le système de ranking
 
-func _on_ranking_updated(_rankings: Array):
+func _on_ranking_updated(_rankings: Array) -> void:
 	"""Appelé quand le classement est mis à jour"""
 	if visible and advanced_tabs and advanced_tabs.get_current_tab_index() == 0:  # Si on est sur l'onglet classement
 		_refresh_guild_ranking()
 
-func _on_guild_position_changed(guild_name: String, old_position: int, new_position: int):
+func _on_guild_position_changed(guild_name: String, old_position: int, new_position: int) -> void:
 	"""Appelé quand une guilde change de position"""
 	if guild_manager and guild_manager.guild and guild_name == guild_manager.guild.name:
 		# C'est notre guilde qui a changé de position
-		var change_text = ""
+		var change_text: String = ""
 		if new_position < old_position:
 			change_text = "📈 Notre guilde monte au classement ! #%d → #%d" % [old_position, new_position]
 		else:
@@ -421,9 +421,9 @@ func _on_guild_position_changed(guild_name: String, old_position: int, new_posit
 	if visible and advanced_tabs and advanced_tabs.get_current_tab_index() == 0:
 		_refresh_guild_ranking()
 
-func _on_server_first(guild_name: String, achievement_name: String):
+func _on_server_first(guild_name: String, achievement_name: String) -> void:
 	"""Appelé quand une guilde fait un server first"""
-	var message = ""
+	var message: String = ""
 	if guild_manager and guild_manager.guild and guild_name == guild_manager.guild.name:
 		message = "🏆 FÉLICITATIONS ! Nous avons réalisé : %s" % achievement_name
 	else:
@@ -436,7 +436,7 @@ func _on_server_first(guild_name: String, achievement_name: String):
 	if visible and advanced_tabs and advanced_tabs.get_current_tab_index() == 0:
 		_refresh_guild_ranking()
 
-func _on_guild_selected(index: int):
+func _on_guild_selected(index: int) -> void:
 	"""Appelé quand une guilde est sélectionnée dans la liste"""
 	var rankings = guild_ranking.get_current_rankings() if guild_ranking else []
 	if index >= 0 and index < rankings.size():
@@ -445,7 +445,7 @@ func _on_guild_selected(index: int):
 	else:
 		_clear_guild_details()
 
-func _on_refresh_ranking_pressed():
+func _on_refresh_ranking_pressed() -> void:
 	"""Appelé quand le bouton d'actualisation est pressé"""
 	if guild_ranking:
 		guild_ranking.update_rankings()
@@ -453,15 +453,15 @@ func _on_refresh_ranking_pressed():
 	else:
 		_refresh_guild_ranking()
 
-func _on_view_mode_changed(index: int):
+func _on_view_mode_changed(index: int) -> void:
 	"""Appelé quand le mode d'affichage change"""
 	_apply_view_mode_filter(index)
 
-func _apply_view_mode_filter(mode_index: int):
+func _apply_view_mode_filter(mode_index: int) -> void:
 	"""Applique le filtre de mode d'affichage"""
 	if not guild_ranking:
 		return
-	
+
 	var all_rankings = guild_ranking.get_current_rankings()
 	var filtered_rankings = []
 	
@@ -499,10 +499,10 @@ func _get_rankings_around_player(all_rankings: Array) -> Array:
 	
 	return all_rankings.slice(start_index, end_index)
 
-func _display_filtered_rankings(filtered_rankings: Array):
+func _display_filtered_rankings(filtered_rankings: Array) -> void:
 	"""Affiche une liste filtrée de rankings"""
 	guild_ranking_list.clear()
-	
+
 	for guild_data in filtered_rankings:
 		var rank = guild_data.get("position", 1)
 		var guild_name = guild_data.get("name", "Guilde Inconnue")
@@ -511,7 +511,7 @@ func _display_filtered_rankings(filtered_rankings: Array):
 		var is_player = guild_data.get("is_player", false)
 
 		# Icône de changement de rang
-		var rank_icon = ""
+		var rank_icon: String = ""
 		if rank_change > 0:
 			rank_icon = "▲"
 		elif rank_change < 0:
@@ -520,10 +520,10 @@ func _display_filtered_rankings(filtered_rankings: Array):
 			rank_icon = "▬"
 
 		# Couleur selon si c'est notre guilde
-		var text = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, guild_name, score]
+		var text: String = "%s #%d - %s (Score: %.0f)" % [rank_icon, rank, guild_name, score]
 		if is_player:
 			text += " ⭐"
-		
+
 		guild_ranking_list.add_item(text)
 		
 		# Colorer différemment notre guilde
@@ -533,59 +533,59 @@ func _display_filtered_rankings(filtered_rankings: Array):
 	# Mettre à jour les informations sur notre position
 	_update_our_position_info()
 
-func _display_guild_details(guild_data: Dictionary):
+func _display_guild_details(guild_data: Dictionary) -> void:
 	"""Affiche les détails d'une guilde sélectionnée"""
 	var details_container = _get_guild_details_container()
 	if not details_container:
 		return
-	
+
 	# Nettoyer le contenu précédent
 	for child in details_container.get_children():
 		child.queue_free()
-	
+
 	# Titre avec nom de guilde
 	var guild_name = guild_data.get("name", "Guilde Inconnue")
 	var rank = guild_data.get("position", 0)
 	var is_player = guild_data.get("is_player", false)
-	
-	var title_container = HBoxContainer.new()
+
+	var title_container: HBoxContainer = HBoxContainer.new()
 	details_container.add_child(title_container)
-	
-	var guild_title_label = Label.new()
+
+	var guild_title_label: Label = Label.new()
 	guild_title_label.text = "#%d - %s" % [rank, guild_name]
 	guild_title_label.add_theme_font_size_override("font_size", 18)
 	if is_player:
 		guild_title_label.modulate = Color(1.0, 0.8, 0.2)
 	title_container.add_child(guild_title_label)
-	
+
 	if is_player:
 		title_container.add_spacer(false)
-		var player_icon = Label.new()
+		var player_icon: Label = Label.new()
 		player_icon.text = "⭐"
 		player_icon.add_theme_font_size_override("font_size", 20)
 		title_container.add_child(player_icon)
-	
+
 	details_container.add_child(HSeparator.new())
-	
+
 	# Statistiques principales
-	var stats_title = Label.new()
+	var stats_title: Label = Label.new()
 	stats_title.text = "📊 Statistiques"
 	stats_title.add_theme_font_size_override("font_size", 14)
 	details_container.add_child(stats_title)
-	
-	var stats_grid = GridContainer.new()
+
+	var stats_grid: GridContainer = GridContainer.new()
 	stats_grid.columns = 2
 	stats_grid.add_theme_constant_override("h_separation", 15)
 	stats_grid.add_theme_constant_override("v_separation", 5)
 	details_container.add_child(stats_grid)
-	
+
 	_add_stat_row(stats_grid, "Score total:", "%.0f" % guild_data.get("score", 0.0))
 	_add_stat_row(stats_grid, "Membres actifs:", str(guild_data.get("active_members", "N/A")))
 	_add_stat_row(stats_grid, "Réputation:", "%.0f" % guild_data.get("reputation", 0.0))
-	
+
 	var rank_change = guild_data.get("rank_change", 0)
-	var trend_text = ""
-	var trend_color = Color.WHITE
+	var trend_text: String = ""
+	var trend_color: Color = Color.WHITE
 	if rank_change > 0:
 		trend_text = "↗️ +%d" % rank_change
 		trend_color = Color.GREEN
@@ -595,35 +595,35 @@ func _display_guild_details(guild_data: Dictionary):
 	else:
 		trend_text = "➡️ Stable"
 		trend_color = Color.YELLOW
-	
+
 	_add_stat_row(stats_grid, "Tendance:", trend_text, trend_color)
-	
+
 	details_container.add_child(HSeparator.new())
-	
+
 	# Progression récente (simulée)
-	var progress_title = Label.new()
+	var progress_title: Label = Label.new()
 	progress_title.text = "📈 Progression récente"
 	progress_title.add_theme_font_size_override("font_size", 14)
 	details_container.add_child(progress_title)
-	
-	var progress_list = ItemList.new()
+
+	var progress_list: ItemList = ItemList.new()
 	progress_list.custom_minimum_size = Vector2(0, 120)
 	details_container.add_child(progress_list)
-	
+
 	# Simuler quelques événements récents
 	_populate_recent_events(progress_list, guild_data)
-	
+
 	details_container.add_child(HSeparator.new())
-	
+
 	# Spécialités/Points forts
-	var strengths_title = Label.new()
+	var strengths_title: Label = Label.new()
 	strengths_title.text = "💪 Points forts"
 	strengths_title.add_theme_font_size_override("font_size", 14)
 	details_container.add_child(strengths_title)
-	
+
 	# RichTextLabel : la description des points forts peut contenir du BBCode
 	# (ex. [b]…[/b], [color=gray]…[/color]) qui doit être rendu, pas affiché en texte brut.
-	var strengths_label = RichTextLabel.new()
+	var strengths_label: RichTextLabel = RichTextLabel.new()
 	strengths_label.bbcode_enabled = true
 	strengths_label.fit_content = true
 	strengths_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -632,18 +632,18 @@ func _display_guild_details(guild_data: Dictionary):
 	strengths_label.modulate = Color(0.8, 0.9, 1.0)
 	details_container.add_child(strengths_label)
 
-func _clear_guild_details():
+func _clear_guild_details() -> void:
 	"""Efface les détails de guilde et affiche le message initial"""
 	var details_container = _get_guild_details_container()
 	if not details_container:
 		return
-	
+
 	# Nettoyer le contenu
 	for child in details_container.get_children():
 		child.queue_free()
-	
+
 	# Remettre le message initial
-	var initial_message = Label.new()
+	var initial_message: Label = Label.new()
 	initial_message.text = "Sélectionnez une guilde dans la liste\npour voir ses détails complets"
 	initial_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	initial_message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -672,20 +672,20 @@ func _get_guild_details_container() -> VBoxContainer:
 	
 	return scroll_container.get_child(0) as VBoxContainer
 
-func _add_stat_row(grid: GridContainer, label_text: String, value_text: String, value_color: Color = Color.WHITE):
+func _add_stat_row(grid: GridContainer, label_text: String, value_text: String, value_color: Color = Color.WHITE) -> void:
 	"""Ajoute une ligne de statistique"""
-	var label = Label.new()
+	var label: Label = Label.new()
 	label.text = label_text
 	label.add_theme_font_size_override("font_size", 12)
 	grid.add_child(label)
-	
-	var value = Label.new()
+
+	var value: Label = Label.new()
 	value.text = value_text
 	value.add_theme_font_size_override("font_size", 12)
 	value.modulate = value_color
 	grid.add_child(value)
 
-func _populate_recent_events(list: ItemList, guild_data: Dictionary):
+func _populate_recent_events(list: ItemList, guild_data: Dictionary) -> void:
 	"""Remplit la liste des événements récents (simulés)"""
 	var _guild_name = guild_data.get("name", "Guilde")
 	var is_player = guild_data.get("is_player", false)
@@ -715,7 +715,7 @@ func _populate_recent_events(list: ItemList, guild_data: Dictionary):
 		
 		# Ajouter 2-4 événements aléatoires
 		events.shuffle()
-		var count = randi_range(2, 4)
+		var count: int = randi_range(2, 4)
 		for i in range(min(count, events.size())):
 			list.add_item(events[i])
 
@@ -762,6 +762,6 @@ func _get_guild_strengths(guild_data: Dictionary) -> String:
 	
 	return ", ".join(strengths)
 
-func _on_close_pressed():
+func _on_close_pressed() -> void:
 	# Délègue la fermeture au WindowManager (qui synchronise son état) au lieu d'un hide() local.
 	close_requested.emit()

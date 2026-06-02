@@ -15,27 +15,27 @@ var _buttons: Dictionary = {}  # window_name -> Button
 # Fenêtres débloquées à partir d'une phase (window_name -> phase min). Les autres restent toujours accessibles.
 const PHASE_LOCKS := {"national": 2, "esport": 3}
 
-func _ready():
+func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	custom_minimum_size.y = 80
-	
-	var panel = PanelContainer.new()
+
+	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(panel)
-	
-	var hbox = HBoxContainer.new()
+
+	var hbox := HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	hbox.add_theme_constant_override("separation", 20)
 	panel.add_child(hbox)
-	
-	var personnage_btn = _create_menu_button("Personnage", "personnage", _on_personnage_pressed)
-	var guilde_btn = _create_menu_button("Guilde", "guilde", _on_guilde_pressed)
-	var monde_btn = _create_menu_button("Monde", "monde", _on_monde_pressed)
-	var organisation_btn = _create_menu_button("Organisation", "organisation", _on_organisation_pressed)
-	var national_btn = _create_menu_button("National", "national", _on_national_pressed)
-	var esport_btn = _create_menu_button("Esport", "esport", _on_esport_pressed)
-	var cohesion_btn = _create_menu_button("Cohésion", "cohesion", _on_cohesion_pressed)
-	var conseils_btn = _create_menu_button("Conseils", "conseils", _on_conseils_pressed)
+
+	var personnage_btn := _create_menu_button("Personnage", "personnage", _on_personnage_pressed)
+	var guilde_btn := _create_menu_button("Guilde", "guilde", _on_guilde_pressed)
+	var monde_btn := _create_menu_button("Monde", "monde", _on_monde_pressed)
+	var organisation_btn := _create_menu_button("Organisation", "organisation", _on_organisation_pressed)
+	var national_btn := _create_menu_button("National", "national", _on_national_pressed)
+	var esport_btn := _create_menu_button("Esport", "esport", _on_esport_pressed)
+	var cohesion_btn := _create_menu_button("Cohésion", "cohesion", _on_cohesion_pressed)
+	var conseils_btn := _create_menu_button("Conseils", "conseils", _on_conseils_pressed)
 
 	hbox.add_child(personnage_btn)
 	hbox.add_child(guilde_btn)
@@ -82,7 +82,7 @@ func _shortcut_tooltip(window_name: String, text: String) -> String:
 	return text
 
 func _create_menu_button(text: String, window_name: String, callback: Callable) -> Button:
-	var button = Button.new()
+	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(150, 50)
 	button.tooltip_text = _shortcut_tooltip(window_name, text)
@@ -103,16 +103,16 @@ func set_active_window(window_name: String) -> void:
 		btn.button_pressed = is_active
 		btn.modulate = Color(1, 1, 1, 1) if is_active else Color(0.60, 0.63, 0.70, 1.0)
 
-func _on_personnage_pressed():
+func _on_personnage_pressed() -> void:
 	personnage_button_pressed.emit()
 
-func _on_guilde_pressed():
+func _on_guilde_pressed() -> void:
 	guilde_button_pressed.emit()
 
-func _on_monde_pressed():
+func _on_monde_pressed() -> void:
 	monde_button_pressed.emit()
 
-func _on_organisation_pressed():
+func _on_organisation_pressed() -> void:
 	organisation_button_pressed.emit()
 
 func _is_window_locked(window_name: String) -> bool:
@@ -124,18 +124,18 @@ func _is_window_locked(window_name: String) -> bool:
 		return false
 	return PhaseManager.get_current_phase() < int(PHASE_LOCKS[window_name])
 
-func _on_national_pressed():
+func _on_national_pressed() -> void:
 	if _is_window_locked("national"):
 		return
 	national_button_pressed.emit()
 
-func _on_esport_pressed():
+func _on_esport_pressed() -> void:
 	if _is_window_locked("esport"):
 		return
 	esport_button_pressed.emit()
 
-func _on_cohesion_pressed():
+func _on_cohesion_pressed() -> void:
 	cohesion_button_pressed.emit()
 
-func _on_conseils_pressed():
+func _on_conseils_pressed() -> void:
 	conseils_button_pressed.emit()

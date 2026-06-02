@@ -85,7 +85,7 @@ func _setup_ui() -> void:
 	slots_container.add_theme_constant_override("separation", 6)
 	left.add_child(slots_container)
 	for slot in [0, 1, 2, 3, 4]:
-		var cell := EquipDragCellScript.new()
+		var cell: EquipDragCell = EquipDragCellScript.new()
 		cell.configure("slot", slot, null, self)
 		slots_container.add_child(cell)
 		_slot_cells[slot] = cell
@@ -93,7 +93,7 @@ func _setup_ui() -> void:
 	cols.add_child(VSeparator.new())
 
 	# Colonne droite : banque (zone de dépôt) + liste scrollable
-	var bank_drop := EquipDragCellScript.new()
+	var bank_drop: EquipDragCell = EquipDragCellScript.new()
 	bank_drop.configure("bank_drop", -1, null, self)
 	bank_drop.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bank_drop.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -111,10 +111,10 @@ func _setup_ui() -> void:
 	bank_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(bank_container)
 
-func _mk_label(text: String, size: int) -> Label:
+func _mk_label(text: String, font_size: int) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", font_size)
 	return l
 
 # ==================== API PUBLIQUE ====================
@@ -155,6 +155,7 @@ func _refresh() -> void:
 
 	var total_ilvl: int = current_member.get_total_ilvl()
 	total_ilvl_label.text = "iLvl Total: %d" % total_ilvl
+	@warning_ignore("integer_division")
 	var avg: int = total_ilvl / 5
 	if avg >= 50:
 		total_ilvl_label.modulate = Color.PURPLE
@@ -184,7 +185,7 @@ func _refresh_bank() -> void:
 		bank_container.add_child(empty)
 		return
 	for it in bank:
-		var cell := EquipDragCellScript.new()
+		var cell: EquipDragCell = EquipDragCellScript.new()
 		cell.configure("bank_item", -1, it, self)
 		bank_container.add_child(cell)
 

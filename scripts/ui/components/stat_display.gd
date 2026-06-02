@@ -65,12 +65,12 @@ signal value_changed(old_value: float, new_value: float)
 signal max_value_changed(old_max: float, new_max: float)
 signal percentage_threshold_crossed(threshold: float)
 
-func _ready():
+func _ready() -> void:
 	animated_value = current_value
 	_create_ui()
 	_update_display()
 
-func _create_ui():
+func _create_ui() -> void:
 	"""Crée la structure UI selon le layout"""
 	
 	# Nettoyer les enfants existants
@@ -99,21 +99,21 @@ func _create_ui():
 	if layout != Layout.ICON_ONLY:
 		_create_text_elements()
 
-func _create_icon():
+func _create_icon() -> void:
 	"""Crée l'élément icône — cherche d'abord dans AssetLoader si pas de texture explicite"""
 	var resolved_texture: Texture2D = icon_texture
 	if not resolved_texture and stat_name != "":
 		resolved_texture = AssetLoader.get_stat_icon(stat_name)
 
 	if resolved_texture:
-		var texture_rect = TextureRect.new()
+		var texture_rect := TextureRect.new()
 		texture_rect.texture = resolved_texture
 		texture_rect.custom_minimum_size = icon_size
 		texture_rect.size = icon_size
 		texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon_element = texture_rect
 	else:
-		var icon_label = Label.new()
+		var icon_label := Label.new()
 		icon_label.text = icon_text if icon_text != "" else "★"
 		icon_label.add_theme_font_size_override("font_size", int(icon_size.x * 0.8))
 		icon_label.custom_minimum_size = icon_size
@@ -123,7 +123,7 @@ func _create_icon():
 
 	container.add_child(icon_element)
 
-func _create_text_elements():
+func _create_text_elements() -> void:
 	"""Crée les éléments texte"""
 	
 	# Container pour texte (peut contenir label + progress bar)
@@ -161,36 +161,36 @@ func _create_text_elements():
 
 # ==================== SETTERS ====================
 
-func set_stat_name(new_name: String):
+func set_stat_name(new_name: String) -> void:
 	stat_name = new_name
 	if is_inside_tree():
 		_update_display()
 
-func set_current_value(new_value: float):
-	var old_value = current_value
+func set_current_value(new_value: float) -> void:
+	var old_value := current_value
 	current_value = max(0.0, new_value)
-	
+
 	if animate_changes and is_inside_tree():
 		_animate_to_value(current_value)
 	else:
 		animated_value = current_value
 		if is_inside_tree():
 			_update_display()
-	
+
 	value_changed.emit(old_value, current_value)
-	
+
 	# Vérifier les seuils de pourcentage
 	if max_value > 0:
-		var old_percentage = (old_value / max_value) * 100.0
-		var new_percentage = (current_value / max_value) * 100.0
-		
-		var thresholds = [70.0, 30.0]
+		var old_percentage := (old_value / max_value) * 100.0
+		var new_percentage := (current_value / max_value) * 100.0
+
+		var thresholds := [70.0, 30.0]
 		for threshold in thresholds:
 			if (old_percentage >= threshold) != (new_percentage >= threshold):
 				percentage_threshold_crossed.emit(threshold)
 
-func set_max_value(new_max: float):
-	var old_max = max_value
+func set_max_value(new_max: float) -> void:
+	var old_max := max_value
 	max_value = max(0.1, new_max)
 	
 	if progress_bar:
@@ -202,45 +202,45 @@ func set_max_value(new_max: float):
 	
 	max_value_changed.emit(old_max, max_value)
 
-func set_display_mode(new_mode: DisplayMode):
+func set_display_mode(new_mode: DisplayMode) -> void:
 	display_mode = new_mode
 	if is_inside_tree():
 		_create_ui()
 		_update_display()
 
-func set_layout(new_layout: Layout):
+func set_layout(new_layout: Layout) -> void:
 	layout = new_layout
 	if is_inside_tree():
 		_create_ui()
 		_update_display()
 
-func set_show_icon(show: bool):
+func set_show_icon(show: bool) -> void:
 	show_icon = show
 	if is_inside_tree():
 		_create_ui()
 		_update_display()
 
-func set_icon_texture(texture: Texture2D):
+func set_icon_texture(texture: Texture2D) -> void:
 	icon_texture = texture
 	if is_inside_tree() and icon_element is TextureRect:
 		(icon_element as TextureRect).texture = texture
 
-func set_icon_text(text: String):
+func set_icon_text(text: String) -> void:
 	icon_text = text
 	if is_inside_tree() and icon_element is Label:
 		(icon_element as Label).text = text
 
 # ==================== API PUBLIQUE ====================
 
-func add_value(delta: float):
+func add_value(delta: float) -> void:
 	"""Ajoute une valeur à la valeur actuelle"""
 	set_current_value(current_value + delta)
 
-func subtract_value(delta: float):
+func subtract_value(delta: float) -> void:
 	"""Soustrait une valeur de la valeur actuelle"""
 	set_current_value(current_value - delta)
 
-func set_values(current: float, maximum: float):
+func set_values(current: float, maximum: float) -> void:
 	"""Définit les deux valeurs en même temps"""
 	set_max_value(maximum)
 	set_current_value(current)
@@ -265,34 +265,34 @@ func is_empty() -> bool:
 	"""Vérifie si la valeur est à zéro"""
 	return current_value <= 0.0
 
-func pulse():
+func pulse() -> void:
 	"""Effet de pulsation pour attirer l'attention"""
 	if value_tween:
 		value_tween.kill()
-	
+
 	value_tween = create_tween()
 	value_tween.tween_property(self, "scale", Vector2(1.1, 1.1), 0.15)
 	value_tween.tween_property(self, "scale", Vector2.ONE, 0.15)
 
-func flash_color(color: Color, duration: float = 0.3):
+func flash_color(color: Color, duration: float = 0.3) -> void:
 	"""Flash avec une couleur spécifique"""
-	var original_modulate = modulate
-	var tween = create_tween()
+	var original_modulate := modulate
+	var tween := create_tween()
 	tween.tween_property(self, "modulate", color, duration * 0.5)
 	tween.tween_property(self, "modulate", original_modulate, duration * 0.5)
 
 # ==================== MÉTHODES PRIVÉES ====================
 
-func _animate_to_value(target_value: float):
+func _animate_to_value(target_value: float) -> void:
 	"""Anime la valeur vers une cible"""
 	if value_tween:
 		value_tween.kill()
-	
+
 	value_tween = create_tween()
 	value_tween.tween_property(self, "animated_value", target_value, 0.3)
 	value_tween.tween_callback(_update_display)
 
-func _update_display():
+func _update_display() -> void:
 	"""Met à jour l'affichage visuel"""
 	
 	# Mettre à jour le texte
@@ -312,17 +312,17 @@ func _update_display():
 		progress_bar.value = animated_value
 		
 		if color_by_percentage:
-			var color = _get_color_for_percentage()
+			var color := _get_color_for_percentage()
 			# Appliquer la couleur via modulate
 			progress_bar.modulate = color
 
 func _get_formatted_text() -> String:
 	"""Retourne le texte formaté selon le mode d'affichage"""
 	
-	var value_int = int(animated_value)
-	var max_int = int(max_value)
-	var percentage = get_percentage()
-	
+	var value_int := int(animated_value)
+	var max_int := int(max_value)
+	var percentage := get_percentage()
+
 	match display_mode:
 		DisplayMode.VALUE_ONLY:
 			return str(value_int)
@@ -348,7 +348,7 @@ func _get_formatted_text() -> String:
 
 func _get_color_for_percentage() -> Color:
 	"""Retourne la couleur selon le pourcentage"""
-	var percentage = get_percentage()
+	var percentage := get_percentage()
 	
 	if percentage >= 70.0:
 		return color_high
@@ -361,7 +361,7 @@ func _get_color_for_percentage() -> Color:
 
 static func create_health_display(current_hp: int, max_hp: int, parent: Node) -> StatDisplay:
 	"""Crée un affichage de santé"""
-	var stat = StatDisplay.new()
+	var stat := StatDisplay.new()
 	stat.stat_name = "HP"
 	stat.icon_text = "♥"
 	stat.display_mode = DisplayMode.VALUE_MAX
@@ -375,7 +375,7 @@ static func create_health_display(current_hp: int, max_hp: int, parent: Node) ->
 
 static func create_experience_display(current_xp: int, xp_to_next: int, parent: Node) -> StatDisplay:
 	"""Crée un affichage d'expérience avec barre"""
-	var stat = StatDisplay.new()
+	var stat := StatDisplay.new()
 	stat.stat_name = "XP"
 	stat.icon_text = "★"
 	stat.display_mode = DisplayMode.PROGRESS_BAR
@@ -389,7 +389,7 @@ static func create_experience_display(current_xp: int, xp_to_next: int, parent: 
 
 static func create_level_display(level: int, parent: Node) -> StatDisplay:
 	"""Crée un affichage de niveau"""
-	var stat = StatDisplay.new()
+	var stat := StatDisplay.new()
 	stat.stat_name = "Niveau"
 	stat.icon_text = "Lv"
 	stat.display_mode = DisplayMode.VALUE_ONLY
@@ -401,7 +401,7 @@ static func create_level_display(level: int, parent: Node) -> StatDisplay:
 
 static func create_equipment_display(ilvl: int, parent: Node) -> StatDisplay:
 	"""Crée un affichage d'équipement"""
-	var stat = StatDisplay.new()
+	var stat := StatDisplay.new()
 	stat.stat_name = "iLvl"
 	stat.icon_text = "⚔"
 	stat.display_mode = DisplayMode.VALUE_ONLY
@@ -413,7 +413,7 @@ static func create_equipment_display(ilvl: int, parent: Node) -> StatDisplay:
 
 # ==================== CONFIGURATIONS PRÉDÉFINIES ====================
 
-func setup_for_health(current_hp: int, max_hp: int):
+func setup_for_health(current_hp: int, max_hp: int) -> void:
 	"""Configuration prédéfinie pour la santé"""
 	stat_name = "HP"
 	icon_text = "♥"
@@ -421,7 +421,7 @@ func setup_for_health(current_hp: int, max_hp: int):
 	layout = Layout.HORIZONTAL
 	set_values(current_hp, max_hp)
 
-func setup_for_experience(current_xp: int, xp_needed: int):
+func setup_for_experience(current_xp: int, xp_needed: int) -> void:
 	"""Configuration prédéfinie pour l'expérience"""
 	stat_name = "XP"
 	icon_text = "★"
@@ -429,7 +429,7 @@ func setup_for_experience(current_xp: int, xp_needed: int):
 	layout = Layout.HORIZONTAL
 	set_values(current_xp, xp_needed)
 
-func setup_for_level(level: int):
+func setup_for_level(level: int) -> void:
 	"""Configuration prédéfinie pour le niveau"""
 	stat_name = "Niveau"
 	icon_text = "Lv"
@@ -438,7 +438,7 @@ func setup_for_level(level: int):
 	color_by_percentage = false
 	set_values(level, level)
 
-func setup_for_equipment(ilvl: int):
+func setup_for_equipment(ilvl: int) -> void:
 	"""Configuration prédéfinie pour l'équipement"""
 	stat_name = "iLvl"
 	icon_text = "⚔"
@@ -447,7 +447,7 @@ func setup_for_equipment(ilvl: int):
 	color_by_percentage = false
 	set_values(ilvl, 100)
 
-func setup_for_percentage_stat(stat_name_param: String, value: float, icon_param: String = "●"):
+func setup_for_percentage_stat(stat_name_param: String, value: float, icon_param: String = "●") -> void:
 	"""Configuration pour une statistique en pourcentage"""
 	stat_name = stat_name_param
 	icon_text = icon_param

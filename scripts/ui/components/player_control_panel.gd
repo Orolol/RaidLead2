@@ -19,7 +19,7 @@ var disconnect_button: Button
 var status_label: Label
 var session_info_label: Label
 
-func _ready():
+func _ready() -> void:
 	custom_minimum_size = Vector2(300, 200)
 	_setup_ui()
 	_connect_signals()
@@ -27,8 +27,8 @@ func _ready():
 	# (connecté dans set_player_character) + appel direct sur set_player_character.
 	# Plus de Timer 5 s.
 
-func _setup_ui():
-	var main_vbox = VBoxContainer.new()
+func _setup_ui() -> void:
+	var main_vbox := VBoxContainer.new()
 	main_vbox.add_theme_constant_override("separation", 8)
 	add_child(main_vbox)
 	
@@ -53,7 +53,7 @@ func _setup_ui():
 	# Informations de session
 	_setup_session_info(main_vbox)
 
-func _setup_header(parent: VBoxContainer):
+func _setup_header(parent: VBoxContainer) -> void:
 	header_label = Label.new()
 	header_label.text = "🎮 Contrôle Joueur"
 	header_label.add_theme_font_size_override("font_size", 16)
@@ -61,11 +61,11 @@ func _setup_header(parent: VBoxContainer):
 	header_label.modulate = Color(1.0, 0.8, 0.2)
 	parent.add_child(header_label)
 
-func _setup_energy_display(parent: VBoxContainer):
-	var energy_container = VBoxContainer.new()
+func _setup_energy_display(parent: VBoxContainer) -> void:
+	var energy_container := VBoxContainer.new()
 	parent.add_child(energy_container)
-	
-	var energy_header = Label.new()
+
+	var energy_header := Label.new()
 	energy_header.text = "⚡ Énergie"
 	energy_header.add_theme_font_size_override("font_size", 14)
 	energy_container.add_child(energy_header)
@@ -86,15 +86,15 @@ func _setup_energy_display(parent: VBoxContainer):
 	energy_label.visible = false
 	energy_container.add_child(energy_label)
 
-func _setup_activity_selector(parent: VBoxContainer):
-	var activity_container = VBoxContainer.new()
+func _setup_activity_selector(parent: VBoxContainer) -> void:
+	var activity_container := VBoxContainer.new()
 	parent.add_child(activity_container)
-	
-	var activity_header = Label.new()
+
+	var activity_header := Label.new()
 	activity_header.text = "🎯 Activité"
 	activity_header.add_theme_font_size_override("font_size", 14)
 	activity_container.add_child(activity_header)
-	
+
 	activity_option = OptionButton.new()
 	activity_option.custom_minimum_size = Vector2(0, 35)
 	activity_container.add_child(activity_option)
@@ -103,15 +103,15 @@ func _setup_activity_selector(parent: VBoxContainer):
 	_populate_activity_options()
 
 	# Contenu de groupe : ouvre la fenêtre d'organisation (vrai flow PvE)
-	var organize_button = Button.new()
+	var organize_button := Button.new()
 	organize_button.text = "⚔️ Donjon / Raid"
 	organize_button.tooltip_text = "Organiser un groupe pour lancer un donjon ou un raid"
 	organize_button.custom_minimum_size = Vector2(0, 32)
 	organize_button.pressed.connect(func(): organize_requested.emit("dungeon"))
 	activity_container.add_child(organize_button)
 
-func _setup_status_and_controls(parent: VBoxContainer):
-	var controls_container = VBoxContainer.new()
+func _setup_status_and_controls(parent: VBoxContainer) -> void:
+	var controls_container := VBoxContainer.new()
 	parent.add_child(controls_container)
 	
 	# Statut actuel
@@ -130,11 +130,11 @@ func _setup_status_and_controls(parent: VBoxContainer):
 	disconnect_button.modulate = Color(0.8, 0.9, 1.0)
 	controls_container.add_child(disconnect_button)
 
-func _setup_session_info(parent: VBoxContainer):
-	var session_container = VBoxContainer.new()
+func _setup_session_info(parent: VBoxContainer) -> void:
+	var session_container := VBoxContainer.new()
 	parent.add_child(session_container)
-	
-	var session_header = Label.new()
+
+	var session_header := Label.new()
 	session_header.text = "📊 Session"
 	session_header.add_theme_font_size_override("font_size", 12)
 	session_container.add_child(session_header)
@@ -145,7 +145,7 @@ func _setup_session_info(parent: VBoxContainer):
 	session_info_label.modulate = Color(0.9, 0.9, 0.9)
 	session_container.add_child(session_info_label)
 
-func _populate_activity_options():
+func _populate_activity_options() -> void:
 	activity_option.clear()
 	activity_option.add_item("Choisir une activité...", -1)
 	activity_option.add_separator()
@@ -158,17 +158,17 @@ func _populate_activity_options():
 	
 	for i in range(activities.size()):
 		var activity = activities[i]
-		var item_index = activity_option.get_item_count()  # Index réel après ajout
+		var item_index := activity_option.get_item_count()  # Index réel après ajout
 		activity_option.add_item(activity.name, i)
 		activity_option.set_item_metadata(item_index, activity.key)
 
-func _connect_signals():
+func _connect_signals() -> void:
 	if activity_option:
 		activity_option.item_selected.connect(_on_activity_selected)
 	if disconnect_button:
 		disconnect_button.pressed.connect(_on_disconnect_pressed)
 
-func set_player_character(player: PlayerCharacterScript):
+func set_player_character(player: PlayerCharacterScript) -> void:
 	player_character = player
 	_update_display()
 
@@ -177,10 +177,10 @@ func set_player_character(player: PlayerCharacterScript):
 		if not player_character.player_state_changed.is_connected(_update_display):
 			player_character.player_state_changed.connect(_update_display)
 
-func _update_display():
+func _update_display() -> void:
 	if not player_character:
 		return
-	
+
 	# Mise à jour de l'énergie
 	var energy_percent = player_character.get_energy_percentage()
 	energy_progress.set_value(energy_percent)
@@ -203,10 +203,10 @@ func _update_display():
 	# Mise à jour des activités disponibles
 	_update_available_activities()
 
-func _update_status_display():
+func _update_status_display() -> void:
 	if not player_character:
 		return
-	
+
 	if not player_character.is_online:
 		status_label.text = "🔌 Déconnecté"
 		status_label.modulate = Color.GRAY
@@ -218,10 +218,10 @@ func _update_status_display():
 		status_label.text = "⏳ En attente..."
 		status_label.modulate = Color.YELLOW
 
-func _update_session_display():
+func _update_session_display() -> void:
 	if not player_character:
 		return
-	
+
 	var report = player_character.get_session_report()
 	var duration_text = _format_duration(report.duration_minutes)
 	
@@ -235,17 +235,17 @@ func _update_session_display():
 	if report.levels_gained > 0:
 		session_info_label.text += " | +%d LVL!" % report.levels_gained
 
-func _update_available_activities():
+func _update_available_activities() -> void:
 	if not player_character:
 		return
-	
+
 	var available = player_character.get_available_activities()
-	
+
 	# Désactiver les options non disponibles
 	for i in range(activity_option.get_item_count()):
 		var metadata = activity_option.get_item_metadata(i)
 		if metadata != null:
-			var is_available = metadata in available
+			var is_available: bool = metadata in available
 			activity_option.set_item_disabled(i, not is_available)
 
 func _format_duration(minutes: int) -> String:
@@ -258,12 +258,12 @@ func _format_duration(minutes: int) -> String:
 		var mins: int = minutes % 60
 		return "%dh%02dmin" % [hours, mins]
 
-func _on_activity_selected(index: int):
+func _on_activity_selected(index: int) -> void:
 	var metadata = activity_option.get_item_metadata(index)
 	if metadata == null or not player_character:
 		return
-	
-	var activity_type = metadata as String
+
+	var activity_type := metadata as String
 
 	if player_character.can_perform_activity(activity_type):
 		if player_character.choose_activity(activity_type):
@@ -274,47 +274,47 @@ func _on_activity_selected(index: int):
 	else:
 		_show_error_message("Énergie insuffisante pour cette activité")
 
-func _on_disconnect_pressed():
+func _on_disconnect_pressed() -> void:
 	if not player_character:
 		return
-	
+
 	# Émettre directement le signal pour demander une déconnexion manuelle
 	disconnect_requested.emit(-1, -1)  # -1, -1 indique une déconnexion manuelle (choix utilisateur)
 
-func _show_activity_feedback(activity_type: String):
+func _show_activity_feedback(activity_type: String) -> void:
 	var activity_name = player_character.get_activity_display_name(activity_type)
-	
+
 	# Créer une notification temporaire
-	var feedback = Label.new()
+	var feedback := Label.new()
 	feedback.text = "✓ Activité démarrée: %s" % activity_name
 	feedback.modulate = Color.GREEN
 	feedback.add_theme_font_size_override("font_size", 12)
 	add_child(feedback)
-	
+
 	# Créer une animation pour faire disparaître le message
-	var tween = create_tween()
+	var tween := create_tween()
 	tween.tween_property(feedback, "modulate:a", 0.0, 2.0)
 	tween.tween_callback(feedback.queue_free)
 
-func _show_error_message(message: String):
+func _show_error_message(message: String) -> void:
 	# Créer une notification d'erreur temporaire
-	var error = Label.new()
+	var error := Label.new()
 	error.text = "❌ " + message
 	error.modulate = Color.RED
 	error.add_theme_font_size_override("font_size", 12)
 	add_child(error)
-	
+
 	# Animation pour faire disparaître le message
-	var tween = create_tween()
+	var tween := create_tween()
 	tween.tween_property(error, "modulate:a", 0.0, 3.0)
 	tween.tween_callback(error.queue_free)
 
-func show_reconnection_dialog():
+func show_reconnection_dialog() -> void:
 	"""Affiche un dialogue quand le joueur peut se reconnecter"""
 	if not player_character:
 		return
-	
-	var dialog = AcceptDialog.new()
+
+	var dialog := AcceptDialog.new()
 	dialog.title = "Retour de connexion"
 	dialog.dialog_text = "Votre personnage est prêt à se reconnecter !\n\nÉnergie récupérée: %.0f/%.0f" % [
 		player_character.player_energy_pool, 
@@ -330,7 +330,7 @@ func show_reconnection_dialog():
 	dialog.popup_centered()
 
 # Méthodes publiques pour intégration
-func refresh_display():
+func refresh_display() -> void:
 	"""Force une mise à jour de l'affichage"""
 	_update_display()
 

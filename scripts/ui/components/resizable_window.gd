@@ -14,25 +14,25 @@ var title_label: Label
 var close_button: Button
 var content_container: VBoxContainer
 
-func _ready():
+func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
-	
-func setup_window(title: String, initial_size: Vector2):
+
+func setup_window(title: String, initial_size: Vector2) -> void:
 	custom_minimum_size = initial_size
 	size = initial_size
-	
+
 	# Container principal
-	var main_vbox = VBoxContainer.new()
+	var main_vbox := VBoxContainer.new()
 	main_vbox.add_theme_constant_override("separation", 0)
 	add_child(main_vbox)
-	
+
 	# Barre de titre
 	title_bar = PanelContainer.new()
 	title_bar.custom_minimum_size = Vector2(0, 30)
 	title_bar.modulate = Color(0.8, 0.8, 0.8)
 	main_vbox.add_child(title_bar)
-	
-	var title_hbox = HBoxContainer.new()
+
+	var title_hbox := HBoxContainer.new()
 	title_bar.add_child(title_hbox)
 	
 	title_label = Label.new()
@@ -57,7 +57,7 @@ func setup_window(title: String, initial_size: Vector2):
 	title_bar.gui_input.connect(_on_title_bar_input)
 	gui_input.connect(_on_window_input)
 
-func _on_title_bar_input(event: InputEvent):
+func _on_title_bar_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
@@ -66,19 +66,19 @@ func _on_title_bar_input(event: InputEvent):
 			else:
 				is_dragging = false
 
-func _on_window_input(event: InputEvent):
+func _on_window_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		if is_dragging:
 			global_position = event.global_position + drag_offset
 		elif is_resizing:
-			var new_size = event.global_position - global_position
+			var new_size: Vector2 = event.global_position - global_position
 			size = Vector2(
 				max(min_size.x, new_size.x),
 				max(min_size.y, new_size.y)
 			)
 		else:
 			# Vérifie si on est sur le bord pour redimensionner
-			var cursor_type = _get_resize_cursor(event.position)
+			var cursor_type: String = _get_resize_cursor(event.position)
 			if cursor_type != "":
 				mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
 			else:
@@ -87,14 +87,14 @@ func _on_window_input(event: InputEvent):
 	elif event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				var cursor_type = _get_resize_cursor(event.position)
+				var cursor_type: String = _get_resize_cursor(event.position)
 				if cursor_type != "":
 					is_resizing = true
 			else:
 				is_resizing = false
 
 func _get_resize_cursor(pos: Vector2) -> String:
-	var margin = resize_margin
+	var margin: int = resize_margin
 	
 	# Coin bas-droite
 	if pos.x > size.x - margin and pos.y > size.y - margin:
@@ -108,13 +108,13 @@ func _get_resize_cursor(pos: Vector2) -> String:
 		
 	return ""
 
-func _on_close_pressed():
+func _on_close_pressed() -> void:
 	close_requested.emit()
 	hide()
 
 func get_content_container() -> VBoxContainer:
 	return content_container
 
-func set_window_title(title: String):
+func set_window_title(title: String) -> void:
 	if title_label:
 		title_label.text = title

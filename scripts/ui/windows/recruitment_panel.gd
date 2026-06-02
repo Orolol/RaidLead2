@@ -45,24 +45,24 @@ func refresh() -> void:
 
 func build() -> void:
 	"""Construit le contenu de l'onglet directement dans self (ex-_setup_recruitment_tab)."""
-	var hsplit = HSplitContainer.new()
+	var hsplit: HSplitContainer = HSplitContainer.new()
 	hsplit.split_offset = 400
 	add_child(hsplit)
 
-	var left_panel = PanelContainer.new()
+	var left_panel: PanelContainer = PanelContainer.new()
 	hsplit.add_child(left_panel)
 
-	var left_vbox = VBoxContainer.new()
+	var left_vbox: VBoxContainer = VBoxContainer.new()
 	left_panel.add_child(left_vbox)
 
-	var filter_hbox = HBoxContainer.new()
+	var filter_hbox: HBoxContainer = HBoxContainer.new()
 	left_vbox.add_child(filter_hbox)
 
-	var filter_label = Label.new()
+	var filter_label: Label = Label.new()
 	filter_label.text = "Filtrer par classe:"
 	filter_hbox.add_child(filter_label)
 
-	var filter_option = OptionButton.new()
+	var filter_option: OptionButton = OptionButton.new()
 	filter_option.add_item("Tous")
 	filter_option.add_item("Guerrier")
 	filter_option.add_item("Mage")
@@ -77,7 +77,7 @@ func build() -> void:
 	recruitment_list.item_selected.connect(_on_recruit_selected)
 	left_vbox.add_child(recruitment_list)
 
-	var right_panel = PanelContainer.new()
+	var right_panel: PanelContainer = PanelContainer.new()
 	hsplit.add_child(right_panel)
 
 	recruit_details = VBoxContainer.new()
@@ -87,12 +87,12 @@ func build() -> void:
 	_setup_recruit_details()
 
 func _setup_recruit_details() -> void:
-	var details_label = Label.new()
+	var details_label: Label = Label.new()
 	details_label.text = "Détails du Candidat"
 	details_label.add_theme_font_size_override("font_size", 16)
 	recruit_details.add_child(details_label)
 
-	var info_label = Label.new()
+	var info_label: Label = Label.new()
 	info_label.text = "Sélectionnez un joueur pour voir ses détails"
 	info_label.modulate = Color(0.7, 0.7, 0.7)
 	recruit_details.add_child(info_label)
@@ -131,14 +131,14 @@ func _refresh_recruitment_list(filter_class: String = "") -> void:
 
 	for player in filtered_players:
 		var difficulty = player.get_meta("recruitment_difficulty", 0.5)
-		var difficulty_text = ""
+		var difficulty_text: String = ""
 		if difficulty > 0.7:
 			difficulty_text = " (Difficile)"
 		elif difficulty < 0.3:
 			difficulty_text = " (Facile)"
 
-		var national_marker = "💼 " if player.get_meta("is_national", false) else ""
-		var text = "%s%s - %s Niv.%d (Équip: %d)%s" % [
+		var national_marker: String = "💼 " if player.get_meta("is_national", false) else ""
+		var text: String = "%s%s - %s Niv.%d (Équip: %d)%s" % [
 			national_marker,
 			player.nom,
 			player.personnage_classe,
@@ -149,7 +149,7 @@ func _refresh_recruitment_list(filter_class: String = "") -> void:
 		recruitment_list.add_item(text)
 
 func _on_filter_changed(index: int) -> void:
-	var filter_class = ""
+	var filter_class: String = ""
 	match index:
 		1: filter_class = "Guerrier"
 		2: filter_class = "Mage"
@@ -162,7 +162,7 @@ func _on_recruit_selected(index: int) -> void:
 
 	# Récupère la classe filtrée actuelle directement depuis le filtre (plus de
 	# navigation fragile dans l'arbre des nodes).
-	var filter_class = ""
+	var filter_class: String = ""
 	if _filter_option:
 		match _filter_option.selected:
 			1: filter_class = "Guerrier"
@@ -188,14 +188,14 @@ func _update_recruit_details() -> void:
 	if not selected_recruit:
 		return
 
-	var details_label = Label.new()
+	var details_label: Label = Label.new()
 	details_label.text = "Candidat: " + selected_recruit.nom
 	details_label.add_theme_font_size_override("font_size", 18)
 	recruit_details.add_child(details_label)
 
 	recruit_details.add_child(HSeparator.new())
 
-	var info_grid = GridContainer.new()
+	var info_grid: GridContainer = GridContainer.new()
 	info_grid.columns = 2
 	info_grid.add_theme_constant_override("h_separation", 20)
 	info_grid.add_theme_constant_override("v_separation", 10)
@@ -208,11 +208,11 @@ func _update_recruit_details() -> void:
 
 	recruit_details.add_child(HSeparator.new())
 
-	var tags_label = Label.new()
+	var tags_label: Label = Label.new()
 	tags_label.text = "Tags visibles:"
 	recruit_details.add_child(tags_label)
 
-	var tags_text = Label.new()
+	var tags_text: Label = Label.new()
 	var visible_tags = selected_recruit.get_visible_tags()
 	if visible_tags.is_empty():
 		tags_text.text = "Aucun tag visible pour le moment"
@@ -228,13 +228,13 @@ func _update_recruit_details() -> void:
 		if motivation != "":
 			recruit_details.add_child(HSeparator.new())
 
-			var motivation_label = Label.new()
+			var motivation_label: Label = Label.new()
 			motivation_label.text = "Motivation:"
 			recruit_details.add_child(motivation_label)
 
 			# RichTextLabel : la motivation peut contenir du BBCode (mise en forme),
 			# sinon les balises s'afficheraient en texte littéral dans un Label.
-			var motivation_text = RichTextLabel.new()
+			var motivation_text: RichTextLabel = RichTextLabel.new()
 			motivation_text.bbcode_enabled = true
 			motivation_text.fit_content = true
 			motivation_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -243,11 +243,11 @@ func _update_recruit_details() -> void:
 			motivation_text.modulate = Color(0.9, 0.9, 0.7)
 			recruit_details.add_child(motivation_text)
 
-	var planning_label = Label.new()
+	var planning_label: Label = Label.new()
 	planning_label.text = "\nDisponibilité probable:"
 	recruit_details.add_child(planning_label)
 
-	var planning_text = Label.new()
+	var planning_text: Label = Label.new()
 	planning_text.text = _get_planning_summary(selected_recruit.planning)
 	planning_text.modulate = Color(0.8, 1.0, 0.8)
 	recruit_details.add_child(planning_text)
@@ -261,12 +261,12 @@ func _update_recruit_details() -> void:
 		_build_standard_invite_controls()
 
 func _build_standard_invite_controls() -> void:
-	var button_container = HBoxContainer.new()
+	var button_container: HBoxContainer = HBoxContainer.new()
 	button_container.add_theme_constant_override("separation", 10)
 	recruit_details.add_child(button_container)
 	button_container.add_spacer(false)
 
-	var invite_button = Button.new()
+	var invite_button: Button = Button.new()
 	invite_button.text = "Envoyer une invitation"
 	invite_button.custom_minimum_size = Vector2(250, 50)
 	invite_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -278,7 +278,7 @@ func _build_standard_invite_controls() -> void:
 	button_container.add_child(invite_button)
 	button_container.add_spacer(false)
 
-	var spacer = Control.new()
+	var spacer: Control = Control.new()
 	spacer.custom_minimum_size = Vector2(0, 20)
 	recruit_details.add_child(spacer)
 
@@ -286,13 +286,13 @@ func _build_national_recruit_controls() -> void:
 	var demand: int = selected_recruit.salary_demand
 	var has_agent: bool = selected_recruit.get_meta("has_agent", false)
 
-	var header = Label.new()
+	var header: Label = Label.new()
 	header.text = "💼 Recrue semi-professionnelle"
 	header.add_theme_font_size_override("font_size", 15)
 	header.modulate = Color(1.0, 0.82, 0.30)
 	recruit_details.add_child(header)
 
-	var grid = GridContainer.new()
+	var grid: GridContainer = GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 20)
 	grid.add_theme_constant_override("v_separation", 6)
@@ -305,10 +305,10 @@ func _build_national_recruit_controls() -> void:
 	_add_detail_row(grid, "Masse salariale actuelle:", "%d or/sem" % (guild_manager.get_total_weekly_salaries() if guild_manager else 0))
 
 	# Négociation salariale
-	var neg_box = HBoxContainer.new()
+	var neg_box: HBoxContainer = HBoxContainer.new()
 	neg_box.add_theme_constant_override("separation", 8)
 	recruit_details.add_child(neg_box)
-	var lbl = Label.new()
+	var lbl: Label = Label.new()
 	lbl.text = "Votre offre:"
 	neg_box.add_child(lbl)
 	salary_spinbox = SpinBox.new()
@@ -317,18 +317,18 @@ func _build_national_recruit_controls() -> void:
 	salary_spinbox.step = 5
 	salary_spinbox.value = demand
 	neg_box.add_child(salary_spinbox)
-	var lbl2 = Label.new()
+	var lbl2: Label = Label.new()
 	lbl2.text = "or/sem"
 	neg_box.add_child(lbl2)
 
-	var btn_box = HBoxContainer.new()
+	var btn_box: HBoxContainer = HBoxContainer.new()
 	btn_box.add_theme_constant_override("separation", 10)
 	recruit_details.add_child(btn_box)
-	var negotiate_btn = Button.new()
+	var negotiate_btn: Button = Button.new()
 	negotiate_btn.text = "Négocier"
 	negotiate_btn.pressed.connect(_on_negotiate_pressed)
 	btn_box.add_child(negotiate_btn)
-	var scout_btn = Button.new()
+	var scout_btn: Button = Button.new()
 	scout_btn.text = "Scouter (-2 réput.)"
 	scout_btn.tooltip_text = "Révèle les traits cachés et le skill réel"
 	scout_btn.pressed.connect(_on_scout_pressed)
@@ -364,7 +364,7 @@ func _on_negotiate_pressed() -> void:
 				_show_recruit_dialog(result.get("reason", "Recrutement échoué"))
 
 func _show_counter_offer_dialog(player, counter: int) -> void:
-	var dialog = ConfirmationDialog.new()
+	var dialog: ConfirmationDialog = ConfirmationDialog.new()
 	dialog.title = "Contre-proposition"
 	dialog.dialog_text = "%s demande %d or/semaine. Accepter ce contrat ?" % [player.nom, counter]
 	get_tree().root.add_child(dialog)
@@ -387,7 +387,7 @@ func _on_scout_pressed() -> void:
 	if not selected_recruit or not recruitment_pool:
 		return
 	var result: Dictionary = recruitment_pool.scout_player(selected_recruit)
-	var msg = "Skill réel : %d\nSalaire demandé : %d or/sem\nAgent : %s" % [
+	var msg: String = "Skill réel : %d\nSalaire demandé : %d or/sem\nAgent : %s" % [
 		result.get("skill", 0), result.get("salary_demand", 0),
 		"Oui" if result.get("has_agent", false) else "Non"]
 	var revealed: Array = result.get("revealed_tags", [])
@@ -405,26 +405,26 @@ func _format_national_signing(result: Dictionary) -> String:
 	return text
 
 func _show_recruit_dialog(text: String) -> void:
-	var dialog = AcceptDialog.new()
+	var dialog: AcceptDialog = AcceptDialog.new()
 	dialog.dialog_text = text
 	get_tree().root.add_child(dialog)
 	dialog.popup_centered()
 	dialog.confirmed.connect(dialog.queue_free)
 
 func _add_detail_row(parent: GridContainer, label_text: String, value_text: String) -> void:
-	var label = Label.new()
+	var label: Label = Label.new()
 	label.text = label_text
 	label.add_theme_font_size_override("font_size", 14)
 	parent.add_child(label)
 
-	var value = Label.new()
+	var value: Label = Label.new()
 	value.text = value_text
 	value.add_theme_font_size_override("font_size", 14)
 	value.modulate = Color(0.9, 0.9, 1.0)
 	parent.add_child(value)
 
 func _get_planning_summary(planning: Dictionary) -> String:
-	var active_days = []
+	var active_days: Array[String] = []
 	if planning.has("vendredi") and planning["vendredi"].get("soir", false):
 		active_days.append("Vendredi soir")
 	if planning.has("samedi") and (planning["samedi"].get("apres_midi", false) or planning["samedi"].get("soir", false)):
@@ -465,14 +465,14 @@ func _on_invite_pressed() -> void:
 		_refresh_recruitment_list()
 		_update_recruit_details()
 
-		var dialog = AcceptDialog.new()
+		var dialog: AcceptDialog = AcceptDialog.new()
 		dialog.dialog_text = "Le joueur a accepté votre invitation et rejoint la guilde!"
 		get_tree().root.add_child(dialog)
 		dialog.popup_centered()
 		dialog.confirmed.connect(dialog.queue_free)
 	else:
 		# Le joueur a refusé
-		var dialog = AcceptDialog.new()
+		var dialog: AcceptDialog = AcceptDialog.new()
 		dialog.dialog_text = "Le joueur a décliné votre invitation.\nRaison: %s" % result.reason
 		get_tree().root.add_child(dialog)
 		dialog.popup_centered()

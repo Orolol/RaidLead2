@@ -93,17 +93,17 @@ signal close_requested()
 signal hovered()
 signal unhovered()
 
-func _ready():
+func _ready() -> void:
 	_create_ui()
 	_apply_styling()
 	_setup_interactions()
-	
+
 	if animate_appearance:
 		_animate_appear()
 
-func _create_ui():
+func _create_ui() -> void:
 	"""Crée la structure UI du badge"""
-	
+
 	# Panel de fond
 	background_panel = PanelContainer.new()
 	add_child(background_panel)
@@ -124,7 +124,7 @@ func _create_ui():
 	if show_close_button:
 		_create_close_button()
 
-func _create_close_button():
+func _create_close_button() -> void:
 	"""Crée le bouton de fermeture"""
 	close_button = Button.new()
 	close_button.text = "×"
@@ -133,14 +133,14 @@ func _create_close_button():
 	close_button.pressed.connect(_on_close_pressed)
 	content_container.add_child(close_button)
 
-func _apply_styling():
+func _apply_styling() -> void:
 	"""Applique le style visuel au badge"""
-	
+
 	var size_config = SIZE_CONFIGS[badge_size]
 	current_color = BADGE_COLORS[badge_type]
-	
+
 	# Style du panel de fond
-	var style = StyleBoxFlat.new()
+	var style := StyleBoxFlat.new()
 	style.bg_color = current_color
 	style.corner_radius_top_left = size_config.corner_radius
 	style.corner_radius_top_right = size_config.corner_radius
@@ -175,9 +175,9 @@ func _apply_styling():
 	if auto_size:
 		size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
-func _setup_interactions():
+func _setup_interactions() -> void:
 	"""Configure les interactions souris"""
-	
+
 	if clickable:
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		gui_input.connect(_on_gui_input)
@@ -188,22 +188,22 @@ func _setup_interactions():
 
 # ==================== SETTERS ====================
 
-func set_text(new_text: String):
+func set_text(new_text: String) -> void:
 	text = new_text
 	if text_label:
 		text_label.text = text
 
-func set_badge_type(new_type: BadgeType):
+func set_badge_type(new_type: BadgeType) -> void:
 	badge_type = new_type
 	if is_inside_tree():
 		_apply_styling()
 
-func set_badge_size(new_size: BadgeSize):
+func set_badge_size(new_size: BadgeSize) -> void:
 	badge_size = new_size
 	if is_inside_tree():
 		_apply_styling()
 
-func set_show_close_button(show: bool):
+func set_show_close_button(show: bool) -> void:
 	show_close_button = show
 	if is_inside_tree():
 		if show and not close_button:
@@ -212,62 +212,62 @@ func set_show_close_button(show: bool):
 			close_button.queue_free()
 			close_button = null
 
-func set_clickable(is_clickable: bool):
+func set_clickable(is_clickable: bool) -> void:
 	clickable = is_clickable
 	if is_inside_tree():
 		_setup_interactions()
 
 # ==================== API PUBLIQUE ====================
 
-func update_text(new_text: String):
+func update_text(new_text: String) -> void:
 	"""Met à jour le texte du badge"""
 	set_text(new_text)
 
-func update_type(new_type: BadgeType):
+func update_type(new_type: BadgeType) -> void:
 	"""Met à jour le type du badge avec animation"""
 	if current_tween:
 		current_tween.kill()
-	
-	var old_color = current_color
+
+	var old_color := current_color
 	badge_type = new_type
-	var new_color = BADGE_COLORS[badge_type]
-	
+	var new_color: Color = BADGE_COLORS[badge_type]
+
 	# Animation de transition de couleur
 	current_tween = create_tween()
 	current_tween.tween_method(_animate_color, old_color, new_color, 0.3)
 	current_tween.finished.connect(func(): _apply_styling())
 
-func pulse():
+func pulse() -> void:
 	"""Effet de pulsation pour attirer l'attention"""
 	if current_tween:
 		current_tween.kill()
-	
+
 	current_tween = create_tween()
 	current_tween.tween_property(self, "scale", Vector2(1.1, 1.1), 0.15)
 	current_tween.tween_property(self, "scale", Vector2.ONE, 0.15)
 
-func flash(color: Color = Color.WHITE, duration: float = 0.2):
+func flash(color: Color = Color.WHITE, duration: float = 0.2) -> void:
 	"""Effet de flash coloré"""
 	if current_tween:
 		current_tween.kill()
-	
-	var original_modulate = modulate
+
+	var original_modulate := modulate
 	current_tween = create_tween()
 	current_tween.tween_property(self, "modulate", color, duration * 0.5)
 	current_tween.tween_property(self, "modulate", original_modulate, duration * 0.5)
 
-func fade_in(duration: float = 0.3):
+func fade_in(duration: float = 0.3) -> void:
 	"""Animation d'apparition en fondu"""
 	modulate.a = 0.0
 	visible = true
-	
+
 	if current_tween:
 		current_tween.kill()
-	
+
 	current_tween = create_tween()
 	current_tween.tween_property(self, "modulate:a", 1.0, duration)
 
-func fade_out(duration: float = 0.3, hide_after: bool = true):
+func fade_out(duration: float = 0.3, hide_after: bool = true) -> void:
 	"""Animation de disparition en fondu"""
 	if current_tween:
 		current_tween.kill()
@@ -287,17 +287,17 @@ func is_close_button_visible() -> bool:
 
 # ==================== MÉTHODES PRIVÉES ====================
 
-func _animate_appear():
+func _animate_appear() -> void:
 	"""Animation d'apparition du badge"""
 	scale = Vector2.ZERO
 	modulate.a = 0.0
-	
-	var tween = create_tween()
+
+	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "scale", Vector2.ONE, 0.3).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "modulate:a", 1.0, 0.3).set_ease(Tween.EASE_OUT)
 
-func _animate_color(color: Color):
+func _animate_color(color: Color) -> void:
 	"""Animation de changement de couleur"""
 	current_color = color
 	var style = background_panel.get_theme_stylebox("panel").duplicate()
@@ -305,7 +305,7 @@ func _animate_color(color: Color):
 	style.border_color = color.lightened(0.2)
 	background_panel.add_theme_stylebox_override("panel", style)
 
-func _on_gui_input(event: InputEvent):
+func _on_gui_input(event: InputEvent) -> void:
 	"""Gère les événements de souris"""
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -318,24 +318,24 @@ func _on_gui_input(event: InputEvent):
 				is_pressed = false
 				_update_hover_state()
 
-func _on_mouse_entered():
+func _on_mouse_entered() -> void:
 	"""Souris entre dans le badge"""
 	is_hovered = true
 	_update_hover_state()
 	hovered.emit()
 
-func _on_mouse_exited():
+func _on_mouse_exited() -> void:
 	"""Souris sort du badge"""
 	is_hovered = false
 	is_pressed = false
 	_update_hover_state()
 	unhovered.emit()
 
-func _update_hover_state():
+func _update_hover_state() -> void:
 	"""Met à jour l'apparence selon l'état hover/pressed"""
 	if not background_panel:
 		return
-	
+
 	var style = background_panel.get_theme_stylebox("panel").duplicate()
 	
 	if is_pressed:
@@ -350,7 +350,7 @@ func _update_hover_state():
 	
 	background_panel.add_theme_stylebox_override("panel", style)
 
-func _on_close_pressed():
+func _on_close_pressed() -> void:
 	"""Bouton fermer pressé"""
 	close_requested.emit()
 
@@ -358,7 +358,7 @@ func _on_close_pressed():
 
 static func create_tag_badge(tag_text: String, parent: Node) -> Badge:
 	"""Crée un badge de tag de joueur"""
-	var badge = Badge.new()
+	var badge := Badge.new()
 	badge.text = tag_text
 	badge.badge_type = BadgeType.TAG
 	badge.badge_size = BadgeSize.SMALL
@@ -369,7 +369,7 @@ static func create_tag_badge(tag_text: String, parent: Node) -> Badge:
 
 static func create_counter_badge(count: int, parent: Node) -> Badge:
 	"""Crée un badge compteur"""
-	var badge = Badge.new()
+	var badge := Badge.new()
 	badge.text = str(count)
 	badge.badge_type = BadgeType.COUNTER
 	badge.badge_size = BadgeSize.SMALL
@@ -379,7 +379,7 @@ static func create_counter_badge(count: int, parent: Node) -> Badge:
 
 static func create_status_badge(is_online: bool, parent: Node) -> Badge:
 	"""Crée un badge de statut en ligne/hors ligne"""
-	var badge = Badge.new()
+	var badge := Badge.new()
 	badge.text = "●"  # Caractère cercle
 	badge.badge_type = BadgeType.SUCCESS if is_online else BadgeType.ERROR
 	badge.badge_size = BadgeSize.SMALL
@@ -390,7 +390,7 @@ static func create_status_badge(is_online: bool, parent: Node) -> Badge:
 
 # ==================== MÉTHODES POUR LES CAS D'USAGE SPÉCIFIQUES ====================
 
-func setup_for_player_tag(tag_name: String, removable: bool = false):
+func setup_for_player_tag(tag_name: String, removable: bool = false) -> void:
 	"""Configuration spéciale pour les tags de joueur"""
 	update_text(tag_name)
 	update_type(BadgeType.TAG)
@@ -398,7 +398,7 @@ func setup_for_player_tag(tag_name: String, removable: bool = false):
 	set_show_close_button(removable)
 	set_clickable(true)
 
-func setup_for_notification_count(count: int):
+func setup_for_notification_count(count: int) -> void:
 	"""Configuration spéciale pour les compteurs de notifications"""
 	update_text(str(count))
 	update_type(BadgeType.COUNTER)
@@ -408,7 +408,7 @@ func setup_for_notification_count(count: int):
 	else:
 		visible = true
 
-func setup_for_connection_status(is_connected: bool):
+func setup_for_connection_status(is_connected: bool) -> void:
 	"""Configuration spéciale pour le statut de connexion"""
 	update_text("●")
 	update_type(BadgeType.SUCCESS if is_connected else BadgeType.ERROR)
@@ -417,24 +417,24 @@ func setup_for_connection_status(is_connected: bool):
 
 # ==================== ANIMATIONS AVANCÉES ====================
 
-func bounce():
+func bounce() -> void:
 	"""Animation de rebond"""
 	if current_tween:
 		current_tween.kill()
-	
+
 	current_tween = create_tween()
 	current_tween.tween_property(self, "scale", Vector2(1.2, 1.2), 0.1)
 	current_tween.tween_property(self, "scale", Vector2(0.9, 0.9), 0.1)
 	current_tween.tween_property(self, "scale", Vector2.ONE, 0.1)
 
-func shake():
+func shake() -> void:
 	"""Animation de secousse pour attirer l'attention"""
 	if current_tween:
 		current_tween.kill()
-	
-	var original_pos = position
+
+	var original_pos := position
 	current_tween = create_tween()
 	for i in range(6):
-		var offset = Vector2(randf_range(-2, 2), randf_range(-2, 2))
+		var offset := Vector2(randf_range(-2, 2), randf_range(-2, 2))
 		current_tween.tween_property(self, "position", original_pos + offset, 0.05)
 	current_tween.tween_property(self, "position", original_pos, 0.05)

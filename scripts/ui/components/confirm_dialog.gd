@@ -65,12 +65,12 @@ const TYPE_ICONS = {
 	DialogType.DESTRUCTIVE: "⚠"
 }
 
-func _ready():
+func _ready() -> void:
 	_setup_ui()
 	_apply_type_style()
 	hide()
 
-func _setup_ui():
+func _setup_ui() -> void:
 	"""Configure la structure UI"""
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	z_index = 1000  # Au-dessus de tout
@@ -88,9 +88,9 @@ func _setup_ui():
 	dialog_panel.custom_minimum_size = Vector2(dialog_width, dialog_min_height)
 	dialog_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	add_child(dialog_panel)
-	
+
 	# Container principal
-	var main_vbox = VBoxContainer.new()
+	var main_vbox := VBoxContainer.new()
 	main_vbox.add_theme_constant_override("separation", 10)
 	dialog_panel.add_child(main_vbox)
 	
@@ -106,9 +106,9 @@ func _setup_ui():
 	# Style du panel
 	_apply_panel_style()
 
-func _setup_header(parent: VBoxContainer):
+func _setup_header(parent: VBoxContainer) -> void:
 	"""Configure le header du dialogue"""
-	var header_container = HBoxContainer.new()
+	var header_container := HBoxContainer.new()
 	header_container.add_theme_constant_override("separation", 10)
 	parent.add_child(header_container)
 	
@@ -131,20 +131,20 @@ func _setup_header(parent: VBoxContainer):
 	# Séparateur
 	parent.add_child(HSeparator.new())
 
-func _setup_content(parent: VBoxContainer):
+func _setup_content(parent: VBoxContainer) -> void:
 	"""Configure le contenu du dialogue"""
-	var content_hbox = HBoxContainer.new()
+	var content_hbox := HBoxContainer.new()
 	content_hbox.add_theme_constant_override("separation", 15)
 	parent.add_child(content_hbox)
-	
+
 	# Icône
 	if show_icon:
 		icon_texture = TextureRect.new()
 		icon_texture.custom_minimum_size = Vector2(icon_size, icon_size)
 		icon_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		
+
 		# Utiliser un label pour afficher un caractère Unicode comme icône
-		var icon_label = Label.new()
+		var icon_label := Label.new()
 		icon_label.text = TYPE_ICONS.get(dialog_type, "?")
 		icon_label.add_theme_font_size_override("font_size", 32)
 		icon_label.custom_minimum_size = Vector2(icon_size, icon_size)
@@ -160,13 +160,13 @@ func _setup_content(parent: VBoxContainer):
 	message_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content_hbox.add_child(message_label)
 
-func _setup_buttons(parent: VBoxContainer):
+func _setup_buttons(parent: VBoxContainer) -> void:
 	"""Configure les boutons du dialogue"""
 	# Séparateur
 	parent.add_child(HSeparator.new())
-	
+
 	# Container des boutons
-	var button_container = HBoxContainer.new()
+	var button_container := HBoxContainer.new()
 	button_container.add_theme_constant_override("separation", 10)
 	button_container.alignment = BoxContainer.ALIGNMENT_END
 	parent.add_child(button_container)
@@ -185,9 +185,9 @@ func _setup_buttons(parent: VBoxContainer):
 	confirm_button.pressed.connect(_on_confirm_pressed)
 	button_container.add_child(confirm_button)
 
-func _apply_panel_style():
+func _apply_panel_style() -> void:
 	"""Applique le style au panel"""
-	var style = StyleBoxFlat.new()
+	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.15, 0.15, 0.2)
 	style.border_width_left = 2
 	style.border_width_right = 2
@@ -205,24 +205,24 @@ func _apply_panel_style():
 	
 	dialog_panel.add_theme_stylebox_override("panel", style)
 
-func _apply_type_style():
+func _apply_type_style() -> void:
 	"""Applique le style selon le type de dialogue"""
 	var color = TYPE_COLORS.get(dialog_type, Color.WHITE)
-	
+
 	if title_label:
 		title_label.modulate = color
-	
+
 	if confirm_button:
 		# Style du bouton confirmer selon le type
-		var button_style = StyleBoxFlat.new()
+		var button_style := StyleBoxFlat.new()
 		button_style.bg_color = color.darkened(0.3)
 		button_style.corner_radius_top_left = 4
 		button_style.corner_radius_top_right = 4
 		button_style.corner_radius_bottom_left = 4
 		button_style.corner_radius_bottom_right = 4
 		confirm_button.add_theme_stylebox_override("normal", button_style)
-		
-		var hover_style = button_style.duplicate()
+
+		var hover_style: StyleBoxFlat = button_style.duplicate()
 		hover_style.bg_color = color.darkened(0.1)
 		confirm_button.add_theme_stylebox_override("hover", hover_style)
 		
@@ -233,87 +233,87 @@ func _apply_type_style():
 
 # ==================== SETTERS ====================
 
-func set_dialog_type(type: DialogType):
+func set_dialog_type(type: DialogType) -> void:
 	dialog_type = type
 	if is_inside_tree():
 		_apply_type_style()
 
-func set_title_text(text: String):
+func set_title_text(text: String) -> void:
 	title_text = text
 	if title_label:
 		title_label.text = text
 
-func set_message_text(text: String):
+func set_message_text(text: String) -> void:
 	message_text = text
 	if message_label:
 		message_label.text = text
 
-func set_confirm_text(text: String):
+func set_confirm_text(text: String) -> void:
 	confirm_text = text
 	if confirm_button:
 		confirm_button.text = text
 
-func set_cancel_text(text: String):
+func set_cancel_text(text: String) -> void:
 	cancel_text = text
 	if cancel_button:
 		cancel_button.text = text
 
-func set_show_icon(show: bool):
-	show_icon = show
+func set_show_icon(should_show: bool) -> void:
+	show_icon = should_show
 	if icon_texture:
-		icon_texture.visible = show
+		icon_texture.visible = should_show
 
 # ==================== ÉVÉNEMENTS ====================
 
-func _on_confirm_pressed():
+func _on_confirm_pressed() -> void:
 	"""Gère le clic sur Confirmer"""
 	confirmed.emit()
 	if auto_close_on_action:
 		hide_dialog()
 
-func _on_cancel_pressed():
+func _on_cancel_pressed() -> void:
 	"""Gère le clic sur Annuler"""
 	cancelled.emit()
 	if auto_close_on_action:
 		hide_dialog()
 
-func _on_close_pressed():
+func _on_close_pressed() -> void:
 	"""Gère le clic sur Fermer"""
 	closed.emit()
 	hide_dialog()
 
 # ==================== API PUBLIQUE ====================
 
-func show_dialog():
+func show_dialog() -> void:
 	"""Affiche le dialogue"""
 	show()
-	
+
 	# Animation d'apparition
 	dialog_panel.scale = Vector2(0.8, 0.8)
 	dialog_panel.modulate.a = 0.0
-	
-	var tween = create_tween()
+
+	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(dialog_panel, "scale", Vector2.ONE, 0.2).set_ease(Tween.EASE_OUT)
 	tween.tween_property(dialog_panel, "modulate:a", 1.0, 0.2)
-	
+
 	if background_overlay:
 		background_overlay.modulate.a = 0.0
 		create_tween().tween_property(background_overlay, "modulate:a", 1.0, 0.2)
 
-func hide_dialog():
+func hide_dialog() -> void:
 	"""Cache le dialogue avec animation"""
-	var tween = create_tween()
+	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(dialog_panel, "scale", Vector2(0.8, 0.8), 0.2).set_ease(Tween.EASE_IN)
 	tween.tween_property(dialog_panel, "modulate:a", 0.0, 0.2)
-	
+
 	if background_overlay:
 		create_tween().tween_property(background_overlay, "modulate:a", 0.0, 0.2)
-	
+
 	tween.finished.connect(hide)
 
-func set_dialog_data(title: String, message: String, type: DialogType = DialogType.DEFAULT):
+func set_dialog_data(title: String, message: String, type: DialogType = DialogType.DEFAULT) -> void:
 	"""Configure rapidement le dialogue"""
 	set_title_text(title)
 	set_message_text(message)
@@ -323,7 +323,7 @@ func set_dialog_data(title: String, message: String, type: DialogType = DialogTy
 
 static func create_confirmation(parent: Node, title: String, message: String, on_confirm: Callable) -> ConfirmDialog:
 	"""Crée un dialogue de confirmation simple"""
-	var dialog = ConfirmDialog.new()
+	var dialog := ConfirmDialog.new()
 	dialog.set_dialog_data(title, message, DialogType.DEFAULT)
 	dialog.confirmed.connect(on_confirm)
 	parent.add_child(dialog)
@@ -332,7 +332,7 @@ static func create_confirmation(parent: Node, title: String, message: String, on
 
 static func create_warning(parent: Node, title: String, message: String, on_confirm: Callable) -> ConfirmDialog:
 	"""Crée un dialogue d'avertissement"""
-	var dialog = ConfirmDialog.new()
+	var dialog := ConfirmDialog.new()
 	dialog.set_dialog_data(title, message, DialogType.WARNING)
 	dialog.confirmed.connect(on_confirm)
 	parent.add_child(dialog)
@@ -341,7 +341,7 @@ static func create_warning(parent: Node, title: String, message: String, on_conf
 
 static func create_destructive(parent: Node, title: String, message: String, on_confirm: Callable) -> ConfirmDialog:
 	"""Crée un dialogue pour action destructive"""
-	var dialog = ConfirmDialog.new()
+	var dialog := ConfirmDialog.new()
 	dialog.set_dialog_data(title, message, DialogType.DESTRUCTIVE)
 	dialog.confirm_text = "Supprimer"
 	dialog.confirmed.connect(on_confirm)
@@ -351,7 +351,7 @@ static func create_destructive(parent: Node, title: String, message: String, on_
 
 static func create_info(parent: Node, title: String, message: String) -> ConfirmDialog:
 	"""Crée un dialogue d'information (un seul bouton OK)"""
-	var dialog = ConfirmDialog.new()
+	var dialog := ConfirmDialog.new()
 	dialog.set_dialog_data(title, message, DialogType.INFO)
 	dialog.cancel_button.visible = false
 	dialog.confirm_text = "OK"

@@ -23,11 +23,11 @@ var guild_members: Array = []
 var selected_activity: String = ""
 var selected_instance: String = ""
 
-func _ready():
+func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(900, 700)
-	
-	var vbox = VBoxContainer.new()
+
+	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 10)
 	add_child(vbox)
 	
@@ -62,10 +62,10 @@ func preselect_activity(kind: String) -> void:
 		activity_option.select(idx)
 		_on_activity_selected(idx)
 
-func _setup_header(parent: VBoxContainer):
-	var header = HBoxContainer.new()
+func _setup_header(parent: VBoxContainer) -> void:
+	var header: HBoxContainer = HBoxContainer.new()
 	parent.add_child(header)
-	
+
 	title_label = Label.new()
 	title_label.text = "Organisation de Groupe"
 	title_label.add_theme_font_size_override("font_size", 20)
@@ -79,12 +79,12 @@ func _setup_header(parent: VBoxContainer):
 	close_button.pressed.connect(_on_close_pressed)
 	header.add_child(close_button)
 
-func _setup_content(parent: VBoxContainer):
+func _setup_content(parent: VBoxContainer) -> void:
 	_setup_activity_selection(parent)
-	
+
 	parent.add_child(HSeparator.new())
-	
-	var hsplit = HSplitContainer.new()
+
+	var hsplit: HSplitContainer = HSplitContainer.new()
 	hsplit.split_offset = 300
 	parent.add_child(hsplit)
 	
@@ -95,15 +95,15 @@ func _setup_content(parent: VBoxContainer):
 	
 	_setup_launch_button(parent)
 
-func _setup_activity_selection(parent: VBoxContainer):
-	var selection_panel = PanelContainer.new()
+func _setup_activity_selection(parent: VBoxContainer) -> void:
+	var selection_panel: PanelContainer = PanelContainer.new()
 	parent.add_child(selection_panel)
-	
-	var hbox = HBoxContainer.new()
+
+	var hbox: HBoxContainer = HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 20)
 	selection_panel.add_child(hbox)
-	
-	var activity_label = Label.new()
+
+	var activity_label: Label = Label.new()
 	activity_label.text = "Type d'activité:"
 	hbox.add_child(activity_label)
 	
@@ -117,8 +117,8 @@ func _setup_activity_selection(parent: VBoxContainer):
 	hbox.add_child(activity_option)
 	
 	hbox.add_child(VSeparator.new())
-	
-	var instance_label = Label.new()
+
+	var instance_label: Label = Label.new()
 	instance_label.text = "Instance:"
 	hbox.add_child(instance_label)
 	
@@ -128,14 +128,14 @@ func _setup_activity_selection(parent: VBoxContainer):
 	instance_option.item_selected.connect(_on_instance_selected)
 	hbox.add_child(instance_option)
 
-func _setup_available_members(parent: HSplitContainer):
-	var left_panel = PanelContainer.new()
+func _setup_available_members(parent: HSplitContainer) -> void:
+	var left_panel: PanelContainer = PanelContainer.new()
 	parent.add_child(left_panel)
-	
-	var vbox = VBoxContainer.new()
+
+	var vbox: VBoxContainer = VBoxContainer.new()
 	left_panel.add_child(vbox)
-	
-	var label = Label.new()
+
+	var label: Label = Label.new()
 	label.text = "Membres Disponibles"
 	label.add_theme_font_size_override("font_size", 16)
 	vbox.add_child(label)
@@ -149,35 +149,35 @@ func _setup_available_members(parent: HSplitContainer):
 	available_members_container.add_theme_constant_override("separation", 5)
 	available_members_scroll.add_child(available_members_container)
 
-func _setup_group_composition(parent: HSplitContainer):
-	var right_panel = PanelContainer.new()
+func _setup_group_composition(parent: HSplitContainer) -> void:
+	var right_panel: PanelContainer = PanelContainer.new()
 	parent.add_child(right_panel)
-	
+
 	group_composition = VBoxContainer.new()
 	group_composition.add_theme_constant_override("separation", 10)
 	right_panel.add_child(group_composition)
-	
-	var label = Label.new()
+
+	var label: Label = Label.new()
 	label.text = "Composition du Groupe"
 	label.add_theme_font_size_override("font_size", 16)
 	group_composition.add_child(label)
-	
-	var info_label = Label.new()
+
+	var info_label: Label = Label.new()
 	info_label.text = "Sélectionnez une activité pour voir les rôles requis"
 	info_label.modulate = Color(0.7, 0.7, 0.7)
 	group_composition.add_child(info_label)
 
-func _setup_launch_button(parent: VBoxContainer):
+func _setup_launch_button(parent: VBoxContainer) -> void:
 	# Container pour les boutons
-	var buttons_container = HBoxContainer.new()
+	var buttons_container: HBoxContainer = HBoxContainer.new()
 	buttons_container.add_theme_constant_override("separation", 20)
 	parent.add_child(buttons_container)
-	
+
 	# Spacer pour centrer
 	buttons_container.add_spacer(false)
-	
+
 	# Bouton Auto-Assigner
-	var auto_assign_button = Button.new()
+	var auto_assign_button: Button = Button.new()
 	auto_assign_button.text = "Auto-Assigner"
 	auto_assign_button.custom_minimum_size = Vector2(150, 40)
 	auto_assign_button.pressed.connect(_on_auto_assign_pressed)
@@ -194,7 +194,7 @@ func _setup_launch_button(parent: VBoxContainer):
 	# Spacer pour centrer
 	buttons_container.add_spacer(false)
 
-func _on_activity_selected(index: int):
+func _on_activity_selected(index: int) -> void:
 	instance_option.clear()
 	instance_option.disabled = index == 0
 	
@@ -212,7 +212,7 @@ func _on_activity_selected(index: int):
 	_update_group_composition()
 	_refresh_available_members()
 
-func _populate_dungeon_list():
+func _populate_dungeon_list() -> void:
 	instance_option.add_item("Sélectionner un donjon...")
 
 	var avg_level: int = _get_guild_average_level()
@@ -235,7 +235,7 @@ func _populate_dungeon_list():
 		var req_level: int = int(heroics[hid].get("requires_level", 60))
 		_add_instance_item(hid, str(heroics[hid].name), req_level, avg_level)
 
-func _populate_raid_list():
+func _populate_raid_list() -> void:
 	instance_option.add_item("Sélectionner un raid...")
 
 	var avg_level: int = _get_guild_average_level()
@@ -278,7 +278,7 @@ func _get_guild_average_level() -> int:
 		total += member.personnage_niveau
 	return int(round(float(total) / float(pool.size())))
 
-func _on_instance_selected(index: int):
+func _on_instance_selected(index: int) -> void:
 	if index > 0:  # Ignorer "Sélectionner..."
 		var meta: Variant = instance_option.get_item_metadata(index)
 		# Métadonnée nulle = item verrouillé (hors de portée) : pas de sélection valide.
@@ -287,17 +287,17 @@ func _on_instance_selected(index: int):
 		selected_instance = ""
 	_update_group_composition()
 
-func _update_group_composition():
+func _update_group_composition() -> void:
 	for child in group_composition.get_children():
 		child.queue_free()
-	
+
 	group_slots.clear()
 	run_preview_label = null
-	
+
 	if selected_activity == "" or selected_instance == "":
 		return
-	
-	var composition_label = Label.new()
+
+	var composition_label: Label = Label.new()
 	composition_label.text = "Composition requise:"
 	composition_label.add_theme_font_size_override("font_size", 14)
 	group_composition.add_child(composition_label)
@@ -318,25 +318,25 @@ func _update_group_composition():
 	_setup_run_preview()
 	_check_launch_button()
 
-func _add_role_slot(role: String, count: int):
+func _add_role_slot(role: String, count: int) -> void:
 	for i in count:
-		var slot_hbox = HBoxContainer.new()
+		var slot_hbox: HBoxContainer = HBoxContainer.new()
 		slot_hbox.add_theme_constant_override("separation", 10)
 		group_composition.add_child(slot_hbox)
-		
-		var role_label = Label.new()
+
+		var role_label: Label = Label.new()
 		role_label.text = role + ":"
 		role_label.custom_minimum_size.x = 80
 		slot_hbox.add_child(role_label)
-		
+
 		# Créer une DropZone au lieu d'un Button
-		var drop_zone = DropZone.new()
+		var drop_zone: DropZone = DropZone.new()
 		drop_zone.custom_minimum_size = Vector2(300, 40)
 		drop_zone.set_placeholder_text("Glisser un %s ici" % role)
 		drop_zone.drop_policy = DropZone.DropPolicy.REPLACE
 		slot_hbox.add_child(drop_zone)
-		
-		var slot_id = role + "_" + str(i)
+
+		var slot_id: String = role + "_" + str(i)
 		group_slots[slot_id] = {
 			"role": role,
 			"drop_zone": drop_zone,
@@ -353,28 +353,28 @@ func _add_role_slot(role: String, count: int):
 		drop_zone.gui_input.connect(_on_slot_gui_input.bind(slot_id))
 
 # Nouvelle fonction pour créer un membre draggable
-func _create_draggable_member(member):
-	var draggable = DraggableItem.new()
+func _create_draggable_member(member) -> void:
+	var draggable: DraggableItem = DraggableItem.new()
 	draggable.custom_minimum_size = Vector2(240, 40)
-	
+
 	# Configurer les données du drag
-	var drag_data = {
+	var drag_data: Dictionary = {
 		"type": "guild_member",
 		"member": member,
 		"role": member.get_role(),
 		"text": "%s - %s" % [member.nom, member.personnage_classe]
 	}
 	draggable.set_drag_data(drag_data)
-	
+
 	# Créer le contenu visuel
-	var hbox = HBoxContainer.new()
+	var hbox: HBoxContainer = HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 10)
 	draggable.add_child(hbox)
-	
+
 	# Portrait de classe
 	var class_portrait: Texture2D = AssetLoader.get_class_portrait(member.personnage_classe)
 	if class_portrait:
-		var portrait_rect = TextureRect.new()
+		var portrait_rect: TextureRect = TextureRect.new()
 		portrait_rect.texture = class_portrait
 		portrait_rect.custom_minimum_size = Vector2(32, 32)
 		portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -384,24 +384,24 @@ func _create_draggable_member(member):
 	# Icône de rôle
 	var role_tex: Texture2D = AssetLoader.get_role_icon(member.get_role())
 	if role_tex:
-		var role_rect = TextureRect.new()
+		var role_rect: TextureRect = TextureRect.new()
 		role_rect.texture = role_tex
 		role_rect.custom_minimum_size = Vector2(20, 20)
 		role_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		role_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		hbox.add_child(role_rect)
 	else:
-		var role_label = Label.new()
+		var role_label: Label = Label.new()
 		role_label.text = _get_role_icon(member.get_role())
 		role_label.add_theme_font_size_override("font_size", 16)
 		hbox.add_child(role_label)
 
 	# Nom et classe
-	var member_label = Label.new()
+	var member_label: Label = Label.new()
 	member_label.text = "%s\n%s Niv.%d" % [member.nom, member.personnage_classe, member.personnage_niveau]
 	member_label.add_theme_font_size_override("font_size", 12)
 	hbox.add_child(member_label)
-	
+
 	available_members_container.add_child(draggable)
 	draggable_members.append(draggable)
 
@@ -412,8 +412,8 @@ func _get_role_icon(role: String) -> String:
 		"DPS": return "⚔️"
 		_: return "👥"
 
-# Gestionnaire pour le drop d'un membre  
-func _on_member_dropped(slot_id: String, item: DraggableItem, zone: DropZone):
+# Gestionnaire pour le drop d'un membre
+func _on_member_dropped(slot_id: String, item: DraggableItem, _zone: DropZone) -> void:
 	var slot = group_slots[slot_id]
 	var item_data = item.get_drag_data()
 	var member = item_data.member
@@ -430,7 +430,7 @@ func _on_member_dropped(slot_id: String, item: DraggableItem, zone: DropZone):
 	_check_launch_button()
 
 # Validation pour le drop
-func _validate_member_drop(slot_id: String, item: DraggableItem, data: Dictionary, zone: DropZone) -> bool:
+func _validate_member_drop(slot_id: String, item: DraggableItem, _data: Dictionary, _zone: DropZone) -> bool:
 	var item_data = item.get_drag_data()
 	if item_data.type != "guild_member":
 		return false
@@ -442,14 +442,14 @@ func _validate_member_drop(slot_id: String, item: DraggableItem, data: Dictionar
 	return _can_fill_role(member, slot.role)
 
 # Gestionnaire d'input pour le double-clic sur slot
-func _on_slot_gui_input(slot_id: String, event: InputEvent):
+func _on_slot_gui_input(slot_id: String, event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		var mouse_event = event as InputEventMouseButton
+		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
 		if mouse_event.pressed and mouse_event.double_click and mouse_event.button_index == MOUSE_BUTTON_LEFT:
 			_unassign_member_from_slot(slot_id)
 
 # Fonction pour désassigner un membre d'un slot
-func _unassign_member_from_slot(slot_id: String):
+func _unassign_member_from_slot(slot_id: String) -> void:
 	var slot = group_slots[slot_id]
 	if slot.member:
 		slot.member = null
@@ -457,7 +457,7 @@ func _unassign_member_from_slot(slot_id: String):
 		_refresh_available_members()
 		_check_launch_button()
 
-func _check_launch_button():
+func _check_launch_button() -> void:
 	var total: int = group_slots.size()
 	var filled: int = 0
 	for slot_id in group_slots:
@@ -598,18 +598,18 @@ func _count_required_members(required: Dictionary) -> int:
 		total += int(required[role])
 	return total
 
-func _refresh_available_members():
+func _refresh_available_members() -> void:
 	# Nettoyer les anciens DraggableItems
 	for draggable in draggable_members:
 		if is_instance_valid(draggable):
 			draggable.queue_free()
 	draggable_members.clear()
-	
+
 	# Créer de nouveaux DraggableItems pour les membres disponibles
 	for member in guild_members:
 		# Only show online players who are available
 		if member.is_online and member.is_available_now():
-			var assigned = false
+			var assigned: bool = false
 			for slot_id in group_slots:
 				if group_slots[slot_id].member == member:
 					assigned = true
@@ -618,11 +618,11 @@ func _refresh_available_members():
 			if not assigned:
 				_create_draggable_member(member)
 
-func _on_launch_pressed():
+func _on_launch_pressed() -> void:
 	# Seul du contenu de groupe (donjon/raid) est composable ici.
 	_launch_dungeon_or_raid()
 
-func _launch_dungeon_or_raid():
+func _launch_dungeon_or_raid() -> void:
 	# Construit le groupe à partir des slots assignés (effectif partiel autorisé pour les raids).
 	var group = []
 	for slot_id in group_slots:
@@ -630,7 +630,7 @@ func _launch_dungeon_or_raid():
 		if slot.member != null:
 			group.append(slot.member)
 	if group.is_empty():
-		var dialog = AcceptDialog.new()
+		var dialog: AcceptDialog = AcceptDialog.new()
 		dialog.dialog_text = "Assignez au moins quelques membres avant de lancer."
 		get_tree().root.add_child(dialog)
 		dialog.popup_centered()
@@ -645,28 +645,28 @@ func _launch_dungeon_or_raid():
 			_open_dungeon_window(dungeon_instance)
 			hide()
 		else:
-			var dialog = AcceptDialog.new()
+			var dialog: AcceptDialog = AcceptDialog.new()
 			dialog.dialog_text = "Impossible de démarrer le donjon!"
 			get_tree().root.add_child(dialog)
 			dialog.popup_centered()
 
-func _simulate_dungeon_run(dungeon_run):
+func _simulate_dungeon_run(dungeon_run) -> void:
 	var instance_data = dungeon_run.instance_data
-	var result_text = "=== %s ===\n\n" % instance_data.name
-	
+	var result_text: String = "=== %s ===\n\n" % instance_data.name
+
 	# Simule chaque boss
 	for i in range(instance_data.bosses.size()):
 		if not dungeon_run.can_continue():
 			result_text += "\nLe groupe abandonne après trop de wipes!\n"
 			break
-			
+
 		var result = dungeon_run.simulate_boss_fight(i)
-		
+
 		if result.success:
 			result_text += "✓ %s vaincu!\n" % result.boss_name
 		else:
 			result_text += "✗ Wipe sur %s: %s\n" % [result.boss_name, result.wipe_reason]
-	
+
 	# Finalise le run
 	var success = dungeon_run.defeated_bosses.size() == instance_data.bosses.size()
 	dungeon_run.complete_run(success)
@@ -687,13 +687,13 @@ func _simulate_dungeon_run(dungeon_run):
 					item_strings.append(item.get_display_name())
 				else:
 					item_strings.append(str(item))
-			var loot_line = "Aucun objet"
+			var loot_line: String = "Aucun objet"
 			if not item_strings.is_empty():
 				loot_line = ", ".join(item_strings)
 			result_text += "- %s: %s\n" % [member_name, loot_line]
-	
+
 	# Affiche les résultats
-	var dialog = AcceptDialog.new()
+	var dialog: AcceptDialog = AcceptDialog.new()
 	dialog.dialog_text = result_text
 	dialog.title = "Résultat du donjon"
 	get_tree().root.add_child(dialog)
@@ -701,7 +701,7 @@ func _simulate_dungeon_run(dungeon_run):
 	
 	hide()
 
-func _open_dungeon_window(dungeon_instance):
+func _open_dungeon_window(dungeon_instance) -> void:
 	# Charger et afficher la fenêtre de donjon
 	var dungeon_window_scene = load("res://scenes/Fenetre_Donjon.tscn")
 	var dungeon_window = dungeon_window_scene.instantiate()
@@ -727,10 +727,10 @@ func _open_dungeon_window(dungeon_instance):
 		dungeon_window.queue_free()
 	)
 
-func _on_close_pressed():
+func _on_close_pressed() -> void:
 	hide()
 
-func set_guild_members(members: Array):
+func set_guild_members(members: Array) -> void:
 	guild_members = members
 	_refresh_available_members()
 
@@ -744,7 +744,7 @@ func _can_fill_role(member: SimulatedPlayer, role: String) -> bool:
 # Fonction remplacée par le système de drag & drop
 # func _on_member_double_clicked - supprimée
 
-func _on_auto_assign_pressed():
+func _on_auto_assign_pressed() -> void:
 	# Vider tous les slots d'abord
 	for slot_id in group_slots:
 		_unassign_member_from_slot(slot_id)
@@ -777,12 +777,12 @@ func _on_auto_assign_pressed():
 	_check_launch_button()
 	
 	# Si tous les slots ne sont pas remplis, afficher un message
-	var all_filled = true
+	var all_filled: bool = true
 	for slot_id in group_slots:
 		if group_slots[slot_id].member == null:
 			all_filled = false
 			break
-	
+
 	if not all_filled:
 		# Utiliser NotificationManager si disponible
 		var notification_manager = NotificationManager
@@ -794,7 +794,7 @@ func _on_auto_assign_pressed():
 				"Auto-assignation"
 			)
 		else:
-			var dialog = AcceptDialog.new()
+			var dialog: AcceptDialog = AcceptDialog.new()
 			dialog.dialog_text = "Impossible de remplir tous les rôles. Vérifiez que vous avez assez de membres en ligne avec les bons rôles."
 			get_tree().root.add_child(dialog)
 			dialog.popup_centered()

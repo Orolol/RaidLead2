@@ -38,11 +38,11 @@ var mood_label: Label
 var session_label: Label
 var _state_signal_connected: bool = false
 
-func _ready():
+func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(800, 600)
-	
-	var vbox = VBoxContainer.new()
+
+	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 10)
 	add_child(vbox)
 	
@@ -65,10 +65,10 @@ func _ready():
 
 	hide()
 
-func _setup_header(parent: VBoxContainer):
-	var header = HBoxContainer.new()
+func _setup_header(parent: VBoxContainer) -> void:
+	var header: HBoxContainer = HBoxContainer.new()
 	parent.add_child(header)
-	
+
 	title_label = Label.new()
 	title_label.text = "Informations du Personnage"
 	title_label.add_theme_font_size_override("font_size", 20)
@@ -93,7 +93,7 @@ func _on_header_drag(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and _drag_active:
 		position += event.relative
 
-func _setup_content(parent: VBoxContainer):
+func _setup_content(parent: VBoxContainer) -> void:
 	# Utiliser AdvancedTabs pour organiser les informations
 	advanced_tabs = AdvancedTabs.create_simple_tabs(parent)
 	
@@ -106,53 +106,53 @@ func _setup_content(parent: VBoxContainer):
 	# Onglet Réputation
 	_setup_reputation_tab()
 
-func _setup_character_info_tab():
+func _setup_character_info_tab() -> void:
 	"""Configure l'onglet des informations de personnage"""
-	var info_tab = VBoxContainer.new()
+	var info_tab: VBoxContainer = VBoxContainer.new()
 	info_tab.name = "Personnage"
 	info_tab.add_theme_constant_override("separation", 15)
 	advanced_tabs.add_tab("Personnage", info_tab, false)
-	
-	var info_panel = PanelContainer.new()
+
+	var info_panel: PanelContainer = PanelContainer.new()
 	info_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_tab.add_child(info_panel)
 
 	# Disposition en deux colonnes : identité (gauche) / état (droite)
-	var columns = HBoxContainer.new()
+	var columns: HBoxContainer = HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 24)
 	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_panel.add_child(columns)
 
-	var info_vbox = VBoxContainer.new()
+	var info_vbox: VBoxContainer = VBoxContainer.new()
 	info_vbox.add_theme_constant_override("separation", 10)
 	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(info_vbox)
 
 	columns.add_child(VSeparator.new())
 
-	var right_vbox = VBoxContainer.new()
+	var right_vbox: VBoxContainer = VBoxContainer.new()
 	right_vbox.add_theme_constant_override("separation", 12)
 	right_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(right_vbox)
 
 	# Header avec portrait (colonne gauche)
-	var header_hbox = HBoxContainer.new()
+	var header_hbox: HBoxContainer = HBoxContainer.new()
 	header_hbox.add_theme_constant_override("separation", 15)
 	info_vbox.add_child(header_hbox)
 
 	var portrait: Texture2D = AssetLoader.get_class_portrait("Guerrier")
 	if portrait:
-		var portrait_rect = TextureRect.new()
+		var portrait_rect: TextureRect = TextureRect.new()
 		portrait_rect.texture = portrait
 		portrait_rect.custom_minimum_size = Vector2(80, 80)
 		portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		header_hbox.add_child(portrait_rect)
 
-	var title_vbox = VBoxContainer.new()
+	var title_vbox: VBoxContainer = VBoxContainer.new()
 	header_hbox.add_child(title_vbox)
 
-	var character_title = Label.new()
+	var character_title: Label = Label.new()
 	character_title.text = "Votre Personnage"
 	character_title.add_theme_font_size_override("font_size", 18)
 	title_vbox.add_child(character_title)
@@ -178,17 +178,17 @@ func _setup_character_info_tab():
 	_setup_player_stats(right_vbox)
 
 	# Aperçu de la phase actuelle (sous les deux colonnes)
-	var phase_panel = PanelContainer.new()
+	var phase_panel: PanelContainer = PanelContainer.new()
 	info_tab.add_child(phase_panel)
-	var phase_vbox = VBoxContainer.new()
+	var phase_vbox: VBoxContainer = VBoxContainer.new()
 	phase_vbox.add_theme_constant_override("separation", 4)
 	phase_panel.add_child(phase_vbox)
-	var ph_title = Label.new()
+	var ph_title: Label = Label.new()
 	ph_title.text = "Phase actuelle"
 	ph_title.add_theme_font_size_override("font_size", 14)
 	ph_title.modulate = Color(1.0, 0.82, 0.3)
 	phase_vbox.add_child(ph_title)
-	var ph_name = Label.new()
+	var ph_name: Label = Label.new()
 	if PhaseManager:
 		var cur_phase = PhaseManager.get_current_phase()
 		ph_name.text = "%s — %s" % [PhaseManager.get_phase_name(cur_phase), PhaseManager.get_phase_description(cur_phase)]
@@ -197,13 +197,13 @@ func _setup_character_info_tab():
 	ph_name.modulate = Color(0.72, 0.74, 0.80)
 	phase_vbox.add_child(ph_name)
 
-func _setup_xp_display(parent: VBoxContainer):
+func _setup_xp_display(parent: VBoxContainer) -> void:
 	"""Configure l'affichage de progression XP"""
-	var xp_container = VBoxContainer.new()
+	var xp_container: VBoxContainer = VBoxContainer.new()
 	xp_container.add_theme_constant_override("separation", 5)
 	parent.add_child(xp_container)
-	
-	var xp_title = Label.new()
+
+	var xp_title: Label = Label.new()
 	xp_title.text = "📈 Progression XP"
 	xp_title.add_theme_font_size_override("font_size", 14)
 	xp_container.add_child(xp_title)
@@ -220,13 +220,13 @@ func _setup_xp_display(parent: VBoxContainer):
 	xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	xp_container.add_child(xp_label)
 
-func _setup_player_stats(parent: VBoxContainer):
+func _setup_player_stats(parent: VBoxContainer) -> void:
 	"""Configure l'affichage des stats du joueur"""
-	var stats_container = VBoxContainer.new()
+	var stats_container: VBoxContainer = VBoxContainer.new()
 	stats_container.add_theme_constant_override("separation", 5)
 	parent.add_child(stats_container)
-	
-	var stats_title = Label.new()
+
+	var stats_title: Label = Label.new()
 	stats_title.text = "⚡ État Actuel"
 	stats_title.add_theme_font_size_override("font_size", 14)
 	stats_container.add_child(stats_title)
@@ -252,7 +252,7 @@ func _setup_player_stats(parent: VBoxContainer):
 	session_label.modulate = Color(0.8, 0.8, 1.0)
 	stats_container.add_child(session_label)
 
-func _setup_phase_progression_tab():
+func _setup_phase_progression_tab() -> void:
 	"""Configure l'onglet de progression de phase"""
 	var progress_tab: VBoxContainer = VBoxContainer.new()
 	progress_tab.name = "Progression"
@@ -271,10 +271,10 @@ func _setup_phase_progression_tab():
 	current_phase_label.add_theme_font_size_override("font_size", 18)
 	current_phase_label.modulate = Color(1.0, 0.8, 0.2)
 	phase_header.add_child(current_phase_label)
-	
+
 	phase_header.add_spacer(false)
-	
-	var refresh_button = Button.new()
+
+	var refresh_button: Button = Button.new()
 	refresh_button.text = "Actualiser"
 	refresh_button.pressed.connect(_refresh_phase_progression)
 	phase_header.add_child(refresh_button)
@@ -294,7 +294,7 @@ func _setup_phase_progression_tab():
 	# Côté droit : Achievements
 	_setup_achievements_section(progress_content)
 
-func _setup_requirements_section(parent: HSplitContainer):
+func _setup_requirements_section(parent: HSplitContainer) -> void:
 	"""Configure la section des requirements"""
 	var requirements_panel: VBoxContainer = VBoxContainer.new()
 	requirements_panel.custom_minimum_size = Vector2(420, 0)
@@ -302,8 +302,8 @@ func _setup_requirements_section(parent: HSplitContainer):
 	requirements_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	requirements_panel.add_theme_constant_override("separation", 8)
 	parent.add_child(requirements_panel)
-	
-	var req_title = Label.new()
+
+	var req_title: Label = Label.new()
 	req_title.text = "🎯 Objectifs pour la prochaine phase"
 	req_title.add_theme_font_size_override("font_size", 16)
 	requirements_panel.add_child(req_title)
@@ -318,7 +318,7 @@ func _setup_requirements_section(parent: HSplitContainer):
 	requirements_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	requirements_scroll.add_child(requirements_container)
 
-func _setup_achievements_section(parent: HSplitContainer):
+func _setup_achievements_section(parent: HSplitContainer) -> void:
 	"""Configure la section des achievements"""
 	var achievements_panel: VBoxContainer = VBoxContainer.new()
 	achievements_panel.custom_minimum_size = Vector2(260, 0)
@@ -326,8 +326,8 @@ func _setup_achievements_section(parent: HSplitContainer):
 	achievements_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	achievements_panel.add_theme_constant_override("separation", 8)
 	parent.add_child(achievements_panel)
-	
-	var ach_title = Label.new()
+
+	var ach_title: Label = Label.new()
 	ach_title.text = "🏆 Réalisations"
 	ach_title.add_theme_font_size_override("font_size", 16)
 	achievements_panel.add_child(ach_title)
@@ -339,8 +339,8 @@ func _setup_achievements_section(parent: HSplitContainer):
 	achievements_panel.add_child(achievements_list)
 	
 	achievements_panel.add_child(HSeparator.new())
-	
-	var runs_title = Label.new()
+
+	var runs_title: Label = Label.new()
 	runs_title.text = "⚔️ Derniers runs PvE"
 	runs_title.add_theme_font_size_override("font_size", 16)
 	achievements_panel.add_child(runs_title)
@@ -380,7 +380,7 @@ func _on_member_leveled_up(player: SimulatedPlayer, _new_level: int) -> void:
 	if player == guild_manager.get_player_character():
 		update_character_info()
 
-func update_character_info():
+func update_character_info() -> void:
 	"""Met à jour les informations du personnage joueur"""
 	var guild_manager = GuildManager
 	if not guild_manager:
@@ -468,14 +468,14 @@ func update_character_info():
 
 # Fonctions de gestion de la progression
 
-func _refresh_phase_progression():
+func _refresh_phase_progression() -> void:
 	"""Met à jour l'affichage de la progression de phase"""
 	if not PhaseManager:
 		return
-	
+
 	# Mettre à jour la phase actuelle
 	var current_phase = PhaseManager.get_current_phase()
-	var phase_name = PhaseManager.get_phase_name(current_phase)
+	var phase_name: String = PhaseManager.get_phase_name(current_phase)
 	current_phase_label.text = "Phase Actuelle: " + phase_name
 	
 	# Mettre à jour les requirements
@@ -487,7 +487,7 @@ func _refresh_phase_progression():
 	# Mettre à jour l'historique PvE
 	_update_pve_run_history_display()
 
-func _update_requirements_display():
+func _update_requirements_display() -> void:
 	"""Met à jour l'affichage des requirements"""
 	# Nettoyer l'affichage précédent
 	for child in requirements_container.get_children():
@@ -501,7 +501,7 @@ func _update_requirements_display():
 	# Vérifier si on est déjà en phase finale
 	var phase_config: Dictionary = PhaseManager.get_current_phase_config()
 	if not phase_config.has("next_phase") or phase_config.next_phase == null:
-		var final_label = Label.new()
+		var final_label: Label = Label.new()
 		final_label.text = "🎉 Vous avez atteint la phase finale !"
 		final_label.add_theme_font_size_override("font_size", 16)
 		final_label.modulate = Color(0.2, 1.0, 0.2)
@@ -514,7 +514,7 @@ func _update_requirements_display():
 	var progress_data: Dictionary = PhaseManager.get_requirements_progress(PhaseManager.get_current_phase())
 	
 	if requirements.is_empty():
-		var no_req_label = Label.new()
+		var no_req_label: Label = Label.new()
 		no_req_label.text = "Aucun objectif défini pour cette phase."
 		no_req_label.modulate = Color(0.7, 0.7, 0.7)
 		requirements_container.add_child(no_req_label)
@@ -616,7 +616,7 @@ func _get_requirement_description(req_name: String, required_value) -> String:
 		_:
 			return req_name.capitalize() + ": " + str(required_value)
 
-func _update_achievements_display():
+func _update_achievements_display() -> void:
 	"""Met à jour l'affichage des achievements"""
 	achievements_list.clear()
 	
@@ -641,17 +641,17 @@ func _update_achievements_display():
 		var description = achievement.get("description", "")
 		var phase = achievement.get("phase", PhaseManager.GamePhase.SERVEUR)
 
-		var item_text = "🏆 %s" % achievement_name
+		var item_text: String = "🏆 %s" % achievement_name
 		if description != "":
 			item_text += "\n   %s" % description
-		
-		var phase_name = PhaseManager.get_phase_name(phase)
+
+		var phase_name: String = PhaseManager.get_phase_name(phase)
 		item_text += "\n   Phase: %s" % phase_name
-		
+
 		achievements_list.add_item(item_text)
-		
+
 		# Colorer selon la phase
-		var item_index = achievements_list.get_item_count() - 1
+		var item_index: int = achievements_list.get_item_count() - 1
 		match phase:
 			PhaseManager.GamePhase.SERVEUR:
 				achievements_list.set_item_custom_bg_color(item_index, Color(0.2, 0.3, 0.5, 0.3))
@@ -773,20 +773,20 @@ func _compare_dates(date_a: Dictionary, date_b: Dictionary) -> int:
 
 # Callbacks des signaux PhaseManager
 
-func _on_phase_changed(new_phase, _old_phase):
+func _on_phase_changed(new_phase, _old_phase) -> void:
 	"""Réagit aux changements de phase"""
 	if visible:
 		_refresh_phase_progression()
 
 		# Afficher une notification si la fenêtre est ouverte
-		var phase_notif = Label.new()
+		var phase_notif: Label = Label.new()
 		phase_notif.text = "🎉 NOUVELLE PHASE DÉBLOQUÉE: %s" % PhaseManager.get_phase_name(new_phase)
 		phase_notif.add_theme_font_size_override("font_size", 18)
 		phase_notif.modulate = Color(0.2, 1.0, 0.2)
 		phase_notif.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 		# Ajouter temporairement en haut de la fenêtre
-		var vbox = get_children()[0] as VBoxContainer
+		var vbox: VBoxContainer = get_children()[0] as VBoxContainer
 		if vbox:
 			vbox.add_child(phase_notif)
 			vbox.move_child(phase_notif, 1)  # Après le header
@@ -794,98 +794,98 @@ func _on_phase_changed(new_phase, _old_phase):
 			# Supprimer après 5 secondes
 			get_tree().create_timer(5.0).timeout.connect(phase_notif.queue_free)
 
-func _on_progression_updated(_phase, _progress: Dictionary):
+func _on_progression_updated(_phase, _progress: Dictionary) -> void:
 	"""Réagit à la mise à jour de progression"""
 	if visible and advanced_tabs.get_current_tab_index() == 1:  # Onglet Progression
 		_update_requirements_display()
 
-func _on_requirements_met(phase):
+func _on_requirements_met(phase) -> void:
 	"""Réagit quand tous les requirements sont satisfaits"""
 	if visible:
-		var popup = AcceptDialog.new()
+		var popup: AcceptDialog = AcceptDialog.new()
 		popup.dialog_text = "🎉 FÉLICITATIONS !\n\nTous les objectifs de la phase %s sont remplis !\nVous pouvez maintenant passer à la phase suivante." % PhaseManager.get_phase_name(phase)
 		get_tree().root.add_child(popup)
 		popup.popup_centered()
 		popup.confirmed.connect(popup.queue_free)
 		
 		_refresh_phase_progression()
-func _setup_reputation_tab():
+func _setup_reputation_tab() -> void:
 	"""Configure l'onglet de réputation de guilde"""
-	var reputation_tab = VBoxContainer.new()
+	var reputation_tab: VBoxContainer = VBoxContainer.new()
 	reputation_tab.name = "Réputation"
 	reputation_tab.add_theme_constant_override("separation", 15)
 	advanced_tabs.add_tab("Réputation", reputation_tab, false)
-	
+
 	# Header avec réputation actuelle
-	var reputation_header = VBoxContainer.new()
+	var reputation_header: VBoxContainer = VBoxContainer.new()
 	reputation_header.add_theme_constant_override("separation", 5)
 	reputation_tab.add_child(reputation_header)
-	
-	var reputation_title = Label.new()
+
+	var reputation_title: Label = Label.new()
 	reputation_title.text = "🏆 Réputation de la Guilde"
 	reputation_title.add_theme_font_size_override("font_size", 18)
 	reputation_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	reputation_header.add_child(reputation_title)
-	
+
 	# Valeur et tier de réputation
-	var reputation_info_container = HBoxContainer.new()
+	var reputation_info_container: HBoxContainer = HBoxContainer.new()
 	reputation_header.add_child(reputation_info_container)
-	
-	var value_label = Label.new()
+
+	var value_label: Label = Label.new()
 	value_label.text = "Valeur: "
 	reputation_info_container.add_child(value_label)
-	
+
 	reputation_value_label = Label.new()
 	reputation_value_label.text = "50.0 / 100.0"
 	reputation_value_label.add_theme_font_size_override("font_size", 16)
 	reputation_value_label.modulate = Color(0.9, 0.9, 1.0)
 	reputation_info_container.add_child(reputation_value_label)
-	
+
 	reputation_info_container.add_spacer(false)
-	
-	var tier_label = Label.new()
+
+	var tier_label: Label = Label.new()
 	tier_label.text = "Niveau: "
 	reputation_info_container.add_child(tier_label)
-	
+
 	reputation_tier_label = Label.new()
 	reputation_tier_label.text = "Correcte"
 	reputation_tier_label.add_theme_font_size_override("font_size", 16)
 	reputation_tier_label.modulate = Color(1.0, 0.8, 0.2)
 	reputation_info_container.add_child(reputation_tier_label)
-	
+
 	reputation_tab.add_child(HSeparator.new())
-	
+
 	# Bonus de réputation
-	var bonus_section = VBoxContainer.new()
+	var bonus_section: VBoxContainer = VBoxContainer.new()
 	reputation_tab.add_child(bonus_section)
-	
-	var bonus_title = Label.new()
+
+	var bonus_title: Label = Label.new()
 	bonus_title.text = "📈 Effets de la réputation"
 	bonus_title.add_theme_font_size_override("font_size", 14)
 	bonus_section.add_child(bonus_title)
-	
+
 	reputation_bonus_label = Label.new()
 	reputation_bonus_label.text = "Bonus de recrutement: +0%"
 	reputation_bonus_label.modulate = Color(0.8, 1.0, 0.8)
 	bonus_section.add_child(reputation_bonus_label)
-	
+
 	reputation_tab.add_child(HSeparator.new())
-	
+
 	# Historique de réputation
-	var history_section = VBoxContainer.new()
+	var history_section: VBoxContainer = VBoxContainer.new()
 	reputation_tab.add_child(history_section)
-	
-	var history_header = HBoxContainer.new()
+
+	var history_header: HBoxContainer = HBoxContainer.new()
 	history_section.add_child(history_header)
-	
-	var history_title = Label.new()
+
+	var history_title: Label = Label.new()
 	history_title.text = "📚 Historique récent"
 	history_title.add_theme_font_size_override("font_size", 14)
 	history_header.add_child(history_title)
-	
+
 	history_header.add_spacer(false)
-	
-	var refresh_reputation_button = Button.new()
+
+	var refresh_reputation_button: Button = Button.new()
 	refresh_reputation_button.text = "Actualiser"
 	refresh_reputation_button.pressed.connect(_refresh_reputation_display)
 	history_header.add_child(refresh_reputation_button)
@@ -897,7 +897,7 @@ func _setup_reputation_tab():
 	# Actualiser immédiatement
 	call_deferred("_refresh_reputation_display")
 
-func _refresh_reputation_display():
+func _refresh_reputation_display() -> void:
 	"""Met à jour l'affichage de la réputation"""
 	var guild_manager = GuildManager
 	if not guild_manager or not guild_manager.guild:
@@ -935,7 +935,7 @@ func _refresh_reputation_display():
 	# Historique
 	_refresh_reputation_history()
 
-func _refresh_reputation_history():
+func _refresh_reputation_history() -> void:
 	"""Met à jour l'historique de réputation"""
 	reputation_history_list.clear()
 	
@@ -957,21 +957,21 @@ func _refresh_reputation_history():
 		var reputation_after = event.get("reputation_after", 50.0)
 		var date = event.get("date", {})
 		
-		var change_text = ""
+		var change_text: String = ""
 		if change > 0:
 			change_text = "+%.1f" % change
 		else:
 			change_text = "%.1f" % change
-		
-		var date_text = ""
+
+		var date_text: String = ""
 		if date.has("year") and date.has("week") and date.has("day"):
 			date_text = "S%d J%d" % [date.week, date.day]
-		
-		var item_text = "%s %s - %s (%.1f)" % [date_text, change_text, reason, reputation_after]
+
+		var item_text: String = "%s %s - %s (%.1f)" % [date_text, change_text, reason, reputation_after]
 		reputation_history_list.add_item(item_text)
-		
+
 		# Colorer selon le type de changement
-		var item_index = reputation_history_list.get_item_count() - 1
+		var item_index: int = reputation_history_list.get_item_count() - 1
 		if change > 0:
 			reputation_history_list.set_item_custom_bg_color(item_index, Color(0.2, 0.5, 0.2, 0.3))
 		elif change < 0:

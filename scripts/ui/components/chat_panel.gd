@@ -22,7 +22,7 @@ const MESSAGE_COLORS = {
 var messages: Array = []
 var auto_scroll: bool = true
 
-func _ready():
+func _ready() -> void:
 	custom_minimum_size = Vector2(400, 200)
 	
 	# Créer la structure si elle n'existe pas dans la scène
@@ -43,30 +43,30 @@ func _ready():
 	_connect_to_guild_events()
 	_connect_to_activity_events()
 
-func _create_ui_structure():
-	var vbox = VBoxContainer.new()
+func _create_ui_structure() -> void:
+	var vbox := VBoxContainer.new()
 	vbox.name = "VBoxContainer"
 	add_child(vbox)
-	
+
 	# Titre
-	var title = Label.new()
+	var title := Label.new()
 	title.text = "Chat de Guilde"
 	title.add_theme_font_size_override("font_size", 14)
 	vbox.add_child(title)
-	
+
 	# Séparateur
-	var sep = HSeparator.new()
+	var sep := HSeparator.new()
 	vbox.add_child(sep)
-	
+
 	# ScrollContainer
-	var scroll = ScrollContainer.new()
+	var scroll := ScrollContainer.new()
 	scroll.name = "ScrollContainer"
 	scroll.custom_minimum_size = Vector2(0, 150)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(scroll)
-	
+
 	# RichTextLabel pour l'affichage
-	var display = RichTextLabel.new()
+	var display := RichTextLabel.new()
 	display.name = "ChatDisplay"
 	display.bbcode_enabled = true
 	display.scroll_following = true
@@ -79,7 +79,7 @@ func _create_ui_structure():
 	chat_display = display
 	scroll_container = scroll
 
-func _connect_to_guild_events():
+func _connect_to_guild_events() -> void:
 	var guild_manager = GuildManager
 	if guild_manager:
 		# Connexions/Déconnexions
@@ -96,7 +96,7 @@ func _connect_to_guild_events():
 		if not guild_manager.member_recruited.is_connected(_on_member_recruited):
 			guild_manager.member_recruited.connect(_on_member_recruited)
 
-func _connect_to_activity_events():
+func _connect_to_activity_events() -> void:
 	var activity_manager = ActivityManager
 	if activity_manager:
 		# Activités
@@ -111,7 +111,7 @@ func _connect_to_activity_events():
 		if not activity_manager.dungeon_ended.is_connected(_on_dungeon_ended):
 			activity_manager.dungeon_ended.connect(_on_dungeon_ended)
 
-func add_message(text: String, type: String = "info", timestamp: bool = true):
+func add_message(text: String, type: String = "info", timestamp: bool = true) -> void:
 	# Créer le message avec timestamp si demandé
 	var message = ""
 	if timestamp:
@@ -137,7 +137,7 @@ func add_message(text: String, type: String = "info", timestamp: bool = true):
 	# Mettre à jour l'affichage
 	_update_display()
 
-func _update_display():
+func _update_display() -> void:
 	if not chat_display:
 		return
 		
@@ -150,30 +150,30 @@ func _update_display():
 		await get_tree().process_frame
 		scroll_container.scroll_vertical = int(scroll_container.get_v_scroll_bar().max_value)
 
-func clear_chat():
+func clear_chat() -> void:
 	messages.clear()
 	if chat_display:
 		chat_display.clear()
 
 # Handlers pour les événements de guilde
-func _on_member_connected(member: SimulatedPlayer):
-	var msg = "%s s'est connecté(e)" % member.nom
+func _on_member_connected(member: SimulatedPlayer) -> void:
+	var msg := "%s s'est connecté(e)" % member.nom
 	add_message(msg, "connect")
 
-func _on_member_disconnected(member: SimulatedPlayer):
-	var msg = "%s s'est déconnecté(e)" % member.nom
+func _on_member_disconnected(member: SimulatedPlayer) -> void:
+	var msg := "%s s'est déconnecté(e)" % member.nom
 	add_message(msg, "disconnect")
 
-func _on_member_leveled_up(member: SimulatedPlayer, new_level: int):
-	var msg = "%s a atteint le niveau %d !" % [member.nom, new_level]
+func _on_member_leveled_up(member: SimulatedPlayer, new_level: int) -> void:
+	var msg := "%s a atteint le niveau %d !" % [member.nom, new_level]
 	add_message(msg, "levelup")
 
-func _on_member_recruited(member: SimulatedPlayer):
-	var msg = "%s a rejoint la guilde ! Bienvenue !" % member.nom
+func _on_member_recruited(member: SimulatedPlayer) -> void:
+	var msg := "%s a rejoint la guilde ! Bienvenue !" % member.nom
 	add_message(msg, "connect")
 
 # Handlers pour les événements d'activité
-func _on_activity_started(player: SimulatedPlayer, activity):
+func _on_activity_started(player: SimulatedPlayer, activity) -> void:
 	if activity.type == activity.ActivityType.LEVELING:
 		var zone = activity.location if activity.location != "" else "une zone de leveling"
 		var msg = "%s part leveler dans %s" % [player.nom, zone]
@@ -183,16 +183,16 @@ func _on_activity_started(player: SimulatedPlayer, activity):
 		var msg = "%s commence à farmer %s" % [player.nom, location]
 		add_message(msg, "activity")
 
-func _on_activity_completed(_player: SimulatedPlayer, _activity):
+func _on_activity_completed(_player: SimulatedPlayer, _activity) -> void:
 	# Message de fin d'activité si pertinent
 	pass
 
-func _on_dungeon_started(dungeon_instance):
+func _on_dungeon_started(dungeon_instance) -> void:
 	var dungeon_name = dungeon_instance.dungeon_data.get("name", "Donjon")
-	var members_names = []
+	var members_names := []
 	for member in dungeon_instance.group_members:
 		members_names.append(member.nom)
-	var msg = "Groupe formé pour %s : %s" % [dungeon_name, ", ".join(members_names)]
+	var msg := "Groupe formé pour %s : %s" % [dungeon_name, ", ".join(members_names)]
 	add_message(msg, "dungeon")
 	
 	# Connecter aux signaux de l'instance de donjon
@@ -200,27 +200,27 @@ func _on_dungeon_started(dungeon_instance):
 		dungeon_instance.boss_defeated.connect(_on_boss_defeated)
 	if not dungeon_instance.boss_failed.is_connected(_on_boss_failed):
 		dungeon_instance.boss_failed.connect(_on_boss_failed)
-	var completion_callback = _on_dungeon_completed.bind(dungeon_instance)
+	var completion_callback := _on_dungeon_completed.bind(dungeon_instance)
 	if not dungeon_instance.dungeon_completed.is_connected(completion_callback):
 		dungeon_instance.dungeon_completed.connect(completion_callback)
 	if not dungeon_instance.loot_distributed.is_connected(_on_loot_distributed):
 		dungeon_instance.loot_distributed.connect(_on_loot_distributed)
 
-func _on_dungeon_ended(_dungeon_instance):
+func _on_dungeon_ended(_dungeon_instance) -> void:
 	# Les signaux sont déjà connectés dans _on_dungeon_started
 	pass
 
-func _on_boss_defeated(_boss_index: int, boss_name: String, loot_winner):
-	var msg = "Boss vaincu : %s" % boss_name
+func _on_boss_defeated(_boss_index: int, boss_name: String, loot_winner) -> void:
+	var msg := "Boss vaincu : %s" % boss_name
 	if loot_winner:
 		msg += " (Loot : %s)" % loot_winner.nom
 	add_message(msg, "dungeon")
 
-func _on_boss_failed(_boss_index: int, boss_name: String, wipe_count: int):
-	var msg = "Wipe sur %s (tentative #%d)" % [boss_name, wipe_count]
+func _on_boss_failed(_boss_index: int, boss_name: String, wipe_count: int) -> void:
+	var msg := "Wipe sur %s (tentative #%d)" % [boss_name, wipe_count]
 	add_message(msg, "error")
 
-func _on_dungeon_completed(total_time: float, gold_reward: int, dungeon_instance = null):
+func _on_dungeon_completed(total_time: float, gold_reward: int, dungeon_instance = null) -> void:
 	# Troncature volontaire : on veut le nombre entier de minutes écoulées.
 	@warning_ignore("integer_division")
 	var minutes = int(total_time) / 60
@@ -233,7 +233,7 @@ func _on_dungeon_completed(total_time: float, gold_reward: int, dungeon_instance
 		boss_count = dungeon_instance.dungeon_data.get("bosses", []).size()
 		wipe_count = dungeon_instance.total_wipes
 	
-	var msg = "Rapport %s : terminé en %02d:%02d, %d boss, %d wipe(s), %d or" % [
+	var msg := "Rapport %s : terminé en %02d:%02d, %d boss, %d wipe(s), %d or" % [
 		dungeon_name,
 		minutes,
 		seconds,
@@ -242,36 +242,36 @@ func _on_dungeon_completed(total_time: float, gold_reward: int, dungeon_instance
 		gold_reward
 	]
 	add_message(msg, "dungeon")
-	
+
 	# Notification toast pour succès de donjon
 	if NotificationManager != null:
 		var notification_manager = NotificationManager
 		notification_manager.show_success("Donjon complété avec succès !", "Victoire")
 
-func _on_loot_distributed(member, item):
+func _on_loot_distributed(member, item) -> void:
 	add_loot_notification(member.nom, item)
-	
+
 	# Notification toast pour loot rare/épique
 	if item.rarity >= item.Rarity.RARE and NotificationManager != null:
 		var notification_manager = NotificationManager
-		var message = "%s a obtenu %s" % [member.nom, item.name]
+		var message := "%s a obtenu %s" % [member.nom, item.name]
 		notification_manager.show_success(message, "Loot Rare")
 
 # Méthode publique pour ajouter des messages custom
-func add_system_message(text: String):
+func add_system_message(text: String) -> void:
 	add_message("[Système] " + text, "info")
 
-func add_guild_message(text: String):
+func add_guild_message(text: String) -> void:
 	add_message("[Guilde] " + text, "info")
 
-func add_dungeon_message(text: String):
+func add_dungeon_message(text: String) -> void:
 	add_message("[Donjon] " + text, "dungeon")
 
-func add_loot_message(player_name: String, item: String):
-	var msg = "%s a obtenu : %s" % [player_name, item]
+func add_loot_message(player_name: String, item: String) -> void:
+	var msg := "%s a obtenu : %s" % [player_name, item]
 	add_message(msg, "loot")
 
-func add_loot_notification(player_name: String, item):
+func add_loot_notification(player_name: String, item) -> void:
 	# Nouvelle méthode pour les objets Item complets
 	var msg
 	if item.has_method("get_display_name"):
@@ -288,6 +288,6 @@ func add_loot_notification(player_name: String, item):
 		# Fallback pour les anciens objets string
 		add_loot_message(player_name, str(item))
 
-func add_phase_notification(phase_name: String):
-	var msg = "[PHASE] Félicitations ! Passage en %s" % phase_name
+func add_phase_notification(phase_name: String) -> void:
+	var msg := "[PHASE] Félicitations ! Passage en %s" % phase_name
 	add_message(msg, "levelup")

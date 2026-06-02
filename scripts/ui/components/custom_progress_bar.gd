@@ -36,12 +36,12 @@ var text_label: Label
 signal value_changed(new_value: float, old_value: float)
 signal animation_finished()
 
-func _ready():
+func _ready() -> void:
 	custom_minimum_size = Vector2(100, bar_height + 20)  # +20 pour le texte
 	_setup_ui()
 	_update_display()
 
-func _setup_ui():
+func _setup_ui() -> void:
 	"""Configure les éléments UI"""
 	if show_text:
 		text_label = Label.new()
@@ -56,43 +56,43 @@ func _setup_ui():
 		text_label.offset_top = bar_height + 2
 		text_label.offset_bottom = bar_height + 18
 
-func _draw():
+func _draw() -> void:
 	"""Dessine la barre de progression"""
-	var bar_rect = Rect2(Vector2.ZERO, Vector2(size.x, bar_height))
-	
+	var bar_rect := Rect2(Vector2.ZERO, Vector2(size.x, bar_height))
+
 	# Fond
 	draw_rect(bar_rect, color_background, true, -1)
-	
+
 	# Bordure
 	if border_width > 0:
 		draw_rect(bar_rect, color_border, false, border_width)
-	
+
 	# Barre de progression
 	if max_value > min_value and displayed_value > min_value:
-		var progress = (displayed_value - min_value) / (max_value - min_value)
-		var fill_width = (size.x - 2 * border_width) * progress
-		
+		var progress := (displayed_value - min_value) / (max_value - min_value)
+		var fill_width := (size.x - 2 * border_width) * progress
+
 		if fill_width > 0:
-			var fill_rect = Rect2(
-				Vector2(border_width, border_width), 
+			var fill_rect := Rect2(
+				Vector2(border_width, border_width),
 				Vector2(fill_width, bar_height - 2 * border_width)
 			)
-			
-			var fill_color = _get_color_for_progress(progress)
+
+			var fill_color := _get_color_for_progress(progress)
 			draw_rect(fill_rect, fill_color, true, -1)
-	
+
 	# Segments (lignes de séparation)
 	if segment_count > 1:
 		_draw_segments(bar_rect)
 
-func _draw_segments(_bar_rect: Rect2):
+func _draw_segments(_bar_rect: Rect2) -> void:
 	"""Dessine les lignes de séparation des segments"""
-	var segment_width = (size.x - 2 * border_width) / segment_count
-	
+	var segment_width := (size.x - 2 * border_width) / segment_count
+
 	for i in range(1, segment_count):
-		var x_pos = border_width + i * segment_width
-		var line_start = Vector2(x_pos, border_width)
-		var line_end = Vector2(x_pos, bar_height - border_width)
+		var x_pos := border_width + i * segment_width
+		var line_start := Vector2(x_pos, border_width)
+		var line_end := Vector2(x_pos, bar_height - border_width)
 		
 		draw_line(line_start, line_end, color_border, segment_spacing)
 
@@ -109,22 +109,22 @@ func _get_color_for_progress(progress: float) -> Color:
 
 # ==================== API PUBLIQUE ====================
 
-func set_value(new_value: float):
+func set_value(new_value: float) -> void:
 	"""Définit une nouvelle valeur avec animation optionnelle"""
-	var old_value = current_value
+	var old_value := current_value
 	current_value = clamp(new_value, min_value, max_value)
-	
+
 	if animate_changes and is_inside_tree():
 		_animate_to_value(current_value)
 	else:
 		displayed_value = current_value
 		_update_display()
-	
+
 	value_changed.emit(current_value, old_value)
 
-func set_value_immediate(new_value: float):
+func set_value_immediate(new_value: float) -> void:
 	"""Définit une nouvelle valeur sans animation"""
-	var old_value = current_value
+	var old_value := current_value
 	current_value = clamp(new_value, min_value, max_value)
 	displayed_value = current_value
 	_update_display()
@@ -144,7 +144,7 @@ func get_progress_percentage() -> float:
 	"""Retourne le pourcentage de progression (0.0 à 100.0)"""
 	return get_progress() * 100.0
 
-func set_range(new_min: float, new_max: float):
+func set_range(new_min: float, new_max: float) -> void:
 	"""Définit une nouvelle plage de valeurs"""
 	min_value = new_min
 	max_value = new_max
@@ -152,28 +152,28 @@ func set_range(new_min: float, new_max: float):
 	displayed_value = clamp(displayed_value, min_value, max_value)
 	_update_display()
 
-func set_segments(count: int):
+func set_segments(count: int) -> void:
 	"""Définit le nombre de segments"""
 	segment_count = max(1, count)
 	queue_redraw()
 
-func set_colors(good: Color, medium: Color, bad: Color):
+func set_colors(good: Color, medium: Color, bad: Color) -> void:
 	"""Définit les couleurs par seuil"""
 	color_good = good
 	color_medium = medium
 	color_bad = bad
 	queue_redraw()
 
-func set_text_format(format: String):
+func set_text_format(format: String) -> void:
 	"""Définit le format du texte"""
 	text_format = format
 	_update_text()
 
-func add_value(delta: float):
+func add_value(delta: float) -> void:
 	"""Ajoute une valeur à la valeur actuelle"""
 	set_value(current_value + delta)
 
-func subtract_value(delta: float):
+func subtract_value(delta: float) -> void:
 	"""Soustrait une valeur de la valeur actuelle"""
 	set_value(current_value - delta)
 
@@ -185,43 +185,43 @@ func is_empty() -> bool:
 	"""Vérifie si la barre est vide"""
 	return current_value <= min_value
 
-func reset():
+func reset() -> void:
 	"""Remet la barre à zéro"""
 	set_value(min_value)
 
-func fill():
+func fill() -> void:
 	"""Remplit complètement la barre"""
 	set_value(max_value)
 
 # ==================== ANIMATIONS ====================
 
-func _animate_to_value(target_value: float):
+func _animate_to_value(target_value: float) -> void:
 	"""Anime la progression vers une valeur cible"""
 	if tween:
 		tween.kill()
-	
+
 	tween = create_tween()
 	tween.tween_property(self, "displayed_value", target_value, animation_duration)
 	tween.tween_callback(_on_animation_finished)
 
-func _on_animation_finished():
+func _on_animation_finished() -> void:
 	"""Appelée quand l'animation est terminée"""
 	animation_finished.emit()
 
 # ==================== MISE À JOUR AFFICHAGE ====================
 
-func _update_display():
+func _update_display() -> void:
 	"""Met à jour l'affichage visuel"""
 	queue_redraw()
 	_update_text()
 
-func _update_text():
+func _update_text() -> void:
 	"""Met à jour le texte affiché"""
 	if not text_label:
 		return
-	
-	var text = ""
-	
+
+	var text := ""
+
 	if show_percentage:
 		text = "%.1f%%" % get_progress_percentage()
 	else:
@@ -236,7 +236,7 @@ func _update_text():
 
 # ==================== PROPRIÉTÉS ANIMÉES ====================
 
-func _set_displayed_value(value: float):
+func _set_displayed_value(value: float) -> void:
 	"""Setter pour l'animation de displayed_value"""
 	displayed_value = value
 	queue_redraw()
@@ -249,8 +249,8 @@ func get_segment_for_value(value: float) -> int:
 	if segment_count <= 1:
 		return 0
 	
-	var progress = (value - min_value) / (max_value - min_value)
-	var segment = int(progress * segment_count)
+	var progress := (value - min_value) / (max_value - min_value)
+	var segment := int(progress * segment_count)
 	return clamp(segment, 0, segment_count - 1)
 
 func get_current_segment() -> int:
@@ -262,45 +262,45 @@ func is_segment_filled(segment_index: int) -> bool:
 	if segment_index >= segment_count:
 		return false
 	
-	var segment_threshold = min_value + (max_value - min_value) * (segment_index + 1) / segment_count
+	var segment_threshold := min_value + (max_value - min_value) * (segment_index + 1) / segment_count
 	return current_value >= segment_threshold
 
 func get_filled_segments_count() -> int:
 	"""Retourne le nombre de segments remplis"""
-	var count = 0
+	var count := 0
 	for i in range(segment_count):
 		if is_segment_filled(i):
 			count += 1
 	return count
 
-func set_segment_progress(segment_index: int, progress: float):
+func set_segment_progress(segment_index: int, progress: float) -> void:
 	"""Définit la progression d'un segment spécifique (0.0 à 1.0)"""
 	if segment_index >= segment_count or segment_index < 0:
 		return
-	
-	var segment_size = (max_value - min_value) / segment_count
-	var segment_start = min_value + segment_index * segment_size
-	var target_value = segment_start + progress * segment_size
-	
+
+	var segment_size := (max_value - min_value) / segment_count
+	var segment_start := min_value + segment_index * segment_size
+	var target_value := segment_start + progress * segment_size
+
 	set_value(target_value)
 
 # ==================== EXEMPLES D'USAGE ====================
 
-func setup_for_phases(current_phase: int, total_phases: int):
+func setup_for_phases(current_phase: int, total_phases: int) -> void:
 	"""Configuration spéciale pour les phases de jeu"""
 	set_range(0, total_phases)
 	set_segments(total_phases)
 	set_value(current_phase)
 	set_text_format("Phase %d/%d")
 
-func setup_for_health(current_hp: int, max_hp: int):
+func setup_for_health(current_hp: int, max_hp: int) -> void:
 	"""Configuration spéciale pour la santé"""
 	set_range(0, max_hp)
 	set_segments(1)
 	set_value(current_hp)
 	set_text_format("%d/%d HP")
 
-func setup_for_experience(current_xp: int, xp_to_next_level: int):
+func setup_for_experience(current_xp: int, xp_to_next_level: int) -> void:
 	"""Configuration spéciale pour l'expérience"""
 	set_range(0, xp_to_next_level)
 	set_segments(4)  # Quarts de niveau
