@@ -794,8 +794,8 @@ func _suite_chat_director(tf) -> void:
 	tf.suite("ChatDirector (Phase A)")
 
 	# Corpus chargé
-	tf.eq(ChatDirector.debug_count_pool("ambient"), 40, "corpus ambient = 40 lignes")
-	tf.ok(ChatDirector.get_corpus_size() > 40, "corpus total inclut aussi le réactif")
+	tf.ok(ChatDirector.debug_count_pool("ambient") >= 80, "corpus ambient substantiel (>=80 lignes)")
+	tf.ok(ChatDirector.get_corpus_size() > ChatDirector.debug_count_pool("ambient"), "corpus total inclut aussi le réactif")
 
 	# Grammaire inline {a|b|c}
 	var expanded: String = ChatDirector._expand("{alpha|beta|gamma}")
@@ -908,6 +908,18 @@ func _suite_chat_scoring(tf) -> void:
 		tf.ok(explain["rows"][0]["breakdown"] is Array, "explain expose le breakdown")
 	GuildManager.guild_members.erase(ex)
 
+	# Vibe-space : une réplique salée colle mieux à un locuteur salé qu'à un membre posé
+	var toxic_line := {"weight": 1.0, "vibe": [-0.3, 0.8, 0.2]}
+	var grumpy := SimulatedPlayer.new()
+	grumpy.tags_comportement = ["drama_queen"]
+	grumpy.mood = 20.0
+	var sweet := SimulatedPlayer.new()
+	sweet.tags_comportement = ["serviable"]
+	sweet.mood = 90.0
+	var s_grumpy: float = CS.score_line(toxic_line, ChatDirector._build_ctx(grumpy, null))["score"]
+	var s_sweet: float = CS.score_line(toxic_line, ChatDirector._build_ctx(sweet, null))["score"]
+	tf.ok(s_grumpy > s_sweet, "vibe : réplique salée score plus haut pour un locuteur salé")
+
 func _suite_chat_reactive(tf) -> void:
 	tf.suite("ChatDirector réactif (Phase C)")
 
@@ -948,7 +960,7 @@ func _suite_chat_reactive(tf) -> void:
 
 func _suite_chat_scenes(tf) -> void:
 	tf.suite("ChatDirector scènes (Phase D)")
-	tf.eq(ChatDirector.get_scene_count(), 3, "3 scènes chargées")
+	tf.ok(ChatDirector.get_scene_count() >= 6, "scènes chargées (>=6)")
 	tf.ok(not ChatDirector.debug_get_scene("rickroll").is_empty(), "scène rickroll trouvée")
 
 	# Résolution de branche : colle au trait/à l'humeur de l'acteur (le cœur "vivant")

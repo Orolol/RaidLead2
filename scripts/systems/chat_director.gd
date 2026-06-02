@@ -141,6 +141,9 @@ func _try_ambient(ignore_floor: bool = false) -> void:
 	# Parfois, jouer une vraie scène multi-acteurs plutôt qu'un one-liner.
 	if GameRandom.chance(AMBIENT_SCENE_CHANCE) and _try_scene("ambient"):
 		return
+	_emit_ambient_line(online)
+
+func _emit_ambient_line(online: Array) -> void:
 	var speaker: Variant = _pick_speaker(online)
 	if speaker == null:
 		return
@@ -218,11 +221,49 @@ func _build_ctx(speaker: Variant, subject: Variant, salience: float = 0.0) -> Di
 		"speaker": speaker,
 		"subject": subject,
 		"relation": _relation_between(speaker, subject),
+		"speaker_vibe": _speaker_vibe(speaker),
 		"salience": salience,
 		"hour": GameTime.current_hour if GameTime else 0,
 		"guild_morale": GuildCultureManager.guild_morale if GuildCultureManager else 50.0,
 		"phase": int(PhaseManager.current_phase) if PhaseManager else 0,
 	}
+
+func _speaker_vibe(m: Variant) -> Array:
+	# Coords vibe du locuteur (serieux, toxicite, sweat) ∈ [-1,1], dérivées des traits + humeur.
+	if m == null:
+		return [0.0, 0.0, 0.0]
+	var traits: Array = _traits(m)
+	var serieux: float = 0.0
+	var toxicite: float = 0.0
+	var sweat: float = 0.0
+	if "perfectionniste" in traits:
+		serieux += 0.6
+		sweat += 0.3
+	if "solitaire" in traits:
+		serieux += 0.3
+	if "drama_queen" in traits:
+		serieux -= 0.5
+		toxicite += 0.5
+	if "casual" in traits:
+		serieux -= 0.4
+		sweat -= 0.7
+	if "social" in traits:
+		serieux -= 0.2
+	if "tryhard" in traits:
+		sweat += 0.8
+		serieux += 0.2
+	if "greedy" in traits:
+		toxicite += 0.3
+	if "rage_quitter" in traits:
+		toxicite += 0.4
+	if "serviable" in traits:
+		toxicite -= 0.5
+	var mood: float = float(m.mood)
+	if mood < 40.0:
+		toxicite += 0.4
+	elif mood > 75.0:
+		toxicite -= 0.2
+	return [clampf(serieux, -1.0, 1.0), clampf(toxicite, -1.0, 1.0), clampf(sweat, -1.0, 1.0)]
 
 func _line_in_pool(line: Variant, pool: String) -> bool:
 	var pools: Variant = line.get("pools", [])
@@ -355,6 +396,7 @@ func _connect_event_signals() -> void:
 		_safe_connect(GuildManager, "member_leveled_up", _on_member_leveled_up)
 		_safe_connect(GuildManager, "member_recruited", _on_member_recruited)
 		_safe_connect(GuildManager, "member_left", _on_member_left)
+		_safe_connect(GuildManager, "loot_conflict_occurred", _on_loot_conflict)
 	if ActivityManager:
 		_safe_connect(ActivityManager, "dungeon_started", _on_dungeon_started)
 	if DramaManager:
@@ -406,10 +448,13 @@ func _expire_stimuli() -> void:
 	_blackboard = kept
 
 func _emit_reactive(stim: Dictionary) -> void:
-	var subject: Variant = stim.get("subject")
 	# Une scène réactive (plus riche) est préférée si elle peut être castée.
-	if not scene_active and _try_scene(String(stim["kind"]), subject, stim.get("vars", {})):
+	if not scene_active and _try_scene(String(stim["kind"]), stim.get("subject"), stim.get("vars", {})):
 		return
+	_emit_reactive_line(stim)
+
+func _emit_reactive_line(stim: Dictionary) -> void:
+	var subject: Variant = stim.get("subject")
 	var speaker: Variant = _pick_reactive_speaker(subject)
 	if speaker == null:
 		return
@@ -511,6 +556,14 @@ func _on_member_leveled_up(player: Variant, new_level: int) -> void:
 func _on_member_recruited(player: Variant) -> void:
 	_push_stimulus("recruit", 0.5, player, {"subject": String(player.nom)})
 
+func _on_loot_conflict(conflict: Variant) -> void:
+	var vars: Dictionary = {}
+	if conflict is Dictionary and conflict.has("item"):
+		var it: Variant = conflict["item"]
+		if it is Resource and "name" in it:
+			vars["item"] = String(it.name)
+	_push_stimulus("ninja", 0.9, null, vars)
+
 func _on_member_left(player: Variant) -> void:
 	_push_stimulus("member_left", 0.8, player, {"subject": String(player.nom)})
 
@@ -558,15 +611,18 @@ func _on_burnout_changed(player: Variant, new_level: int) -> void:
 func debug_force_ambient() -> bool:
 	## Force une tentative d'émission ambient (ignore la cadence ET le plancher temps-réel,
 	## garde les vetos/cooldowns). Utilisé par le harnais de test et le menu debug.
+	## Émet un one-liner ambient (jamais une scène : forceur de ligne déterministe).
 	var before: int = _emitted_count
-	_try_ambient(true)
+	var online: Array = _online_members()
+	if not online.is_empty():
+		_emit_ambient_line(online)
 	return _emitted_count > before
 
 func debug_force_reactive(kind: String, subject: Variant = null, vars: Dictionary = {}, salience: float = 0.7) -> bool:
-	## Force l'émission d'une réaction pour un type d'événement donné (ignore le plancher).
+	## Force une réaction one-liner pour un type d'événement (jamais une scène).
 	## Utilisé par le harnais de test et le menu debug.
 	var before: int = _emitted_count
-	_emit_reactive({"kind": kind, "salience": salience, "subject": subject, "vars": vars})
+	_emit_reactive_line({"kind": kind, "salience": salience, "subject": subject, "vars": vars})
 	return _emitted_count > before
 
 func get_corpus_size() -> int:

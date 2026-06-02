@@ -11,6 +11,9 @@ extends RefCounted
 ## Une « considération » = un axe (d'où vient la valeur) + une courbe (valeur→[0,1])
 ## + un kind (bonus|veto) + un poids. Référencée par ChatDirector via preload.
 
+# Poids de l'affinité de vibe (§2 : "vibe-space" basse dimension serieux/toxicite/sweat).
+const VIBE_WEIGHT: float = 1.0
+
 # ==================== SCORING ====================
 
 static func score_line(line: Dictionary, ctx: Dictionary) -> Dictionary:
@@ -45,8 +48,28 @@ static func score_line(line: Dictionary, ctx: Dictionary) -> Dictionary:
 				bonus += contrib
 				breakdown.append({"label": _cons_label(cons), "kind": "bonus", "value": contrib})
 
+	# Affinité de vibe : si la ligne a des coords vibe et que le locuteur en a aussi,
+	# une réplique "dans le ton" du locuteur (toxique/sérieux/sweat) score plus haut.
+	if line.has("vibe") and ctx.has("speaker_vibe"):
+		var aff: float = _vibe_affinity(line["vibe"], ctx["speaker_vibe"])
+		var vcontrib: float = VIBE_WEIGHT * aff
+		bonus += vcontrib
+		breakdown.append({"label": "vibe", "kind": "bonus", "value": vcontrib})
+
 	var score: float = bonus * veto
 	return {"score": score, "bonus": bonus, "veto": veto, "breakdown": breakdown}
+
+static func _vibe_affinity(line_vibe: Variant, speaker_vibe: Variant) -> float:
+	## Gaussienne sur la distance dans la vibe-space (basse dimension) → (0,1].
+	if not (line_vibe is Array) or not (speaker_vibe is Array):
+		return 0.0
+	var n: int = mini(line_vibe.size(), speaker_vibe.size())
+	var d2: float = 0.0
+	for i in range(n):
+		var diff: float = float(line_vibe[i]) - float(speaker_vibe[i])
+		d2 += diff * diff
+	var sigma: float = 1.2
+	return exp(-d2 / (2.0 * sigma * sigma))
 
 static func _cons_label(cons: Dictionary) -> String:
 	var label: String = String(cons.get("axis", "?"))

@@ -67,10 +67,18 @@ func _run() -> void:
 		print("  %s: %s" % [transcript[i][0], transcript[i][1]])
 
 	print("\n--- Scènes (jeu synchrone, branches résolues par traits) ---")
-	for sid in ["rickroll", "duel_bank", "blame_pull"]:
-		var extra: Dictionary = {"boss": "Ragnaros"} if sid == "blame_pull" else {}
-		var sc_transcript: Array = ChatDirector.debug_play_scene_sync(sid, null, extra)
-		print("  [%s]" % sid)
+	var scene_specs: Array = [
+		["rickroll", null, {}],
+		["duel_bank", null, {}],
+		["blame_pull", null, {"boss": "Ragnaros"}],
+		["tribunal_ninja", null, {"item": "Lame Bénie de Tonnerre"}],
+		["mankrik_gag", null, {}],
+		["worldbuff_panic", null, {}],
+		["recruit_haze", added[5], {}]
+	]
+	for spec in scene_specs:
+		var sc_transcript: Array = ChatDirector.debug_play_scene_sync(spec[0], spec[1], spec[2])
+		print("  [%s]" % spec[0])
 		for line in sc_transcript:
 			print("    %s: %s" % [line[0], line[1]])
 

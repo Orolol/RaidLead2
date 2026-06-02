@@ -91,6 +91,124 @@
           ] } },
         { "actor": "defender", "delay": 2.5, "text": "oh ça va on rerun #boss#, c'est pas la mort 💪" }
       ]
+    },
+
+    {
+      "id": "tribunal_ninja",
+      "trigger": { "pools": ["ninja"], "min_online": 2, "weight": 1.2, "cooldown_min": 360 },
+      "cast": {
+        "accuser": { "considerations": [
+          { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.2 }
+        ] },
+        "accused": { "exclude": ["accuser"], "considerations": [
+          { "axis": "speaker.has_trait", "param": "ninja_looter", "curve": "boolean", "kind": "bonus", "weight": 1.6 },
+          { "axis": "speaker.has_trait", "param": "greedy", "curve": "boolean", "kind": "bonus", "weight": 1.0 }
+        ] },
+        "witness": { "optional": true, "exclude": ["accuser", "accused"], "considerations": [
+          { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.0 }
+        ] }
+      },
+      "beats": [
+        { "actor": "accuser", "delay": 0.0, "text": "BON. qui a ninja #item# ?? 👀" },
+        { "actor": "accused", "delay": 3.0, "branch": {
+          "axis_actor": "accused",
+          "options": [
+            { "text": "moi ?? j'ai même pas roll, c'est un complot je vous dis", "considerations": [
+              { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.3 } ] },
+            { "text": "j'avais les DKP, c'est MON #item#, point.", "considerations": [
+              { "axis": "speaker.has_trait", "param": "greedy", "curve": "boolean", "kind": "bonus", "weight": 1.5 } ] },
+            { "text": "ok ok je le rends, désolé les gars... 😬", "considerations": [
+              { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.0 },
+              { "axis": "speaker.has_trait", "param": "perfectionniste", "curve": "boolean", "kind": "bonus", "weight": 0.8 } ],
+              "effects": [ { "target": "accused", "mood": -3 } ] }
+          ] } },
+        { "actor": "witness", "delay": 2.5, "text": "je confirme, j'ai vu le /roll, #accused# a pas gagné" },
+        { "actor": "accuser", "delay": 2.0, "text": "DKP minus. la prochaine fois c'est /gkick 🔨" }
+      ]
+    },
+
+    {
+      "id": "mankrik_gag",
+      "trigger": { "pools": ["ambient"], "min_online": 2, "weight": 0.6, "cooldown_min": 900 },
+      "cast": {
+        "asker": { "considerations": [
+          { "axis": "speaker.has_trait", "param": "social", "curve": "boolean", "kind": "bonus", "weight": 0.8 }
+        ] },
+        "answerer": { "exclude": ["asker"] }
+      },
+      "beats": [
+        { "actor": "asker", "delay": 0.0, "text": "quelqu'un a vu la femme de Mankrik ? 😏" },
+        { "actor": "answerer", "delay": 2.5, "branch": {
+          "axis_actor": "answerer",
+          "options": [
+            { "text": "pas cette blague pour la 1000e fois pitié", "considerations": [
+              { "axis": "speaker.has_trait", "param": "perfectionniste", "curve": "boolean", "kind": "bonus", "weight": 1.3 } ] },
+            { "text": "elle est aux Barrens avec Chuck Norris voyons", "considerations": [
+              { "axis": "speaker.has_trait", "param": "social", "curve": "boolean", "kind": "bonus", "weight": 1.0 },
+              { "axis": "speaker.has_trait", "param": "casual", "curve": "boolean", "kind": "bonus", "weight": 0.8 } ] },
+            { "text": "...c'est qui Mankrik déjà ?", "considerations": [
+              { "axis": "speaker.has_trait", "param": "solitaire", "curve": "boolean", "kind": "bonus", "weight": 1.2 } ] }
+          ] } },
+        { "actor": "asker", "delay": 2.0, "text": "{classique 😂|jamais déçu|🤣}" }
+      ]
+    },
+
+    {
+      "id": "worldbuff_panic",
+      "trigger": { "pools": ["ambient"], "min_online": 2, "weight": 0.7, "cooldown_min": 600 },
+      "cast": {
+        "leader": { "considerations": [
+          { "axis": "speaker.has_trait", "param": "tryhard", "curve": "boolean", "kind": "bonus", "weight": 1.2 },
+          { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 0.6 }
+        ] },
+        "member": { "exclude": ["leader"] },
+        "witness": { "optional": true, "exclude": ["leader", "member"] }
+      },
+      "beats": [
+        { "actor": "leader", "delay": 0.0, "text": "ON A LES WORLD BUFFS. personne ne meurt jusqu'au raid 🙏" },
+        { "actor": "member", "delay": 2.5, "branch": {
+          "axis_actor": "member",
+          "options": [
+            { "text": "je me déco dans un coin safe, touchez à rien", "considerations": [
+              { "axis": "speaker.has_trait", "param": "perfectionniste", "curve": "boolean", "kind": "bonus", "weight": 1.3 } ] },
+            { "text": "ez, je gère, j'ai jamais perdu un buff de ma vie", "considerations": [
+              { "axis": "speaker.has_trait", "param": "tryhard", "curve": "boolean", "kind": "bonus", "weight": 1.2 } ] },
+            { "text": "UN MOB M'AGGRO NOOON MES BUFFS 😭", "considerations": [
+              { "axis": "speaker.has_trait", "param": "rage_quitter", "curve": "boolean", "kind": "bonus", "weight": 1.4 },
+              { "axis": "speaker.mood", "curve": "inverse", "kind": "bonus", "weight": 0.6 } ],
+              "effects": [ { "target": "member", "mood": -4, "stress": 2 } ] }
+          ] } },
+        { "actor": "witness", "delay": 2.0, "text": "rip les buffs de #member# 💀" }
+      ]
+    },
+
+    {
+      "id": "recruit_haze",
+      "trigger": { "pools": ["recruit"], "min_online": 2, "weight": 1.0, "cooldown_min": 120 },
+      "cast": {
+        "recruit": { "seed": "subject" },
+        "veteran": { "exclude": ["recruit"], "considerations": [
+          { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.0 },
+          { "axis": "speaker.days_in_guild", "curve": "linear", "in_min": 0, "in_max": 60, "kind": "bonus", "weight": 0.6 }
+        ] },
+        "nice": { "optional": true, "exclude": ["recruit", "veteran"], "considerations": [
+          { "axis": "speaker.has_trait", "param": "serviable", "curve": "boolean", "kind": "bonus", "weight": 1.2 }
+        ] }
+      },
+      "beats": [
+        { "actor": "veteran", "delay": 0.0, "text": "tiens un nouveau. #recruit#, montre-nous ton parse ou dégage 😏" },
+        { "actor": "recruit", "delay": 3.0, "branch": {
+          "axis_actor": "recruit",
+          "options": [
+            { "text": "euh salut... je ferai de mon mieux 😅", "considerations": [
+              { "axis": "speaker.integration", "curve": "inverse", "kind": "bonus", "weight": 1.0 } ] },
+            { "text": "t'inquiète je top le dps, tu vas vite comprendre", "considerations": [
+              { "axis": "speaker.has_trait", "param": "tryhard", "curve": "boolean", "kind": "bonus", "weight": 1.3 } ] },
+            { "text": "et toi montre ton DKP avant de l'ouvrir 😎", "considerations": [
+              { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.4 } ] }
+          ] } },
+        { "actor": "nice", "delay": 2.5, "text": "ignore-le #recruit#, bienvenue chez nous 💙" }
+      ]
     }
   ]
 }

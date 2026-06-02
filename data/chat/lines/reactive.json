@@ -48,6 +48,12 @@
 
     { "id": "burn_rest", "pools": ["burnout"], "weight": 1.0, "text": "#subject# a l'air cramé, faut qu'il souffle" },
     { "id": "burn_serious", "pools": ["burnout"], "weight": 0.9, "text": "#subject# go te reposer sérieux, on gère" },
-    { "id": "burn_care", "pools": ["burnout"], "weight": 0.8, "text": "ça va #subject# ? prends une pause si besoin 💙", "considerations": [ { "axis": "relation", "value": "friend", "curve": "boolean", "kind": "bonus", "weight": 1.4 } ] }
+    { "id": "burn_care", "pools": ["burnout"], "weight": 0.8, "text": "ça va #subject# ? prends une pause si besoin 💙", "considerations": [ { "axis": "relation", "value": "friend", "curve": "boolean", "kind": "bonus", "weight": 1.4 } ] },
+
+    { "id": "ninja_accuse", "pools": ["ninja"], "weight": 1.0, "text": "alors comme ça on ninja #item# ? 👀" },
+    { "id": "ninja_council", "pools": ["ninja"], "weight": 0.9, "text": "le loot council va adorer ça tiens 🙄", "considerations": [ { "axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.2 } ] },
+    { "id": "ninja_vanish", "pools": ["ninja"], "weight": 0.9, "text": "#item# qui disparaît mystérieusement... encore une fois" },
+    { "id": "ninja_dkp", "pools": ["ninja"], "weight": 0.8, "text": "DKP minus à vie pour le ninja de #item#" },
+    { "id": "ninja_greedy", "pools": ["ninja"], "weight": 0.7, "text": "j'avais les DKP pour #item# moi, c'est un scandale", "considerations": [ { "axis": "speaker.has_trait", "param": "greedy", "curve": "boolean", "kind": "bonus", "weight": 1.4 } ] }
   ]
 }
