@@ -660,6 +660,15 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Passe de typage statique (2 juin 2026)
+*3 lots, ~60 fichiers. Validé : TestRunner 172/172 + **CheckScripts 104 scripts compilés sans erreur** + boot live.*
+- 🟠 **Typage statique conservateur** appliqué à tout le code (mandat CLAUDE.md) : types de retour (`-> void`/concret), paramètres, variables locales et collections homogènes (`Array[T]`).
+  - **Lot 1** : resources + data (modèle de données).
+  - **Lot 2** : systèmes + autoloads + utils (`save_manager` laissé intact — blobs JSON).
+  - **Lot 3** : UI (fenêtres, composants, dialogs, managers).
+- **Règle d'or** : les Variants (issus de `Dictionary.get`, `JSON`, autoloads dynamiques, duck-typing `player`/`member`, API drag&drop Godot) laissés **non typés** pour ne pas casser la compilation.
+- **Outillage** : `tests/CheckScripts.tscn` (validateur de compile complet, **104 scripts**) ajouté au flux de vérif — il attrape les erreurs de compilation de `main.gd`/UI que `TestRunner` n'exerce pas (ex. une inférence `:=` cassée corrigée dans `player_control_panel.gd`).
+
 ### Refactor god-object — main.gd dégonflé (2 juin 2026)
 *172/172 assertions vertes + boot live vérifié (MCP). Comportement identique.*
 - 🟠 **`main.gd` : ~1080 → ~720 lignes** via 2 extractions à comportement identique :
