@@ -38,11 +38,11 @@ var energy_drain_rates: Dictionary = {
 # Bonus et malus spécifiques au joueur
 @export var consecutive_hours: float = 0.0  # Heures consécutives connecté
 
-func _init():
+func _init() -> void:
 	super()  # Appelle le constructeur de SimulatedPlayer
 	_setup_player_character()
 
-func _setup_player_character():
+func _setup_player_character() -> void:
 	# Configuration spécifique au joueur
 	nom = "Joueur"  # Sera personnalisable plus tard
 	personnage_classe = "Guerrier"
@@ -75,9 +75,9 @@ func _setup_player_character():
 	# Initialiser la session
 	_initialize_session()
 
-func _initialize_session():
+func _initialize_session() -> void:
 	"""Initialise une nouvelle session de jeu"""
-	var game_time = _get_game_time()
+	var game_time: Node = _get_game_time()
 	if game_time:
 		session_start_time = {
 			"hour": game_time.current_hour,
@@ -111,7 +111,7 @@ func choose_activity(activity_type: String) -> bool:
 	current_activity_choice = activity_type
 
 	# Démarrer l'activité via l'ActivityManager
-	var activity_manager = _get_activity_manager()
+	var activity_manager: Node = _get_activity_manager()
 	if activity_manager:
 		var activity_type_enum = _convert_activity_string_to_enum(activity_type)
 		if activity_type_enum != null:
@@ -148,7 +148,7 @@ func _convert_activity_string_to_enum(activity_string: String):
 		"OFFLINE": return ActivityScript.ActivityType.OFFLINE
 		_: return null
 
-func update_player_energy(delta_minutes: float):
+func update_player_energy(delta_minutes: float) -> void:
 	"""Met à jour l'énergie du joueur basée sur l'activité actuelle"""
 	if not current_activity:
 		return
@@ -177,9 +177,9 @@ func update_player_energy(delta_minutes: float):
 	if player_energy_pool <= 0:
 		force_disconnect("Épuisement - énergie insuffisante")
 
-func schedule_disconnect(return_hour: int, return_minute: int = 0):
+func schedule_disconnect(return_hour: int, return_minute: int = 0) -> void:
 	"""Programme une déconnexion avec retour automatique"""
-	var game_time = _get_game_time()
+	var game_time: Node = _get_game_time()
 	if not game_time:
 		return
 	
@@ -203,7 +203,7 @@ func schedule_disconnect(return_hour: int, return_minute: int = 0):
 	
 	print("Déconnexion programmée - retour prévu : J%d %02d:%02d" % [return_day, return_hour, return_minute])
 
-func disconnect_player(reason: String = "Déconnexion manuelle"):
+func disconnect_player(reason: String = "Déconnexion manuelle") -> void:
 	"""Déconnecte le joueur et calcule les gains de la session"""
 	if not is_online:
 		return
@@ -221,7 +221,7 @@ func disconnect_player(reason: String = "Déconnexion manuelle"):
 		print("Joueur déconnecté: %s" % reason)
 		print("Session terminée - XP: +%d, Or: +%d, Durée: %d min" % [session_xp_gained, session_gold_gained, session_duration_minutes])
 
-func force_disconnect(reason: String):
+func force_disconnect(reason: String) -> void:
 	"""Force une déconnexion (épuisement, etc.)"""
 	if OS.is_debug_build():
 		print("PlayerCharacter: Force disconnect - %s" % reason)
@@ -237,11 +237,11 @@ func try_reconnect() -> bool:
 	"""Tente de reconnecter le joueur si c'est l'heure"""
 	if is_online or not scheduled_return_time.has("hour"):
 		return false
-	
-	var game_time = _get_game_time()
+
+	var game_time: Node = _get_game_time()
 	if not game_time:
 		return false
-	
+
 	# Vérifier si c'est l'heure de se reconnecter
 	if (game_time.current_day == scheduled_return_time.day and 
 		game_time.current_hour >= scheduled_return_time.hour and
@@ -257,8 +257,8 @@ func reconnect_player() -> bool:
 		return false
 	
 	# Calculer la récupération d'énergie
-	var offline_duration = _calculate_offline_duration()
-	var energy_recovery = offline_duration * 10.0  # +10 énergie par heure offline
+	var offline_duration: float = _calculate_offline_duration()
+	var energy_recovery: float = offline_duration * 10.0  # +10 énergie par heure offline
 	
 	# Bonus si déconnecté plus de 8h
 	if offline_duration >= 8.0:
@@ -288,11 +288,11 @@ func _calculate_offline_duration() -> float:
 	"""Calcule la durée en heures passée offline"""
 	if not session_start_time.has("hour"):
 		return 8.0  # Valeur par défaut
-	
-	var game_time = _get_game_time()
+
+	var game_time: Node = _get_game_time()
 	if not game_time:
 		return 8.0
-	
+
 	var current_total_minutes = game_time.current_hour * 60 + game_time.current_minute
 	var session_total_minutes = session_start_time.hour * 60 + session_start_time.minute
 	
@@ -302,9 +302,9 @@ func _calculate_offline_duration() -> float:
 	
 	return diff_minutes / 60.0
 
-func _calculate_session_gains():
+func _calculate_session_gains() -> void:
 	"""Calcule les gains de la session actuelle"""
-	var game_time = _get_game_time()
+	var game_time: Node = _get_game_time()
 	if not game_time or not session_start_time.has("hour"):
 		return
 	

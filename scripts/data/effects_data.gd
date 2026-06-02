@@ -22,18 +22,18 @@ static func get_all_effects() -> Array:
 	return effects
 
 static func get_effect_by_id(effect_id: String) -> EffectResource:
-	var all_effects = get_all_effects()
-	
+	var all_effects: Array = get_all_effects()
+
 	for effect in all_effects:
 		if effect.id == effect_id:
 			return effect
-	
+
 	return null
 
 # Effets individuels
 
 static func _create_morale_boost() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "morale_boost"
 	effect.name = "Moral élevé"
 	effect.description = "Les membres de la guilde sont de bonne humeur et plus motivés."
@@ -50,7 +50,7 @@ static func _create_morale_boost() -> EffectResource:
 	return effect
 
 static func _create_morale_penalty() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "morale_penalty"
 	effect.name = "Moral bas"
 	effect.description = "Un événement récent a affecté le moral de la guilde."
@@ -67,7 +67,7 @@ static func _create_morale_penalty() -> EffectResource:
 	return effect
 
 static func _create_energy_boost() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "energy_boost"
 	effect.name = "Regain d'énergie"
 	effect.description = "Les membres récupèrent plus rapidement leur énergie."
@@ -83,7 +83,7 @@ static func _create_energy_boost() -> EffectResource:
 	return effect
 
 static func _create_energy_drain() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "energy_drain"
 	effect.name = "Épuisement"
 	effect.description = "Les activités récentes ont épuisé les membres."
@@ -99,7 +99,7 @@ static func _create_energy_drain() -> EffectResource:
 	return effect
 
 static func _create_skill_bonus() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "skill_bonus"
 	effect.name = "Formation intensive"
 	effect.description = "Amélioration temporaire des compétences suite à une formation."
@@ -115,7 +115,7 @@ static func _create_skill_bonus() -> EffectResource:
 	return effect
 
 static func _create_integration_bonus() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "integration_bonus"
 	effect.name = "Esprit d'équipe"
 	effect.description = "Les membres s'entendent particulièrement bien."
@@ -131,7 +131,7 @@ static func _create_integration_bonus() -> EffectResource:
 	return effect
 
 static func _create_guild_xp_bonus() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "guild_xp_bonus"
 	effect.name = "Boost d'XP guilde"
 	effect.description = "La guilde gagne plus d'expérience pendant un certain temps."
@@ -147,7 +147,7 @@ static func _create_guild_xp_bonus() -> EffectResource:
 	return effect
 
 static func _create_recruitment_bonus() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "recruitment_bonus"
 	effect.name = "Réputation attrayante"
 	effect.description = "La guilde attire plus facilement de nouveaux membres."
@@ -164,7 +164,7 @@ static func _create_recruitment_bonus() -> EffectResource:
 	return effect
 
 static func _create_injured_member() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "injured"
 	effect.name = "Blessé"
 	effect.description = "Ce membre est blessé et ne peut pas participer aux raids."
@@ -183,7 +183,7 @@ static func _create_injured_member() -> EffectResource:
 	return effect
 
 static func _create_lucky_streak() -> EffectResource:
-	var effect = EffectResource.new()
+	var effect: EffectResource = EffectResource.new()
 	effect.id = "lucky_streak"
 	effect.name = "Série chanceuse"
 	effect.description = "La guilde bénéficie d'une chance exceptionnelle."

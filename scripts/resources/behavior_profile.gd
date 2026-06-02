@@ -25,7 +25,7 @@ class_name BehaviorProfile
 @export var reaction_patterns: Dictionary = {}  # event_type -> reaction_type
 @export var social_preferences: Dictionary = {}  # Préférences de groupes/activités
 
-func _init():
+func _init() -> void:
 	_randomize_profile()
 
 func serialize() -> Dictionary:
@@ -57,9 +57,9 @@ func deserialize(data: Dictionary) -> void:
 	fatigue_accumulation_rate = data.get("fatigue_accumulation_rate", fatigue_accumulation_rate)
 	preferred_session_length = data.get("preferred_session_length", preferred_session_length)
 
-func _randomize_profile():
+func _randomize_profile() -> void:
 	"""Génère un profil aléatoire mais cohérent"""
-	
+
 	# Générer les traits de base
 	stress_tolerance = randf()
 	flexibility = randf()
@@ -67,9 +67,9 @@ func _randomize_profile():
 	achievement_drive = randf()
 	routine_preference = randf()
 	conflict_avoidance = randf()
-	
+
 	# Type circadien avec distribution réaliste
-	var circadian_roll = randf()
+	var circadian_roll: float = randf()
 	if circadian_roll < 0.25:
 		circadian_type = "morning"
 	elif circadian_roll < 0.5:
@@ -86,14 +86,14 @@ func _randomize_profile():
 	preferred_session_length = 2.0 + (achievement_drive * 4.0)  # 2-6 heures
 	
 	# Variance selon flexibilité
-	var variance_amount = 0.25 + (flexibility * 0.75)  # 0.25-1.0
+	var variance_amount: float = 0.25 + (flexibility * 0.75)  # 0.25-1.0
 	schedule_variance = Vector2(-variance_amount, variance_amount)
 	
 	# Patterns de réaction cohérents avec la personnalité
 	_generate_reaction_patterns()
 	_generate_social_preferences()
 
-func _generate_reaction_patterns():
+func _generate_reaction_patterns() -> void:
 	"""Génère des patterns de réaction cohérents"""
 	
 	reaction_patterns = {
@@ -157,7 +157,7 @@ func _get_new_member_reaction() -> String:
 	else:
 		return "neutral"
 
-func _generate_social_preferences():
+func _generate_social_preferences() -> void:
 	"""Génère les préférences sociales"""
 	
 	social_preferences = {
@@ -207,8 +207,8 @@ func get_schedule_variance() -> float:
 
 func get_stress_response(stress_level: float) -> Dictionary:
 	"""Retourne la réponse au stress"""
-	var response = {}
-	
+	var response: Dictionary = {}
+
 	if stress_level > (1.0 - stress_tolerance) * 100:
 		response["mood_impact"] = -20.0 * (1.0 - stress_tolerance)
 		response["energy_impact"] = -15.0 * (1.0 - stress_tolerance)
@@ -232,8 +232,8 @@ func should_form_relationship(other_profile: BehaviorProfile) -> bool:
 	"""Détermine si devrait former une relation avec un autre profil"""
 	
 	# Calcul de compatibilité
-	var compatibility = 0.0
-	
+	var compatibility: float = 0.0
+
 	# Les sociaux s'entendent bien ensemble
 	if abs(social_needs - other_profile.social_needs) < 0.3:
 		compatibility += 0.3
@@ -277,7 +277,7 @@ func get_relationship_type(other_profile: BehaviorProfile) -> String:
 	
 	return "neutral"
 
-func adjust_from_experience(event_type: String, outcome: String):
+func adjust_from_experience(event_type: String, outcome: String) -> void:
 	"""Ajuste le profil selon les expériences vécues"""
 	
 	match event_type:

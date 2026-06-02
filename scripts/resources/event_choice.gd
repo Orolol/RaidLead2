@@ -23,7 +23,7 @@ const EffectResource = preload("res://scripts/resources/effect.gd")
 # Probabilités de conséquences
 @export var random_consequences: Array = []  # Array[Dictionary] - {probability, consequence}
 
-func _init():
+func _init() -> void:
 	pass
 
 func is_available(player_data: Dictionary = {}, guild_data: Dictionary = {}) -> bool:
@@ -32,14 +32,14 @@ func is_available(player_data: Dictionary = {}, guild_data: Dictionary = {}) -> 
 		
 		# Vérifier les conditions sur le joueur
 		if requirement.begins_with("player_"):
-			var stat = requirement.substr(7)  # Enlever "player_"
+			var stat: String = requirement.substr(7)  # Enlever "player_"
 			var player_value = player_data.get(stat, 0)
 			if not _check_condition(player_value, required_value):
 				return false
 		
 		# Vérifier les conditions sur la guilde
 		elif requirement.begins_with("guild_"):
-			var stat = requirement.substr(6)  # Enlever "guild_"
+			var stat: String = requirement.substr(6)  # Enlever "guild_"
 			var guild_value = guild_data.get(stat, 0)
 			if not _check_condition(guild_value, required_value):
 				return false
@@ -85,8 +85,8 @@ func _check_condition(actual_value, required_condition) -> bool:
 		return actual_value >= required_condition
 
 func get_detailed_tooltip() -> String:
-	var detailed_tooltip = text
-	
+	var detailed_tooltip: String = text
+
 	if tooltip != "":
 		detailed_tooltip += "\n\n" + tooltip
 	
@@ -95,7 +95,7 @@ func get_detailed_tooltip() -> String:
 		detailed_tooltip += "\n\n[b]Conséquences immédiates:[/b]"
 		for consequence in immediate_consequences:
 			var value = immediate_consequences[consequence]
-			var sign_str = "+" if value > 0 else ""
+			var sign_str: String = "+" if value > 0 else ""
 			detailed_tooltip += "\n  %s: %s%s" % [consequence, sign_str, str(value)]
 	
 	# Ajouter les effets
@@ -123,7 +123,7 @@ func get_detailed_tooltip() -> String:
 	return detailed_tooltip
 
 func apply_consequences() -> Dictionary:
-	var results = {
+	var results: Dictionary = {
 		"immediate": immediate_consequences.duplicate(),
 		"effects": effects_to_apply.duplicate(),
 		"random": null

@@ -72,7 +72,7 @@ static func generate_item_for_level(base_level: int, is_heroic: bool = false) ->
 	"""Génère un objet aléatoirement pour un niveau donné"""
 	
 	# Calculer l'iLvl selon le niveau (nouvelle balance)
-	var item_ilvl = _calculate_ilvl_for_level(base_level)
+	var item_ilvl: int = _calculate_ilvl_for_level(base_level)
 	
 	# Ajouter variation aléatoire (-2 à +3 iLvl)
 	item_ilvl += randi_range(-2, 3)
@@ -82,7 +82,7 @@ static func generate_item_for_level(base_level: int, is_heroic: bool = false) ->
 		item_ilvl += randi_range(10, 15)
 	
 	# Déterminer la rareté
-	var rarity = _roll_rarity(is_heroic)
+	var rarity: ItemScript.Rarity = _roll_rarity(is_heroic)
 	
 	# Bonus d'iLvl selon la rareté
 	match rarity:
@@ -94,7 +94,7 @@ static func generate_item_for_level(base_level: int, is_heroic: bool = false) ->
 	item_ilvl = max(1, item_ilvl)
 	
 	# Choisir un slot aléatoire
-	var slots = [
+	var slots: Array = [
 		ItemScript.EquipmentSlot.HELMET,
 		ItemScript.EquipmentSlot.SHOULDERS,
 		ItemScript.EquipmentSlot.CHEST,
@@ -102,13 +102,13 @@ static func generate_item_for_level(base_level: int, is_heroic: bool = false) ->
 		ItemScript.EquipmentSlot.RING
 	]
 	var slot = slots[randi() % slots.size()]
-	
+
 	# Générer le nom
 	var possible_names = ITEM_NAMES[slot][rarity]
 	var item_name = possible_names[randi() % possible_names.size()]
-	
+
 	# Créer l'objet et lui attribuer des statistiques
-	var item = ItemScript.new(item_name, slot, item_ilvl, rarity)
+	var item: ItemScript = ItemScript.new(item_name, slot, item_ilvl, rarity)
 	_apply_stats_to_item(item)
 	return item
 
@@ -121,17 +121,17 @@ static func generate_loot_for_dungeon(dungeon_name: String, is_heroic: bool = fa
 	var base_ilvl = dungeon_data.get("equipment_reward_level", 10)
 	
 	# Générer 3-6 objets pour la table de loot du donjon
-	var item_count = randi_range(3, 6)
-	
+	var item_count: int = randi_range(3, 6)
+
 	for i in range(item_count):
-		var item = generate_item_for_level(base_ilvl, is_heroic)
+		var item: ItemScript = generate_item_for_level(base_ilvl, is_heroic)
 		items.append(item)
 	
 	return items
 
 static func get_boss_loot_chance(boss_index: int, total_bosses: int, is_heroic: bool = false) -> float:
 	"""Retourne la chance qu'un boss drop du loot"""
-	var base_chance = 0.3  # 30% de chance de base
+	var base_chance: float = 0.3  # 30% de chance de base
 	
 	# Le dernier boss a plus de chance de dropper
 	if boss_index == total_bosses - 1:
@@ -145,11 +145,11 @@ static func get_boss_loot_chance(boss_index: int, total_bosses: int, is_heroic: 
 
 static func _roll_rarity(is_heroic: bool = false) -> ItemScript.Rarity:
 	"""Détermine la rareté d'un objet selon les chances"""
-	var roll = randi() % 100
-	var cumulative_chance = 0
-	
+	var roll: int = randi() % 100
+	var cumulative_chance: int = 0
+
 	# Ajuster les chances pour héroïque
-	var chances = RARITY_CHANCES.duplicate()
+	var chances: Dictionary = RARITY_CHANCES.duplicate()
 	if is_heroic:
 		# Réduire les chances de commun, augmenter rare et épique
 		chances[ItemScript.Rarity.COMMON] = 40
@@ -158,7 +158,7 @@ static func _roll_rarity(is_heroic: bool = false) -> ItemScript.Rarity:
 		chances[ItemScript.Rarity.EPIC] = 5
 	
 	# Rouler pour la rareté (dans l'ordre inverse pour commencer par épique)
-	var rarities = [
+	var rarities: Array = [
 		ItemScript.Rarity.EPIC,
 		ItemScript.Rarity.RARE, 
 		ItemScript.Rarity.UNCOMMON,
@@ -212,38 +212,38 @@ static func create_starting_equipment() -> Array[ItemScript]:
 static func _apply_stats_to_item(item: ItemScript, preferred_primary: String = "") -> void:
 	if not item:
 		return
-	var stats = _generate_stats_for_item(item.ilvl, item.slot, item.rarity, preferred_primary)
+	var stats: Dictionary = _generate_stats_for_item(item.ilvl, item.slot, item.rarity, preferred_primary)
 	item.strength = stats.get("strength", 0)
 	item.agility = stats.get("agility", 0)
 	item.intelligence = stats.get("intelligence", 0)
 
 static func _generate_stats_for_item(item_ilvl: int, slot: ItemScript.EquipmentSlot, rarity: ItemScript.Rarity, preferred_primary: String = "") -> Dictionary:
-	var stat_budget = max(1, int(round(float(item_ilvl) * SLOT_STAT_MULTIPLIERS.get(slot, 0.4))))
+	var stat_budget: int = max(1, int(round(float(item_ilvl) * SLOT_STAT_MULTIPLIERS.get(slot, 0.4))))
 	stat_budget = max(1, int(round(float(stat_budget) * RARITY_STAT_MULTIPLIERS.get(rarity, 1.0))))
 
-	var stats = {
+	var stats: Dictionary = {
 		"strength": 0,
 		"agility": 0,
 		"intelligence": 0
 	}
 
-	var available_primary = ["strength", "agility", "intelligence"]
+	var available_primary: Array = ["strength", "agility", "intelligence"]
 	var primary_stat = preferred_primary if preferred_primary in available_primary else available_primary[randi() % available_primary.size()]
 
-	var secondary_stats = available_primary.duplicate()
+	var secondary_stats: Array = available_primary.duplicate()
 	secondary_stats.erase(primary_stat)
 
-	var primary_ratio = randf_range(0.6, 0.75)
-	var primary_value = max(1, int(round(float(stat_budget) * primary_ratio)))
+	var primary_ratio: float = randf_range(0.6, 0.75)
+	var primary_value: int = max(1, int(round(float(stat_budget) * primary_ratio)))
 	primary_value = min(primary_value, stat_budget)
 	stats[primary_stat] = primary_value
 
-	var remaining = max(0, stat_budget - primary_value)
+	var remaining: int = max(0, stat_budget - primary_value)
 	if remaining > 0:
-		var secondary_ratio = randf_range(0.4, 0.65)
-		var first_secondary_value = int(round(float(remaining) * secondary_ratio))
+		var secondary_ratio: float = randf_range(0.4, 0.65)
+		var first_secondary_value: int = int(round(float(remaining) * secondary_ratio))
 		first_secondary_value = clamp(first_secondary_value, 0, remaining)
-		var second_secondary_value = remaining - first_secondary_value
+		var second_secondary_value: int = remaining - first_secondary_value
 		stats[secondary_stats[0]] += first_secondary_value
 		stats[secondary_stats[1]] += second_secondary_value
 

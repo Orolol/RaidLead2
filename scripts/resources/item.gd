@@ -32,7 +32,7 @@ func _init(
 	p_strength: int = 0,
 	p_agility: int = 0,
 	p_intelligence: int = 0
-):
+) -> void:
 	name = p_name
 	slot = p_slot
 	ilvl = p_ilvl
@@ -67,8 +67,8 @@ func get_rarity_color() -> Color:
 		_: return Color.WHITE
 
 func get_display_name() -> String:
-	var base = "%s (%s, iLvl %d)" % [name, get_slot_name(), ilvl]
-	var stat_summary = get_stat_summary()
+	var base: String = "%s (%s, iLvl %d)" % [name, get_slot_name(), ilvl]
+	var stat_summary: String = get_stat_summary()
 	if stat_summary == "":
 		return base
 	return "%s - %s" % [base, stat_summary]

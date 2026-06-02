@@ -239,13 +239,13 @@ static var RAIDS = {
 }
 
 static func get_all_instances() -> Dictionary:
-	var all_instances = {}
+	var all_instances: Dictionary = {}
 	all_instances.merge(DUNGEONS)
 	all_instances.merge(RAIDS)
 	return all_instances
 
 static func get_available_instances() -> Dictionary:
-	var available_instances = {}
+	var available_instances: Dictionary = {}
 	
 	if not ServerVersion:
 		return get_all_instances()
@@ -272,7 +272,7 @@ static func get_instance_data(instance_id: String) -> Dictionary:
 		return RAIDS[instance_id]
 	elif instance_id.ends_with("_heroic"):
 		# Les variantes héroïques sont générées dynamiquement (pas dans DUNGEONS)
-		var heroics = get_heroic_dungeons()
+		var heroics: Dictionary = get_heroic_dungeons()
 		if heroics.has(instance_id):
 			return heroics[instance_id]
 	return {}
@@ -283,11 +283,11 @@ static func is_instance_available(instance_id: String) -> bool:
 	return ServerVersion.is_instance_available(instance_id)
 
 static func get_instances_for_level(level: int, type = -1, available_only: bool = true) -> Array:
-	var suitable_instances = []
-	var instances_to_check = get_available_instances() if available_only else get_all_instances()
-	
+	var suitable_instances: Array = []
+	var instances_to_check: Dictionary = get_available_instances() if available_only else get_all_instances()
+
 	for id in instances_to_check:
-		var instance = instances_to_check[id]
+		var instance: Dictionary = instances_to_check[id]
 		if level >= instance.level_min and level <= instance.level_max:
 			if type == -1 or instance.type == type:
 				suitable_instances.append({
@@ -298,7 +298,7 @@ static func get_instances_for_level(level: int, type = -1, available_only: bool 
 	return suitable_instances
 
 static func get_group_composition(instance_id: String) -> Dictionary:
-	var instance = get_instance_data(instance_id)
+	var instance: Dictionary = get_instance_data(instance_id)
 	if instance.is_empty():
 		return {}
 		
@@ -329,16 +329,16 @@ static func get_group_composition(instance_id: String) -> Dictionary:
 	return {}
 
 static func calculate_difficulty_score(instance_id: String, group: Array) -> float:
-	var instance = get_instance_data(instance_id)
+	var instance: Dictionary = get_instance_data(instance_id)
 	if instance.is_empty() or group.is_empty():
 		return 0.0
-		
-	var score = 1.0
-	
+
+	var score: float = 1.0
+
 	# Calcul basé sur le niveau moyen du groupe
-	var avg_level = 0
-	var avg_equipment = 0
-	var avg_skill = 0
+	var avg_level: float = 0.0
+	var avg_equipment: float = 0.0
+	var avg_skill: float = 0.0
 	
 	for member in group:
 		avg_level += member.personnage_niveau
@@ -368,10 +368,10 @@ static func calculate_difficulty_score(instance_id: String, group: Array) -> flo
 
 static func get_heroic_dungeons() -> Dictionary:
 	"""Retourne les donjons niveau 60 en version héroïque"""
-	var heroic_dungeons = {}
-	
+	var heroic_dungeons: Dictionary = {}
+
 	# Donjons niveau 60 qui peuvent être faits en héroïque
-	var level_60_dungeons = ["stratholme", "scholomance", "blackrock_depths"]
+	var level_60_dungeons: Array = ["stratholme", "scholomance", "blackrock_depths"]
 	
 	for dungeon_id in level_60_dungeons:
 		var base_dungeon = DUNGEONS.get(dungeon_id, {})
@@ -396,8 +396,8 @@ static func is_heroic_dungeon(instance_id: String) -> bool:
 
 static func get_all_dungeons_and_heroic() -> Dictionary:
 	"""Retourne tous les donjons normaux et héroïques combinés"""
-	var all_dungeons = DUNGEONS.duplicate()
-	var heroic_dungeons = get_heroic_dungeons()
+	var all_dungeons: Dictionary = DUNGEONS.duplicate()
+	var heroic_dungeons: Dictionary = get_heroic_dungeons()
 	
 	for heroic_id in heroic_dungeons:
 		all_dungeons[heroic_id] = heroic_dungeons[heroic_id]
