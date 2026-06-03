@@ -48,6 +48,7 @@ MCPGameInspector="*res://addons/godot_mcp/mcp_game_inspector_service.gd"
 GuildCultureManager="*res://scripts/systems/guild_culture_manager.gd"
 AdvisorManager="*res://scripts/systems/advisor_manager.gd"
 BalanceManager="*res://scripts/systems/balance_manager.gd"
+ChatDirector="*res://scripts/systems/chat_director.gd"
 
 [display]
 

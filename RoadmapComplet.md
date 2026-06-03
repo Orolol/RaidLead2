@@ -52,6 +52,8 @@
 - ✅ Gestion des wipes et conséquences
 - ✅ Compositions requises (tanks, healers, DPS)
 
+- ✅ Polish UI donjon : timeline lisible, marqueurs de boss stylés, liste de groupe clarifiée, rapport de loot sans débordement horizontal
+
 ### 1.5 Pool de Recrutement (RecruitmentPool)
 - ✅ Pool dynamique de 15-30 joueurs disponibles
 - ✅ Actualisation quotidienne
@@ -659,6 +661,20 @@
 RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les **fondations sont excellentes** avec tous les systèmes core opérationnels, les 2 premières milestones complètes et **l'infrastructure UI moderne** implémentée.
 
 ## Accomplissements Récents ✅
+
+### Chat de guilde vivant — moteur + scènes à branches (2 juin 2026)
+*Branche `feat/chat-vivant` (worktree). Implémenté en 7 phases A→G. Validé : CheckScripts 108 scripts OK + TestRunner 220/220 + soak headless. Doc : `docs/design/2026-06-02-chat-guilde-vivant.md`.*
+
+Transformation du `ChatPanel` (ancien log d'événements) en **chat de guilde vivant** style WoW Vanilla, **data-driven** (zéro `if` par réplique), **offline/gratuit/déterministe** (pas de LLM au runtime ; corpus authored au dev-time).
+
+- 🟢 **Nouvel autoload `ChatDirector`** : décide *qui dit quoi quand*. Le `ChatPanel` devient une vue passive (`line_emitted`). Contenu = JSON dans `res://data/chat/`.
+- 🟢 **Moteur de scoring d'utilité** (`ChatScoring`, pur/testable) : `score = (base + Σbonus) × (Π veto)` ; considérations data-driven (axe + courbe + kind) ; **softmax à température** ; vetos `[0,1]` (un 0 élimine) au lieu de `-9999`. Explicateur de score (debug).
+- 🟢 **Vibe-space** (l'idée « embeddings » bakée au dev-time) : coords `[serieux, toxicite, sweat]` par réplique + dérivées du locuteur (traits/humeur) → affinité gaussienne (une réplique « dans le ton » score plus haut).
+- 🟢 **Blackboard de stimuli réactifs** branché sur les vrais signaux : level up (60 = saillance 1.0), recrutement, départ, loot/loot_epic, wipe, boss_kill, drama, tension, burnout, conflit de loot. Injection de variables réelles (`#subject# #item# #boss# #wipes# #lvl#…`). Sélection du locuteur pondérée par la **relation** au sujet (SocialDynamics : un rival se moque, un ami félicite).
+- 🟢 **`SceneRunner` — scènes scriptées multi-acteurs à branches** (le cœur « vivant ») : casting (réutilise le scoring + `relation_to_role`), beats joués **avec pauses** (délais temps-réel), **branches résolues par roll pondéré sur les traits** de l'acteur (rickroll : timide=« haha », perfectionniste=« c'est un rickroll », rage_quitter=« MAIS BORDEL… »), **effets sur la sim** (mood/stress). 7 scènes : rickroll, duel, blame_pull (wipe), tribunal du ninja, Mankrik, world-buff panic, bizutage de recrue.
+- 🟢 **Cadence** ∝ nombre de joueurs en ligne et bavardise ; **plancher temps-réel** (anti-flood à 2400× / fast-forward) ; chat supprimé en fast-forward ; **anti-répétition** (ring buffer + pénalité) + **équité de parole** (les muets reprennent la parole).
+- 🟢 **Corpus** : 85 lignes ambient + ~45 réactives + 7 scènes (Barrens chat, LFG, mage/utility, DKP/ninja, attunements, world buffs, corpse runs, PvP/honor, clichés de classe…).
+- 🟢 **Outillage** : soak-test headless (`tests/ChatSoak.tscn`, aperçu + stats), validation de schéma en CI, actions chat dans le menu debug, indicateur « est en train d'écrire… », stub `ChatBackend` (point d'extension Palier 3 LLM live opt-in). 33 nouvelles assertions de test.
 
 ### Passe de typage statique (2 juin 2026)
 *3 lots, ~60 fichiers. Validé : TestRunner 172/172 + **CheckScripts 104 scripts compilés sans erreur** + boot live.*

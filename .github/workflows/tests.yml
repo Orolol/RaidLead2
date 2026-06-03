@@ -33,3 +33,7 @@ jobs:
 
       - name: Suite de tests automatisés
         run: godot --headless --path . res://tests/TestRunner.tscn
+
+      - name: Aperçu du chat vivant (soak, informatif)
+        run: godot --headless --path . res://tests/ChatSoak.tscn
+        continue-on-error: true

@@ -261,11 +261,17 @@ func _apply_window_layout(instance: Control, window_name: String, config: Dictio
 	if config.default_size != Vector2.ZERO:
 		instance.size = config.default_size
 
-	# Position
-	if window_positions.has(window_name):
-		var saved: Dictionary = window_positions[window_name]
-		instance.position = _to_vec2(saved.get("position"), Vector2.ZERO)
-		instance.size = _to_vec2(saved.get("size"), config.default_size)
+	# Position et taille restaurées depuis la save (format tableau [x, y] sur disque).
+	var saved: Dictionary = window_positions.get(window_name, {})
+	var saved_position = saved.get("position")  # tableau [x,y], ou String (ancienne save), ou null
+	var saved_size = saved.get("size")
+	if saved_size != null:
+		instance.size = _to_vec2(saved_size, config.default_size)
+	# Position : on n'utilise la save QUE si c'est un tableau [x,y] valide ; sinon
+	# position par défaut ou centrage. Une ancienne save au format String (Vector2
+	# sérialisé) tomberait sinon en (0,0) → fenêtre collée en haut-gauche (bug).
+	if saved_position is Array and saved_position.size() >= 2:
+		instance.position = Vector2(saved_position[0], saved_position[1])
 	elif config.default_position != Vector2(-1, -1):
 		instance.position = config.default_position
 	else:

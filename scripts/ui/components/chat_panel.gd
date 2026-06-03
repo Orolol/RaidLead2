@@ -21,6 +21,7 @@ const MESSAGE_COLORS = {
 
 var messages: Array = []
 var auto_scroll: bool = true
+var _typing_speaker: String = ""   # indicateur "X est en train d'écrire…" (scènes)
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(400, 200)
@@ -42,6 +43,7 @@ func _ready() -> void:
 	# Connecter aux signaux des autoloads
 	_connect_to_guild_events()
 	_connect_to_activity_events()
+	_connect_to_chat_director()
 
 func _create_ui_structure() -> void:
 	var vbox := VBoxContainer.new()
@@ -111,6 +113,35 @@ func _connect_to_activity_events() -> void:
 		if not activity_manager.dungeon_ended.is_connected(_on_dungeon_ended):
 			activity_manager.dungeon_ended.connect(_on_dungeon_ended)
 
+func _connect_to_chat_director() -> void:
+	# Le ChatDirector (autoload) émet les répliques "en personnage" du chat vivant.
+	# Le ChatPanel est une vue passive : il se contente de les afficher.
+	if ChatDirector and not ChatDirector.line_emitted.is_connected(_on_chat_line):
+		ChatDirector.line_emitted.connect(_on_chat_line)
+	if ChatDirector and not ChatDirector.typing_changed.is_connected(_on_typing_changed):
+		ChatDirector.typing_changed.connect(_on_typing_changed)
+
+func _on_chat_line(speaker_name: String, text: String, _channel: String) -> void:
+	add_chat_line(speaker_name, text)
+
+func _on_typing_changed(speaker_name: String) -> void:
+	_typing_speaker = speaker_name
+	_update_display()
+
+func add_chat_line(speaker_name: String, text: String) -> void:
+	# Ligne de chat en personnage : "[HH:MM] Nom: texte" (nom mis en évidence).
+	var message := ""
+	if GameTime:
+		message = "[color=#666666][%s][/color] " % GameTime.get_current_time_string()
+	var name_color: Color = MESSAGE_COLORS.get("levelup", UIConstants.COLOR_TEXT_HIGHLIGHT)
+	var name_hex := "#%02x%02x%02x" % [int(name_color.r * 255), int(name_color.g * 255), int(name_color.b * 255)]
+	message += "[color=%s]%s[/color]: %s" % [name_hex, speaker_name, text]
+
+	messages.append(message)
+	if messages.size() > MAX_MESSAGES:
+		messages.pop_front()
+	_update_display()
+
 func add_message(text: String, type: String = "info", timestamp: bool = true) -> void:
 	# Créer le message avec timestamp si demandé
 	var message = ""
@@ -144,7 +175,9 @@ func _update_display() -> void:
 	chat_display.clear()
 	for msg in messages:
 		chat_display.append_text(msg + "\n")
-	
+	if _typing_speaker != "":
+		chat_display.append_text("[color=#666666][i]%s est en train d'écrire…[/i][/color]\n" % _typing_speaker)
+
 	# Auto-scroll vers le bas si activé
 	if auto_scroll:
 		await get_tree().process_frame
