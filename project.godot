@@ -42,13 +42,13 @@ LegacyManager="*res://scripts/systems/legacy_manager.gd"
 NotificationManager="*res://scripts/managers/notification_manager.gd"
 SaveManager="*res://scripts/autoloads/save_manager.gd"
 AssetLoader="*res://scripts/autoloads/asset_loader.gd"
-MCPScreenshot="*res://addons/godot_mcp/mcp_screenshot_service.gd"
-MCPInputService="*res://addons/godot_mcp/mcp_input_service.gd"
-MCPGameInspector="*res://addons/godot_mcp/mcp_game_inspector_service.gd"
 GuildCultureManager="*res://scripts/systems/guild_culture_manager.gd"
 AdvisorManager="*res://scripts/systems/advisor_manager.gd"
 BalanceManager="*res://scripts/systems/balance_manager.gd"
 ChatDirector="*res://scripts/systems/chat_director.gd"
+MCPScreenshot="*res://addons/godot_mcp/mcp_screenshot_service.gd"
+MCPInputService="*res://addons/godot_mcp/mcp_input_service.gd"
+MCPGameInspector="*res://addons/godot_mcp/mcp_game_inspector_service.gd"
 
 [display]
 

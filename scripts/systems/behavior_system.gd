@@ -8,6 +8,10 @@ signal burnout_level_changed(player, new_level)
 const PersonalEventsScript = preload("res://scripts/data/personal_events.gd")
 const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.gd")
 
+const DAY_KEYS: Array[String] = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+const MINUTES_PER_DAY := 24 * 60
+const CONNECTION_WINDOW_MINUTES := 20
+
 var game_time: Node
 var guild_manager: Node
 var social_dynamics: Node
@@ -16,8 +20,8 @@ var social_dynamics: Node
 var connection_probability_cache: Dictionary = {}
 var last_cache_update: int = -1
 
-# Horaires personnalisés par joueur (minute précise de connexion/déconnexion prévue)
-var player_scheduled_times: Dictionary = {}  # player -> {next_connection: int, next_disconnection: int}
+# Horaires personnalisés par joueur (minutes absolues de connexion/déconnexion prévues)
+var player_scheduled_times: Dictionary = {}
 
 func forget_player(player) -> void:
 	"""Purge les caches d'un membre qui quitte la guilde (évite une fuite de références :
@@ -80,68 +84,11 @@ func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 		# Réduire légèrement la fatigue accumulée chaque jour
 		if member.fatigue_accumulated > 0:
 			member.fatigue_accumulated = max(0, member.fatigue_accumulated - 5)
+		if not member.get_meta("is_player", false) and not member.is_online:
+			_schedule_next_connection_time(member)
 
 func should_connect_dynamic(player) -> bool:
-	"""Détermine si un joueur devrait se connecter avec le système dynamique"""
-	
-	# Utiliser le cache si disponible
-	if connection_probability_cache.has(player):
-		return randf() < connection_probability_cache[player]
-	
-	# Calculer la probabilité de base depuis le planning
-	var base_prob = _get_base_connection_probability(player)
-	if base_prob <= 0:
-		return false
-	
-	# Appliquer les modificateurs
-	var final_prob = base_prob
-	
-	# Modificateur de fatigue
-	var fatigue = player.fatigue_accumulated if player.fatigue_accumulated != null else 0
-	if fatigue > 60:
-		final_prob *= 0.7  # -30% si très fatigué
-	elif fatigue > 40:
-		final_prob *= 0.85  # -15% si fatigué
-	
-	# Modificateur de burnout
-	var burnout = player.burnout_level if player.burnout_level != null else 0
-	match burnout:
-		1: final_prob *= 0.9
-		2: final_prob *= 0.7
-		3: final_prob *= 0.4
-	
-	# Modificateur d'humeur
-	var mood = player.mood if player.mood != null else 75
-	if mood < 30:
-		final_prob *= 0.6
-	elif mood > 80:
-		final_prob *= 1.2
-	
-	# Modificateur social (amis en ligne)
-	if social_dynamics:
-		var friends_online = social_dynamics.get_online_friends(player)
-		if friends_online.size() > 0:
-			final_prob *= 1.0 + (0.2 * min(3, friends_online.size()))  # +20% par ami, max +60%
-	
-	# Modificateur d'équipement récent
-	var last_epic_loot_day = player.last_epic_loot_day if player.last_epic_loot_day != null else -1
-	if last_epic_loot_day > 0:
-		var days_since_loot = game_time.current_day - last_epic_loot_day
-		if days_since_loot <= 3:
-			final_prob *= 1.3  # +30% motivation après loot épique
-	
-	# Variance personnelle (personnalité)
-	if player.behavior_profile != null:
-		var variance = player.behavior_profile.get_schedule_variance()
-		final_prob += randf_range(-variance, variance)
-	
-	# Limiter entre 0 et 1
-	final_prob = clamp(final_prob, 0.0, 1.0)
-	
-	# Mettre en cache
-	connection_probability_cache[player] = final_prob
-	
-	return randf() < final_prob
+	return randf() < _get_connection_chance(player)
 
 func should_disconnect_dynamic(player) -> bool:
 	"""Détermine si un joueur devrait se déconnecter avec le système dynamique"""
@@ -185,6 +132,9 @@ func should_disconnect_dynamic(player) -> bool:
 	
 	# Déconnexion aléatoire si très tard
 	if game_time.current_hour >= 2 and game_time.current_hour < 6:
+		var tags: Array = player.get_all_tags() if player and player.has_method("get_all_tags") else []
+		if "insomniaque" in tags:
+			return false
 		var tiredness_factor = (player.energy / 100.0)
 		return randf() > tiredness_factor
 	
@@ -398,6 +348,8 @@ func recover_fatigue(player, amount: float) -> void:
 
 func _get_base_connection_probability(player) -> float:
 	"""Calcule la probabilité de base de connexion selon le planning"""
+	if player and player.has_method("get_connection_score_for_time"):
+		return player.get_connection_score_for_time(game_time)
 	
 	var day_name = game_time.get_day_name().to_lower()
 	if not player.planning.has(day_name):
@@ -424,6 +376,8 @@ func _get_base_connection_probability(player) -> float:
 
 func _should_disconnect_by_schedule(player) -> bool:
 	"""Vérifie si le joueur devrait se déconnecter selon son planning"""
+	if player and player.has_method("get_connection_score_for_time"):
+		return player.get_connection_score_for_time(game_time) < 0.08
 	
 	var day_name = game_time.get_day_name().to_lower()
 	if not player.planning.has(day_name):
@@ -471,9 +425,14 @@ func _update_fatigue_levels() -> void:
 						fatigue_rate = -0.5  # Récupère en s'amusant
 				
 				if fatigue_rate > 0:
-					add_fatigue(member, fatigue_rate)
+					add_fatigue(member, fatigue_rate * _get_energy_drain_modifier())
 				else:
 					recover_fatigue(member, abs(fatigue_rate))
+
+func _get_energy_drain_modifier() -> float:
+	if ServerVersion and ServerVersion.has_method("get_hype_energy_drain_multiplier"):
+		return ServerVersion.get_hype_energy_drain_multiplier()
+	return 1.0
 
 func _check_personal_events() -> void:
 	"""Vérifie et déclenche les événements personnels"""
@@ -534,6 +493,29 @@ func _absolute_day() -> int:
 		return game_time.get_total_days_elapsed()
 	return 0
 
+func _current_absolute_minutes() -> int:
+	if not game_time:
+		return 0
+	return _absolute_day() * MINUTES_PER_DAY + game_time.current_hour * 60 + game_time.current_minute
+
+func _get_connection_chance(player) -> float:
+	var base_prob: float = _get_base_connection_probability(player)
+	if base_prob <= 0.0:
+		return 0.0
+
+	var final_prob: float = base_prob * _connection_state_modifier(player)
+	var last_epic_loot_day: int = player.last_epic_loot_day if player.last_epic_loot_day != null else -1
+	if last_epic_loot_day >= 0:
+		var days_since_loot: int = _absolute_day() - last_epic_loot_day
+		if days_since_loot <= 3:
+			final_prob *= 1.18
+
+	if player.behavior_profile != null:
+		var variance: float = player.behavior_profile.get_schedule_variance() * 0.08
+		final_prob += randf_range(-variance, variance)
+
+	return clampf(final_prob, 0.0, 0.98)
+
 func _connection_state_modifier(player) -> float:
 	"""Multiplicateur de présence selon l'état dynamique du membre (1.0 = neutre).
 	C'est ce qui fait que fatigue / burnout / humeur / amis en ligne influencent
@@ -567,7 +549,47 @@ func _connection_state_modifier(player) -> float:
 		if friends_online.size() > 0:
 			m *= 1.0 + (0.2 * min(3, friends_online.size()))
 
+	var integration: float = player.integration if player.integration != null else 50.0
+	if integration >= 75.0:
+		m *= 1.08
+	elif integration < 25.0:
+		m *= 0.92
+
+	m *= _get_player_motivation_modifier(player)
+	m *= _get_server_hype_modifier()
+	m *= _get_guild_morale_modifier()
+
 	return clampf(m, 0.2, 2.0)
+
+func _get_player_motivation_modifier(player) -> float:
+	var modifier: float = 1.0
+	if player.behavior_profile != null:
+		modifier *= lerpf(0.88, 1.16, clampf(player.behavior_profile.achievement_drive, 0.0, 1.0))
+
+	var today: int = _absolute_day()
+	var last_success: int = player.last_raid_success_day if player.last_raid_success_day != null else -1
+	if last_success >= 0 and today - last_success <= 2:
+		modifier *= 1.08
+
+	var last_wipe: int = player.last_wipe_day if player.last_wipe_day != null else -1
+	if last_wipe >= 0 and today - last_wipe <= 1:
+		modifier *= 0.92
+
+	if player.bonus_session_active:
+		modifier *= 1.12
+
+	return clampf(modifier, 0.75, 1.25)
+
+func _get_server_hype_modifier() -> float:
+	if ServerVersion and ServerVersion.has_method("get_hype_connection_multiplier"):
+		return ServerVersion.get_hype_connection_multiplier()
+	return 1.0
+
+func _get_guild_morale_modifier() -> float:
+	if GuildCultureManager and GuildCultureManager.has_method("get_guild_morale"):
+		var morale: float = GuildCultureManager.get_guild_morale()
+		return clampf(0.78 + morale / 250.0, 0.75, 1.18)
+	return 1.0
 
 func _should_force_disconnect(player) -> bool:
 	"""Déconnexion imposée par l'état : épuisement ou burnout sévère."""
@@ -580,9 +602,9 @@ func _should_force_disconnect(player) -> bool:
 
 func _is_member_absent_today(member) -> bool:
 	"""Vrai si le membre a une absence planifiée (événement personnel) couvrant le jour courant."""
-	if not ("scheduled_absences" in member):
+	if not member:
 		return false
-	var absences: Array = member.scheduled_absences
+	var absences: Array = member.scheduled_absences if member.scheduled_absences != null else []
 	if absences.is_empty():
 		return false
 	var today: int = _absolute_day()
@@ -594,174 +616,185 @@ func _is_member_absent_today(member) -> bool:
 	return false
 
 func _check_scheduled_connections() -> void:
-	"""Vérifie et exécute les connexions/déconnexions planifiées"""
-
-	var current_time = game_time.current_hour * 60 + game_time.current_minute
+	var current_abs: int = _current_absolute_minutes()
 
 	for member in guild_manager.guild_members:
-		# Ne pas gérer le joueur
 		if member.get_meta("is_player", false):
 			continue
 
-		# Initialiser les horaires si nécessaire
 		if not player_scheduled_times.has(member):
 			_schedule_next_connection_time(member)
 			continue
 
-		var schedule = player_scheduled_times[member]
+		var schedule: Dictionary = player_scheduled_times[member]
 
-		# Absence planifiée (événement personnel) : le membre ne se connecte pas ce jour-là.
 		if not member.is_online and _is_member_absent_today(member):
 			continue
 
-		# Déconnexion dynamique : l'épuisement / le burnout sévère priment sur l'horaire.
 		if member.is_online and _should_force_disconnect(member):
 			behavior_changed.emit(member, "spontaneous_disconnection")
-			_schedule_next_connection_time(member)
+			_schedule_next_connection_time(member, current_abs + randi_range(60, 240))
 			continue
 
-		# Vérifier connexion
-		if not member.is_online and schedule.has("next_connection"):
-			var connection_time = schedule["next_connection"]
-			if current_time >= connection_time and current_time < connection_time + 10:
-				# Fenêtre de 10 minutes ; la chance dépend de l'état (fatigue/burnout/humeur/amis)
-				var connect_chance: float = clampf(0.3 * _connection_state_modifier(member), 0.05, 0.95)
+		if not member.is_online:
+			if not schedule.has("next_connection_abs"):
+				_schedule_next_connection_time(member)
+				continue
+			var connection_abs: int = int(schedule.get("next_connection_abs", 0))
+			if current_abs > connection_abs + CONNECTION_WINDOW_MINUTES:
+				_schedule_next_connection_time(member, current_abs + randi_range(30, 120))
+				continue
+			if current_abs >= connection_abs:
+				var connect_chance: float = _get_connection_chance(member)
 				if randf() < connect_chance:
 					member.go_online()
 					behavior_changed.emit(member, "scheduled_connection")
 					_schedule_next_disconnection_time(member)
-		
-		# Vérifier déconnexion
-		elif member.is_online and schedule.has("next_disconnection"):
-			var disconnection_time = schedule["next_disconnection"]
-			if current_time >= disconnection_time:
-				# Probabilité croissante de se déconnecter après l'heure prévue
-				var overtime = current_time - disconnection_time
-				var disconnect_prob = min(0.1 + (overtime * 0.02), 0.8)  # Max 80%
-
-				# L'état dynamique pousse à partir plus tôt : fatigue/burnout augmentent
-				# la proba ; des amis en ligne la réduisent (on reste avec eux).
-				disconnect_prob = clampf(disconnect_prob / _connection_state_modifier(member), 0.05, 0.95)
-
+		else:
+			if not schedule.has("next_disconnection_abs"):
+				_schedule_next_disconnection_time(member)
+				continue
+			var disconnection_abs: int = int(schedule.get("next_disconnection_abs", 0))
+			if current_abs >= disconnection_abs:
+				var overtime: int = current_abs - disconnection_abs
+				var disconnect_prob: float = clampf(0.12 + float(overtime) * 0.012, 0.08, 0.92)
+				disconnect_prob = clampf(disconnect_prob / maxf(_connection_state_modifier(member), 0.25), 0.04, 0.95)
+				if member.current_activity and member.current_activity.type in [Activity.ActivityType.DUNGEON, Activity.ActivityType.RAID]:
+					disconnect_prob *= 0.45
 				if randf() < disconnect_prob:
 					behavior_changed.emit(member, "scheduled_disconnection")
-					_schedule_next_connection_time(member)
+					_schedule_next_connection_time(member, current_abs + randi_range(240, 720))
+	return
 
-func _schedule_next_connection_time(member) -> void:
-	"""Planifie la prochaine heure de connexion avec variance"""
-	
-	var day_name = game_time.get_day_name().to_lower()
-	if not member.planning.has(day_name):
+func _schedule_next_connection_time(member, earliest_abs: int = -1) -> void:
+	if not member or not game_time:
 		return
-	
-	var day_schedule = member.planning[day_name]
-	var scheduled_time = -1
-	
-	# Déterminer l'heure de base selon le planning
-	if game_time.is_morning() and day_schedule.get("apres_midi", false):
-		# Connexion l'après-midi entre 14h et 16h
-		scheduled_time = randi_range(14 * 60, 16 * 60)
-	elif (game_time.is_morning() or game_time.is_afternoon()) and day_schedule.get("soir", false):
-		# Connexion le soir entre 19h et 21h
-		scheduled_time = randi_range(19 * 60, 21 * 60)
-	
-	if scheduled_time > 0:
-		# Ajouter variance personnelle (-30 à +30 minutes)
-		var variance = member.personal_schedule_variance if member.personal_schedule_variance != null else Vector2(-0.5, 0.5)
-		var variance_minutes = int(randf_range(variance.x * 60, variance.y * 60))
-		scheduled_time = max(0, scheduled_time + variance_minutes)
-		
-		# Ajuster selon le type circadien
-		match member.circadian_type:
-			"morning":
-				scheduled_time -= randi_range(30, 60)  # Se connecte plus tôt
-			"evening":
-				scheduled_time += randi_range(30, 60)  # Se connecte plus tard
-		
-		# S'assurer que c'est dans le futur
-		var current_time = game_time.current_hour * 60 + game_time.current_minute
-		if scheduled_time <= current_time:
-			scheduled_time += 24 * 60  # Reporter au lendemain
-		
-		if not player_scheduled_times.has(member):
-			player_scheduled_times[member] = {}
-		player_scheduled_times[member]["next_connection"] = scheduled_time % (24 * 60)
+	if member.has_method("ensure_play_schedule"):
+		member.ensure_play_schedule()
+
+	var now_abs: int = _current_absolute_minutes()
+	var search_from: int = earliest_abs if earliest_abs >= 0 else now_abs + 5
+	var current_weekday_index: int = clampi(game_time.current_day - 1, 0, 6)
+	var current_day_abs: int = _absolute_day()
+	var chosen_abs: int = -1
+
+	for offset in range(0, 8):
+		var day_index: int = (current_weekday_index + offset) % DAY_KEYS.size()
+		var day_name: String = DAY_KEYS[day_index]
+		if day_name not in member.active_days:
+			continue
+
+		var day_abs: int = current_day_abs + offset
+		var base_minute: int = int(member.preferred_start_hour * 60.0)
+		var jitter: int = _connection_jitter_minutes(member)
+		var candidate_abs: int = day_abs * MINUTES_PER_DAY + base_minute + jitter
+		var session_end_abs: int = day_abs * MINUTES_PER_DAY + int((member.preferred_start_hour + member.preferred_session_hours) * 60.0)
+		if session_end_abs <= candidate_abs:
+			session_end_abs += MINUTES_PER_DAY
+
+		if candidate_abs < search_from and search_from < session_end_abs:
+			candidate_abs = search_from + randi_range(5, 35)
+		if candidate_abs >= search_from:
+			chosen_abs = candidate_abs
+			break
+
+	if chosen_abs < 0:
+		chosen_abs = search_from + randi_range(8 * 60, 20 * 60)
+
+	if not player_scheduled_times.has(member):
+		player_scheduled_times[member] = {}
+	player_scheduled_times[member]["next_connection_abs"] = chosen_abs
+	player_scheduled_times[member].erase("next_disconnection_abs")
+	return
+
+func _connection_jitter_minutes(member) -> int:
+	var variance_hours: float = 0.5
+	if member.behavior_profile:
+		variance_hours = maxf(0.15, absf(member.behavior_profile.get_schedule_variance()))
+	if "planning_chaotique" in member.get_all_tags():
+		variance_hours += 0.45
+	if "ponctuel" in member.get_all_tags():
+		variance_hours *= 0.45
+	if "retardataire" in member.get_all_tags():
+		variance_hours += 0.25
+	return int(randf_range(-variance_hours * 60.0, variance_hours * 60.0))
 
 func _schedule_next_disconnection_time(member) -> void:
-	"""Planifie la prochaine heure de déconnexion avec variance"""
-	
-	if not member.is_online:
+	if not member or not game_time or not member.is_online:
 		return
-	
-	var current_time = game_time.current_hour * 60 + game_time.current_minute
-	
-	# Durée de session de base selon l'énergie et l'humeur
-	var base_duration = 120  # 2 heures de base
-	
-	if member.energy > 80:
-		base_duration += 60  # +1h si plein d'énergie
-	elif member.energy < 40:
-		base_duration -= 30  # -30min si fatigué
-	
-	if member.mood > 80:
-		base_duration += 30  # +30min si bonne humeur
-	elif member.mood < 40:
-		base_duration -= 30  # -30min si mauvaise humeur
-	
-	# Variance de ±30 minutes
-	var duration_variance = randi_range(-30, 30)
-	var session_duration = max(30, base_duration + duration_variance)  # Minimum 30 minutes
 
-	# Temps bonus (événement personnel « soirée libre / congé ») : rallonge la
-	# session puis se consomme — auparavant stocké mais jamais lu.
+	var current_abs: int = _current_absolute_minutes()
+	var session_duration: int = int(maxf(0.75, member.preferred_session_hours) * 60.0)
+
+	if member.energy > 80.0:
+		session_duration += 45
+	elif member.energy < 35.0:
+		session_duration -= 35
+	if member.mood > 80.0:
+		session_duration += 30
+	elif member.mood < 40.0:
+		session_duration -= 30
+	if member.current_activity and member.current_activity.type in [Activity.ActivityType.DUNGEON, Activity.ActivityType.RAID]:
+		session_duration += 45
+
+	session_duration = int(float(session_duration) * (1.0 / maxf(_get_energy_drain_modifier(), 0.55)) * 0.85)
+	session_duration = int(float(session_duration) * _get_guild_morale_modifier())
+	session_duration += randi_range(-25, 35)
+
 	var bonus_hours: float = member.bonus_session_hours if member.bonus_session_hours != null else 0.0
 	if bonus_hours > 0.0:
 		session_duration += int(bonus_hours * 60.0)
 		member.bonus_session_hours = 0
 
-	# Ajuster selon le burnout
-	var burnout = member.burnout_level if member.burnout_level != null else 0
+	var burnout: int = member.burnout_level if member.burnout_level != null else 0
 	if burnout > 0:
-		session_duration = int(session_duration * (1.0 - burnout * 0.2))  # -20% par niveau
-	
-	# Calculer l'heure de déconnexion
-	var disconnection_time = current_time + session_duration
-	
-	# Forcer déconnexion tard la nuit
-	var hour_of_disconnect = (disconnection_time / 60) % 24
-	if hour_of_disconnect >= 2 and hour_of_disconnect < 6:
-		# Réduire fortement la durée si ça tombe très tard
-		disconnection_time = current_time + randi_range(15, 45)
-	
+		session_duration = int(float(session_duration) * (1.0 - float(burnout) * 0.18))
+
+	session_duration = clampi(session_duration, 30, 8 * 60)
+	var disconnection_abs: int = current_abs + session_duration
+	var disconnect_hour: int = int((disconnection_abs / 60) % 24)
+	if disconnect_hour >= 2 and disconnect_hour < 6 and not ("insomniaque" in member.get_all_tags()):
+		var current_hour: int = int((current_abs / 60) % 24)
+		if current_hour < 2:
+			var current_day_start: int = current_abs - (current_abs % MINUTES_PER_DAY)
+			disconnection_abs = current_day_start + 2 * 60 + randi_range(0, 20)
+		else:
+			disconnection_abs = current_abs + randi_range(15, 45)
+
 	if not player_scheduled_times.has(member):
 		player_scheduled_times[member] = {}
-	player_scheduled_times[member]["next_disconnection"] = disconnection_time % (24 * 60)
+	player_scheduled_times[member]["next_disconnection_abs"] = disconnection_abs
+	player_scheduled_times[member].erase("next_connection_abs")
+	return
 
 func _check_spontaneous_events() -> void:
-	"""Vérifie les événements spontanés (connexions/déconnexions imprévues)"""
-	
 	for member in guild_manager.guild_members:
 		if member.get_meta("is_player", false):
 			continue
-		
-		# Connexion spontanée (ami en ligne, envie soudaine)
-		if not member.is_online and randf() < 0.02:  # 2% de chance
-			# Vérifier si c'est raisonnable de se connecter
-			if game_time.current_hour >= 8 and game_time.current_hour < 24:
-				if member.energy > 30 and member.mood > 20:
-					# Bonus si des amis sont en ligne
-					var friend_bonus = 1.0
-					if social_dynamics:
-						var friends_online = social_dynamics.get_online_friends(member)
-						friend_bonus = 1.0 + (0.3 * min(3, friends_online.size()))
-					
-					if randf() < 0.1 * friend_bonus:  # 10% de base, jusqu'à 40% avec amis
-						member.go_online()
-						behavior_changed.emit(member, "spontaneous_connection")
-						_schedule_next_disconnection_time(member)
-		
-		# Déconnexion spontanée (urgence, fatigue soudaine)
-		elif member.is_online and randf() < 0.01:  # 1% de chance
-			if member.energy < 20 or randf() < 0.05:  # Très fatigué ou 5% urgence
+
+		if not member.is_online:
+			var base_score: float = _get_base_connection_probability(member)
+			if base_score <= 0.02:
+				continue
+			var spontaneous_chance: float = clampf(member.schedule_spontaneity * 0.12 * _connection_state_modifier(member), 0.002, 0.08)
+			if social_dynamics:
+				var friends_online: Array = social_dynamics.get_online_friends(member)
+				spontaneous_chance *= 1.0 + 0.18 * min(3, friends_online.size())
+			if randf() < spontaneous_chance:
+				member.go_online()
+				behavior_changed.emit(member, "spontaneous_connection")
+				_schedule_next_disconnection_time(member)
+		else:
+			var presence_score: float = _get_base_connection_probability(member)
+			var fatigue: float = member.fatigue_accumulated if member.fatigue_accumulated != null else 0.0
+			var disconnect_chance: float = 0.004
+			if presence_score < 0.08:
+				disconnect_chance += 0.02
+			if member.energy < 25.0:
+				disconnect_chance += 0.025
+			if fatigue > 65.0:
+				disconnect_chance += 0.02
+			if randf() < disconnect_chance:
 				behavior_changed.emit(member, "spontaneous_disconnection")
-				_schedule_next_connection_time(member)
+				_schedule_next_connection_time(member, _current_absolute_minutes() + randi_range(90, 360))
+	return

@@ -7,6 +7,9 @@ const EquipmentScript = preload("res://scripts/resources/equipment.gd")
 const LootTablesScript = preload("res://scripts/data/loot_tables.gd")
 const BehaviorProfileScript = preload("res://scripts/resources/behavior_profile.gd")
 
+const DAY_KEYS: Array[String] = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+const CORE_NIGHT_END := 2.0
+
 ## Identifiant stable inter-session (get_instance_id() ne survit pas au reload) —
 ## utilisé pour persister le graphe social. Généré une fois à la création.
 static var _id_counter: int = 0
@@ -28,6 +31,12 @@ static var _id_counter: int = 0
 @export var skill: int = 50
 @export var integration: float = 0.0
 @export var planning: Dictionary = {}
+@export var active_days: Array = []
+@export var schedule_archetype: String = "regular"
+@export var schedule_reliability: float = 0.75
+@export var schedule_spontaneity: float = 0.08
+@export var preferred_start_hour: float = 19.5
+@export var preferred_session_hours: float = 2.5
 
 # Nouvelles propriétés pour le Dynamic Behavior System
 @export var behavior_profile: BehaviorProfileScript = null
@@ -84,6 +93,7 @@ func _init() -> void:
 	nom = _generate_random_name()
 	_generate_random_stats()
 	_initialize_behavior_profile()
+	regenerate_play_schedule_from_traits()
 
 func _generate_random_name() -> String:
 	var first_names: Array[String] = ["Aragorn", "Legolas", "Gimli", "Frodo", "Gandalf", "Boromir", "Elrond", "Galadriel", "Samwise", "Merry"]
@@ -122,6 +132,229 @@ func _generate_random_stats() -> void:
 		"samedi": {"apres_midi": randf() > 0.2, "soir": randf() > 0.1},  # 80% and 90% chance
 		"dimanche": {"apres_midi": randf() > 0.2, "soir": randf() > 0.15}  # 80% and 85% chance
 	}
+
+func regenerate_play_schedule_from_traits() -> void:
+	"""Construit un profil de connexion lisible depuis les traits et le profil comportemental."""
+	var all_tags: Array = get_all_tags()
+	var drive: float = behavior_profile.achievement_drive if behavior_profile != null else 0.5
+	var flexibility: float = behavior_profile.flexibility if behavior_profile != null else 0.5
+	var routine: float = behavior_profile.routine_preference if behavior_profile != null else 0.5
+
+	var day_target: int = 4
+	if drive > 0.75 or "tryhard" in all_tags or "hardcore_gamer" in all_tags:
+		day_target += 2
+	elif drive > 0.55:
+		day_target += 1
+	if "casual" in all_tags:
+		day_target -= 1
+	if "joueur_weekend" in all_tags:
+		day_target = maxi(day_target, 3)
+	day_target = clampi(day_target, 2, 7)
+
+	active_days = _pick_active_days(day_target, all_tags)
+	schedule_archetype = _pick_schedule_archetype(all_tags)
+	preferred_start_hour = _pick_preferred_start_hour()
+	preferred_session_hours = _pick_preferred_session_hours(all_tags, drive)
+	schedule_reliability = clampf(0.58 + routine * 0.20 + drive * 0.12, 0.35, 0.96)
+	schedule_spontaneity = clampf(0.04 + flexibility * 0.16 + (0.05 if "social" in all_tags else 0.0), 0.02, 0.28)
+
+	if "ponctuel" in all_tags:
+		schedule_reliability += 0.08
+	if "retardataire" in all_tags or "planning_chaotique" in all_tags:
+		schedule_reliability -= 0.14
+		schedule_spontaneity += 0.06
+	if "solitaire" in all_tags:
+		schedule_spontaneity -= 0.03
+	if "insomniaque" in all_tags:
+		schedule_spontaneity += 0.05
+	schedule_reliability = clampf(schedule_reliability, 0.25, 0.98)
+	schedule_spontaneity = clampf(schedule_spontaneity, 0.01, 0.35)
+
+	_sync_legacy_planning()
+
+func ensure_play_schedule() -> void:
+	if active_days.is_empty():
+		_restore_schedule_from_legacy()
+	if active_days.is_empty():
+		regenerate_play_schedule_from_traits()
+
+func _pick_active_days(day_target: int, all_tags: Array) -> Array:
+	var weighted_days: Array = []
+	for day in DAY_KEYS:
+		var weight: int = 3
+		if day in ["vendredi", "samedi", "dimanche"]:
+			weight += 2
+		if "joueur_weekend" in all_tags and day in ["samedi", "dimanche"]:
+			weight += 4
+		if "hardcore_gamer" in all_tags:
+			weight += 1
+		for i in range(weight):
+			weighted_days.append(day)
+
+	var picked: Array = []
+	weighted_days.shuffle()
+	for day in weighted_days:
+		if picked.size() >= day_target:
+			break
+		if day not in picked:
+			picked.append(day)
+	picked.sort_custom(func(a, b): return DAY_KEYS.find(a) < DAY_KEYS.find(b))
+	return picked
+
+func _pick_schedule_archetype(all_tags: Array) -> String:
+	if "insomniaque" in all_tags:
+		return "insomniac"
+	if "nocturne" in all_tags or circadian_type == "evening":
+		return "late_evening"
+	if "diurne" in all_tags or circadian_type == "morning":
+		return "early_evening"
+	if "joueur_weekend" in all_tags:
+		return "weekend"
+	if "hardcore_gamer" in all_tags or "tryhard" in all_tags:
+		return "hardcore"
+	if "casual" in all_tags:
+		return "casual"
+	return "regular"
+
+func _pick_preferred_start_hour() -> float:
+	match schedule_archetype:
+		"insomniac":
+			return randf_range(21.5, 23.5)
+		"late_evening":
+			return randf_range(20.5, 22.0)
+		"early_evening":
+			return randf_range(17.0, 19.0)
+		"weekend":
+			return randf_range(18.0, 20.0)
+		"casual":
+			return randf_range(19.0, 20.5)
+		"hardcore":
+			return randf_range(18.5, 20.5)
+	return randf_range(19.0, 21.0)
+
+func _pick_preferred_session_hours(all_tags: Array, drive: float) -> float:
+	var base: float = 1.8 + drive * 2.6
+	if behavior_profile != null:
+		base = (base + behavior_profile.preferred_session_length) * 0.5
+	if "hardcore_gamer" in all_tags:
+		base += 1.4
+	if "tryhard" in all_tags:
+		base += 0.7
+	if "casual" in all_tags:
+		base -= 0.6
+	if "insomniaque" in all_tags:
+		base += 0.8
+	return clampf(base + randf_range(-0.4, 0.6), 1.0, 7.0)
+
+func _sync_legacy_planning() -> void:
+	planning = {}
+	for day in DAY_KEYS:
+		var is_active: bool = day in active_days
+		var day_schedule: Dictionary = {"apres_midi": false, "soir": false, "nuit": false}
+		if is_active:
+			var weekend: bool = day in ["samedi", "dimanche"]
+			day_schedule["apres_midi"] = weekend and preferred_start_hour < 18.5
+			day_schedule["soir"] = preferred_start_hour < 23.0
+			day_schedule["nuit"] = schedule_archetype in ["late_evening", "insomniac"] or preferred_start_hour + preferred_session_hours > 24.0
+		planning[day] = day_schedule
+
+func _restore_schedule_from_legacy() -> void:
+	var restored: Array = []
+	for day in DAY_KEYS:
+		if not planning.has(day):
+			continue
+		var day_schedule: Dictionary = planning[day]
+		if day_schedule.get("apres_midi", false) or day_schedule.get("soir", false) or day_schedule.get("nuit", false):
+			restored.append(day)
+	active_days = restored
+
+func get_connection_score_for_time(game_time: Node) -> float:
+	ensure_play_schedule()
+	if game_time == null:
+		return 0.0
+
+	var day_name: String = game_time.get_day_name().to_lower()
+	var hour: float = float(game_time.current_hour) + float(game_time.current_minute) / 60.0
+	var all_tags: Array = get_all_tags()
+	var active_today: bool = day_name in active_days
+	var score: float = schedule_reliability if active_today else schedule_spontaneity * 0.35
+
+	if not _is_reasonable_connection_hour(hour, all_tags):
+		return 0.0
+
+	var window_factor: float = _get_window_factor(hour, day_name, active_today, all_tags)
+	score *= window_factor
+
+	if active_today and day_name in ["vendredi", "samedi"]:
+		score *= 1.08
+	if not active_today and day_name in ["samedi", "dimanche"]:
+		score *= 1.35
+	if "hardcore_gamer" in all_tags:
+		score *= 1.20
+	if "casual" in all_tags:
+		score *= 0.88
+	if "ponctuel" in all_tags and absf(_hour_distance(hour, preferred_start_hour)) <= 0.4:
+		score *= 1.18
+	if "retardataire" in all_tags and hour < preferred_start_hour + 0.5:
+		score *= 0.70
+
+	return clampf(score, 0.0, 0.98)
+
+func get_session_end_hour() -> float:
+	ensure_play_schedule()
+	return fposmod(preferred_start_hour + preferred_session_hours, 24.0)
+
+func get_schedule_summary() -> String:
+	ensure_play_schedule()
+	var labels: Array[String] = []
+	for day in active_days:
+		labels.append(str(day).capitalize())
+	return "%s, depart %.0fh, %.1fh/session" % [", ".join(labels), preferred_start_hour, preferred_session_hours]
+
+func _is_reasonable_connection_hour(hour: float, all_tags: Array) -> bool:
+	if "insomniaque" in all_tags:
+		return hour >= 10.0 or hour < 5.0
+	if "nocturne" in all_tags or schedule_archetype == "late_evening":
+		return hour >= 12.0 or hour < CORE_NIGHT_END
+	if "diurne" in all_tags or schedule_archetype == "early_evening":
+		return hour >= 7.0 and hour < 23.5
+	return hour >= 10.0 or hour < CORE_NIGHT_END
+
+func _get_window_factor(hour: float, day_name: String, active_today: bool, all_tags: Array) -> float:
+	var start: float = preferred_start_hour
+	if "retardataire" in all_tags:
+		start += 0.45
+	elif "ponctuel" in all_tags:
+		start -= 0.10
+	if day_name in ["samedi", "dimanche"] and schedule_archetype == "weekend":
+		start -= 1.0
+
+	var hours_from_start: float = _hours_since(start, hour)
+	var session_length: float = preferred_session_hours
+	if not active_today:
+		session_length = maxf(0.8, preferred_session_hours * 0.45)
+
+	if hours_from_start >= 0.0 and hours_from_start <= session_length:
+		var middle: float = session_length * 0.45
+		var middle_distance: float = absf(hours_from_start - middle)
+		return clampf(1.0 - middle_distance / maxf(session_length, 1.0) * 0.35, 0.65, 1.0)
+
+	var before_start: float = _hour_distance(hour, start)
+	if before_start <= 1.0:
+		return lerpf(0.35, 0.75, 1.0 - before_start)
+
+	var after_end: float = _hours_since(fposmod(start + session_length, 24.0), hour)
+	if after_end >= 0.0 and after_end <= 1.5:
+		return lerpf(0.45, 0.12, after_end / 1.5)
+
+	return 0.05 if active_today else 0.02
+
+func _hours_since(start_hour: float, current_hour: float) -> float:
+	return fposmod(current_hour - start_hour + 24.0, 24.0)
+
+func _hour_distance(a: float, b: float) -> float:
+	var raw: float = absf(a - b)
+	return minf(raw, 24.0 - raw)
 
 func get_role() -> String:
 	# Si le rôle est explicitement défini, l'utiliser
@@ -168,7 +401,10 @@ func will_accept_activity(activity_type: String) -> bool:
 
 func go_online() -> void:
 	is_online = true
-	energy = max(energy, 70.0)  # Au minimum 70 d'énergie en se connectant
+	var min_connection_energy: float = 35.0
+	if ServerVersion and ServerVersion.has_method("get_server_hype"):
+		min_connection_energy += clampf((ServerVersion.get_server_hype() - 35.0) / 65.0, 0.0, 1.0) * 15.0
+	energy = maxf(energy, min_connection_energy)
 
 func go_offline() -> void:
 	is_online = false
@@ -177,21 +413,7 @@ func go_offline() -> void:
 func should_connect(game_time: Node) -> bool:
 	if is_online:
 		return false
-		
-	# Vérifie le planning
-	var day_name = game_time.get_day_name().to_lower()
-	if not planning.has(day_name):
-		return false
-		
-	var day_schedule = planning[day_name]
-	
-	# Vérifie les créneaux horaires
-	if game_time.is_evening() and day_schedule.get("soir", false):
-		return true
-	elif game_time.is_afternoon() and day_schedule.get("apres_midi", false):
-		return true
-		
-	return false
+	return randf() < get_connection_score_for_time(game_time)
 
 func should_disconnect(game_time: Node) -> bool:
 	if not is_online:
@@ -203,23 +425,11 @@ func should_disconnect(game_time: Node) -> bool:
 		
 	# Déconnexion si très tard
 	if game_time.current_hour >= 2 and game_time.current_hour < 6:
-		return true
+		return not ("insomniaque" in get_all_tags())
 		
 	# Vérifie si hors planning
-	var day_name = game_time.get_day_name().to_lower()
-	if planning.has(day_name):
-		var day_schedule = planning[day_name]
-		var in_schedule: bool = false
-
-		if game_time.is_evening() and day_schedule.get("soir", false):
-			in_schedule = true
-		elif game_time.is_afternoon() and day_schedule.get("apres_midi", false):
-			in_schedule = true
-			
-		if not in_schedule:
-			return true
-			
-	return false
+	var presence_score: float = get_connection_score_for_time(game_time)
+	return presence_score < 0.08
 
 # Système de révélation des tags
 func _check_tag_reveals() -> void:

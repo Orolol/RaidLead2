@@ -41,6 +41,9 @@ var original_style: StyleBoxFlat = null
 var background_panel: PanelContainer
 var content_container: Container
 var placeholder_label: Label
+var content_label: Label
+var placeholder_text: String = "Drop here"
+var content_text: String = ""
 
 # Signaux
 signal item_dropped(item: DraggableItem, zone: DropZone)
@@ -82,11 +85,20 @@ func _setup_ui() -> void:
 	
 	# Label de placeholder
 	placeholder_label = Label.new()
-	placeholder_label.text = "Drop here"
+	placeholder_label.text = placeholder_text
 	placeholder_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	placeholder_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	placeholder_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 	content_container.add_child(placeholder_label)
+
+	content_label = Label.new()
+	content_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	content_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content_label.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
+	content_label.text = content_text
+	content_label.visible = content_text != ""
+	content_container.add_child(content_label)
 	
 	_update_placeholder_visibility()
 
@@ -190,6 +202,8 @@ func add_item(item: DraggableItem) -> bool:
 	"""Ajoute un item à la zone"""
 	if stored_items.size() >= max_items:
 		return false
+
+	_clear_content_label()
 	
 	# Retirer de l'ancienne zone
 	var old_parent = item.get_parent()
@@ -375,14 +389,38 @@ func _resize_to_fit_items() -> void:
 
 func _update_placeholder_visibility() -> void:
 	"""Met à jour la visibilité du placeholder"""
-	placeholder_label.visible = stored_items.is_empty()
+	if placeholder_label:
+		placeholder_label.visible = stored_items.is_empty() and content_text == ""
 
 # ==================== API UTILITAIRES ====================
 
 func set_placeholder_text(text: String) -> void:
 	"""Définit le texte du placeholder"""
+	placeholder_text = text
 	if placeholder_label:
 		placeholder_label.text = text
+
+func set_content_text(text: String) -> void:
+	"""Affiche un contenu textuel non-draggable dans la zone."""
+	clear_items()
+	content_text = text
+	if content_label:
+		content_label.text = text
+		content_label.visible = text != ""
+	_update_placeholder_visibility()
+
+func clear_content() -> void:
+	"""Vide le contenu textuel et les items de la zone."""
+	clear_items()
+	_clear_content_label()
+	_update_placeholder_visibility()
+
+func _clear_content_label() -> void:
+	content_text = ""
+	if content_label:
+		content_label.text = ""
+		content_label.visible = false
+	_update_placeholder_visibility()
 
 func set_validation_callback(callback: Callable) -> void:
 	"""Définit une fonction de validation personnalisée"""

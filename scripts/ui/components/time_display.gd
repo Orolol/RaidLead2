@@ -31,6 +31,10 @@ func _ready() -> void:
 		game_time.minute_changed.connect(_on_minute_changed)
 		game_time.hour_changed.connect(_on_hour_changed)
 		game_time.day_changed.connect(_on_day_changed)
+		if game_time.has_signal("speed_changed"):
+			game_time.speed_changed.connect(_on_speed_changed_from_game_time)
+		if game_time.has_signal("pause_changed"):
+			game_time.pause_changed.connect(_on_pause_changed_from_game_time)
 
 		# Configure les contrôles
 		pause_button.pressed.connect(_on_pause_button_pressed)
@@ -39,7 +43,7 @@ func _ready() -> void:
 			debug_version_button.pressed.connect(_on_debug_version_button_pressed)
 		speed_slider.value_changed.connect(_on_speed_changed)
 		speed_slider.min_value = 0.1
-		speed_slider.max_value = 2400.0
+		speed_slider.max_value = 3000.0
 		speed_slider.value = game_time.time_speed
 		speed_slider.step = 0.1
 		_setup_speed_presets()
@@ -51,6 +55,8 @@ func _ready() -> void:
 
 	if server_version:
 		server_version.version_updated.connect(_on_server_version_updated)
+		if server_version.has_signal("hype_changed"):
+			server_version.hype_changed.connect(_on_server_hype_changed)
 		_update_server_version_display()
 
 func _on_minute_changed(_minute: int, _hour: int) -> void:
@@ -106,6 +112,17 @@ func _on_speed_changed(value: float) -> void:
 		_update_speed_label()
 		_highlight_active_preset()
 
+func _on_speed_changed_from_game_time(_speed: float) -> void:
+	if not game_time:
+		return
+	speed_slider.set_value_no_signal(game_time.time_speed)
+	_update_speed_label()
+	_highlight_active_preset()
+
+func _on_pause_changed_from_game_time(paused: bool) -> void:
+	pause_button.text = "Reprendre" if paused else "Pause"
+	_update_time_label()
+
 func _setup_speed_presets() -> void:
 	"""Boutons de paliers de vitesse (Football-Manager-like) sous le slider."""
 	var row := HBoxContainer.new()
@@ -142,12 +159,17 @@ func _update_speed_label() -> void:
 func _on_server_version_updated(_new_version: float, _update_name: String) -> void:
 	_update_server_version_display()
 
+func _on_server_hype_changed(_new_hype: float, _old_hype: float) -> void:
+	_update_server_version_display()
+
 func _update_server_version_display() -> void:
 	if server_version and server_version_label:
 		var version_info = server_version.get_current_version_info()
 		var days_until_next = server_version.get_days_until_next_version()
 		
 		var text = "Serveur v%s - %s" % [server_version.get_current_version(), version_info.get("name", "")]
+		if server_version.has_method("get_server_hype"):
+			text += " | Hype %d%%" % int(server_version.get_server_hype())
 		if days_until_next > 0:
 			text += " (Mise à jour dans %d jours)" % days_until_next
 		elif days_until_next == 0:

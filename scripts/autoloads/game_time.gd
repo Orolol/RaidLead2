@@ -5,6 +5,8 @@ signal hour_changed(hour: int)
 signal day_changed(day: int, week: int, year: int)
 signal week_changed(week: int, year: int)
 signal year_changed(year: int)
+signal speed_changed(speed: float)
+signal pause_changed(paused: bool)
 
 const MINUTES_PER_HOUR = 60
 const HOURS_PER_DAY = 24
@@ -28,10 +30,10 @@ var accumulated_time: float = 0.0
 # Noms des jours (pour l'affichage)
 var day_names = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
-func _ready():
+func _ready() -> void:
 	set_process(true)
 
-func _process(delta):
+func _process(delta: float) -> void:
 	if is_paused:
 		return
 	
@@ -43,7 +45,7 @@ func _process(delta):
 		accumulated_time -= 60.0
 		advance_minute()
 
-func advance_minute():
+func advance_minute() -> void:
 	current_minute += 1
 	
 	if current_minute >= MINUTES_PER_HOUR:
@@ -53,7 +55,7 @@ func advance_minute():
 	# Émettre le signal de changement de minute
 	minute_changed.emit(current_minute, current_hour)
 
-func advance_hour():
+func advance_hour() -> void:
 	current_hour += 1
 	
 	if current_hour >= HOURS_PER_DAY:
@@ -62,7 +64,7 @@ func advance_hour():
 	
 	hour_changed.emit(current_hour)
 
-func advance_day():
+func advance_day() -> void:
 	current_day += 1
 	
 	if current_day > DAYS_PER_WEEK:
@@ -71,7 +73,7 @@ func advance_day():
 	
 	day_changed.emit(current_day, current_week, current_year)
 
-func advance_week():
+func advance_week() -> void:
 	current_week += 1
 	
 	if current_week > WEEKS_PER_YEAR:
@@ -80,24 +82,35 @@ func advance_week():
 	
 	week_changed.emit(current_week, current_year)
 
-func advance_year():
+func advance_year() -> void:
 	current_year += 1
 	year_changed.emit(current_year)
 
 # Fonctions de contrôle
-func pause():
+func pause() -> void:
+	if is_paused:
+		return
 	is_paused = true
+	pause_changed.emit(is_paused)
 
-func resume():
+func resume() -> void:
+	if not is_paused:
+		return
 	is_paused = false
+	pause_changed.emit(is_paused)
 
-func toggle_pause():
+func toggle_pause() -> void:
 	is_paused = !is_paused
+	pause_changed.emit(is_paused)
 
-func set_time_speed(speed: float):
-	time_speed = max(0.1, speed)  # Minimum 0.1x
+func set_time_speed(speed: float) -> void:
+	var new_speed: float = max(0.1, speed)  # Minimum 0.1x
+	if is_equal_approx(time_speed, new_speed):
+		return
+	time_speed = new_speed
+	speed_changed.emit(time_speed)
 
-func fast_forward_hours(hours: int):
+func fast_forward_hours(hours: int) -> void:
 	for i in range(hours):
 		for j in range(MINUTES_PER_HOUR):
 			advance_minute()

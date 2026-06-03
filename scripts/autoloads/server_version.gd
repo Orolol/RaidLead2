@@ -2,6 +2,12 @@ extends Node
 
 signal version_updated(new_version: float, update_name: String)
 signal content_unlocked(content_type: String, content_ids: Array)
+signal hype_changed(new_hype: float, old_hype: float)
+
+const HYPE_LAUNCH_PEAK := 100.0
+const HYPE_PATCH_PEAK := 75.0
+const HYPE_FLOOR := 35.0
+const LAST_PATCH_DECAY_DAYS := 21
 
 # Configuration des mises à jour serveur
 const VERSION_DATA = {
@@ -66,6 +72,7 @@ const VERSION_DATA = {
 var current_version: float = 1.0
 var server_start_date: Dictionary = {}
 var days_since_launch: int = 0
+var current_hype: float = HYPE_LAUNCH_PEAK
 
 func _ready() -> void:
 	# Se connecter au signal de changement de jour de GameTime
@@ -77,6 +84,7 @@ func _ready() -> void:
 
 	# Vérifier la version actuelle
 	_check_version_update()
+	_update_hype(false)
 
 func _initialize_server_launch_date() -> void:
 	"""Initialise la date de lancement du serveur avec la date actuelle de GameTime"""
@@ -92,6 +100,7 @@ func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 	"""Appelé à chaque changement de jour pour calculer la progression"""
 	_calculate_days_since_launch()
 	_check_version_update()
+	_update_hype(true)
 
 func _calculate_days_since_launch() -> void:
 	"""Calcule le nombre de jours écoulés depuis le lancement du serveur"""
@@ -123,6 +132,8 @@ func _check_version_update() -> void:
 
 		GameLog.d("Serveur mis à jour vers la version %s: %s" % [current_version, version_info.name])
 
+		_update_hype(true)
+
 func _get_target_version_for_days(days: int) -> float:
 	"""Retourne la version du serveur correspondant au nombre de jours écoulés"""
 	var target_version: float = 1.0
@@ -133,6 +144,52 @@ func _get_target_version_for_days(days: int) -> float:
 			target_version = version
 
 	return target_version
+
+func _update_hype(emit_signal_enabled: bool) -> void:
+	var old_hype: float = current_hype
+	current_hype = _calculate_hype_for_current_progress()
+	if emit_signal_enabled and absf(current_hype - old_hype) >= 0.1:
+		hype_changed.emit(current_hype, old_hype)
+
+func _calculate_hype_for_current_progress() -> float:
+	var versions: Array = get_all_versions()
+	var current_info: Dictionary = get_current_version_info()
+	var current_patch_day: int = int(current_info.get("days_to_unlock", 0))
+	var next_patch_day: int = -1
+	for version in versions:
+		if float(version) > current_version:
+			var info: Dictionary = VERSION_DATA[version]
+			next_patch_day = int(info.get("days_to_unlock", current_patch_day + LAST_PATCH_DECAY_DAYS))
+			break
+
+	var decay_days: int = LAST_PATCH_DECAY_DAYS
+	if next_patch_day > current_patch_day:
+		decay_days = next_patch_day - current_patch_day
+
+	var days_since_patch: int = maxi(0, days_since_launch - current_patch_day)
+	var progress: float = clampf(float(days_since_patch) / float(maxi(1, decay_days)), 0.0, 1.0)
+	var peak: float = HYPE_LAUNCH_PEAK if current_version <= 1.0 else HYPE_PATCH_PEAK
+	return lerpf(peak, HYPE_FLOOR, progress)
+
+func get_server_hype() -> float:
+	return current_hype
+
+func get_hype_connection_multiplier() -> float:
+	var normalized: float = clampf((current_hype - HYPE_FLOOR) / (HYPE_LAUNCH_PEAK - HYPE_FLOOR), 0.0, 1.0)
+	return lerpf(0.85, 1.35, normalized)
+
+func get_hype_energy_drain_multiplier() -> float:
+	var normalized: float = clampf((current_hype - HYPE_FLOOR) / (HYPE_LAUNCH_PEAK - HYPE_FLOOR), 0.0, 1.0)
+	return lerpf(1.0, 0.68, normalized)
+
+func get_hype_label() -> String:
+	if current_hype >= 85.0:
+		return "Explosion"
+	elif current_hype >= 65.0:
+		return "Forte"
+	elif current_hype >= 45.0:
+		return "Stable"
+	return "Basse"
 
 func _emit_content_unlocked_signals(old_version: float, new_version: float) -> void:
 	"""Émet les signaux pour le nouveau contenu débloqué"""
@@ -238,7 +295,8 @@ func save_server_data() -> Dictionary:
 	return {
 		"current_version": current_version,
 		"server_start_date": server_start_date,
-		"days_since_launch": days_since_launch
+		"days_since_launch": days_since_launch,
+		"current_hype": current_hype
 	}
 
 func load_server_data(data: Dictionary) -> void:
@@ -246,10 +304,12 @@ func load_server_data(data: Dictionary) -> void:
 	current_version = data.get("current_version", 1.0)
 	server_start_date = data.get("server_start_date", {})
 	days_since_launch = data.get("days_since_launch", 0)
+	current_hype = data.get("current_hype", _calculate_hype_for_current_progress())
 	
 	# Si pas de date de lancement sauvegardée, l'initialiser
 	if server_start_date.is_empty():
 		_initialize_server_launch_date()
+	_update_hype(false)
 
 # Fonctions utilitaires pour le debug
 
@@ -264,6 +324,8 @@ func force_version_update(target_version: float) -> void:
 		_emit_content_unlocked_signals(old_version, current_version)
 
 		GameLog.d("Version forcée vers %s: %s" % [current_version, version_info.name])
+
+		_update_hype(true)
 
 func get_all_versions() -> Array:
 	"""Retourne toutes les versions disponibles (debug)"""

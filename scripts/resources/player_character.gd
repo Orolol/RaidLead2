@@ -16,6 +16,7 @@ signal player_state_changed()
 @export var last_activity_choice: String = ""  # Dernière activité choisie (persiste à la déconnexion, pour reprise auto)
 @export var scheduled_return_time: Dictionary = {}  # Heure de retour programmée
 @export var session_start_time: Dictionary = {}
+@export var disconnect_start_time: Dictionary = {}
 @export var manual_control_enabled: bool = true
 
 # Stats de session
@@ -75,17 +76,32 @@ func _setup_player_character() -> void:
 	# Initialiser la session
 	_initialize_session()
 
+func _capture_time_data(game_time: Node) -> Dictionary:
+	return {
+		"hour": int(game_time.current_hour),
+		"minute": int(game_time.current_minute),
+		"day": int(game_time.current_day),
+		"week": int(game_time.current_week),
+		"year": int(game_time.current_year)
+	}
+
+func _get_current_absolute_minutes(game_time: Node) -> int:
+	return _time_data_to_absolute_minutes(_capture_time_data(game_time))
+
+func _time_data_to_absolute_minutes(data: Dictionary) -> int:
+	var year: int = max(1, int(data.get("year", 1)))
+	var week: int = max(1, int(data.get("week", 1)))
+	var day: int = max(1, int(data.get("day", 1)))
+	var hour: int = clampi(int(data.get("hour", 0)), 0, 23)
+	var minute: int = clampi(int(data.get("minute", 0)), 0, 59)
+	var days_elapsed: int = (year - 1) * 52 * 7 + (week - 1) * 7 + (day - 1)
+	return days_elapsed * 24 * 60 + hour * 60 + minute
+
 func _initialize_session() -> void:
 	"""Initialise une nouvelle session de jeu"""
 	var game_time: Node = _get_game_time()
 	if game_time:
-		session_start_time = {
-			"hour": game_time.current_hour,
-			"minute": game_time.current_minute,
-			"day": game_time.current_day,
-			"week": game_time.current_week,
-			"year": game_time.current_year
-		}
+		session_start_time = _capture_time_data(game_time)
 	
 	session_xp_gained = 0
 	session_gold_gained = 0
@@ -155,6 +171,8 @@ func update_player_energy(delta_minutes: float) -> void:
 	
 	var activity_name = current_activity.get_type_string().to_upper()
 	var drain_rate = energy_drain_rates.get(activity_name, 10.0)
+	if drain_rate > 0.0 and ServerVersion and ServerVersion.has_method("get_hype_energy_drain_multiplier"):
+		drain_rate *= ServerVersion.get_hype_energy_drain_multiplier()
 	
 	# Calculer le drain pour les minutes écoulées
 	var energy_delta = -(drain_rate * delta_minutes / 60.0)
@@ -210,6 +228,9 @@ func disconnect_player(reason: String = "Déconnexion manuelle") -> void:
 	
 	# Calculer les gains de session
 	_calculate_session_gains()
+	var game_time: Node = _get_game_time()
+	if game_time:
+		disconnect_start_time = _capture_time_data(game_time)
 	
 	# Passer en mode offline (on conserve last_activity_choice pour la reprise auto)
 	go_offline()
@@ -275,6 +296,7 @@ func reconnect_player() -> bool:
 	go_online()
 	manual_control_enabled = true
 	scheduled_return_time.clear()
+	disconnect_start_time.clear()
 	
 	# Initialiser une nouvelle session
 	_initialize_session()
@@ -286,21 +308,19 @@ func reconnect_player() -> bool:
 
 func _calculate_offline_duration() -> float:
 	"""Calcule la durée en heures passée offline"""
-	if not session_start_time.has("hour"):
+	var offline_start: Dictionary = disconnect_start_time if disconnect_start_time.has("hour") else session_start_time
+	if not offline_start.has("hour"):
 		return 8.0  # Valeur par défaut
 
 	var game_time: Node = _get_game_time()
 	if not game_time:
 		return 8.0
 
-	var current_total_minutes = game_time.current_hour * 60 + game_time.current_minute
-	var session_total_minutes = session_start_time.hour * 60 + session_start_time.minute
+	var current_total_minutes: int = _get_current_absolute_minutes(game_time)
+	var offline_total_minutes: int = _time_data_to_absolute_minutes(offline_start)
 	
-	var diff_minutes = current_total_minutes - session_total_minutes
-	if diff_minutes < 0:  # Changement de jour
-		diff_minutes += 24 * 60
-	
-	return diff_minutes / 60.0
+	var diff_minutes: int = max(0, current_total_minutes - offline_total_minutes)
+	return float(diff_minutes) / 60.0
 
 func _calculate_session_gains() -> void:
 	"""Calcule les gains de la session actuelle"""
@@ -308,12 +328,9 @@ func _calculate_session_gains() -> void:
 	if not game_time or not session_start_time.has("hour"):
 		return
 	
-	var current_total_minutes = game_time.current_hour * 60 + game_time.current_minute
-	var session_total_minutes = session_start_time.hour * 60 + session_start_time.minute
-	
-	session_duration_minutes = current_total_minutes - session_total_minutes
-	if session_duration_minutes < 0:  # Changement de jour
-		session_duration_minutes += 24 * 60
+	var current_total_minutes: int = _get_current_absolute_minutes(game_time)
+	var session_total_minutes: int = _time_data_to_absolute_minutes(session_start_time)
+	session_duration_minutes = max(0, current_total_minutes - session_total_minutes)
 	
 	# Les gains XP et or sont calculés en temps réel, pas besoin de les recalculer
 

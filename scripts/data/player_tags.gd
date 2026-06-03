@@ -91,6 +91,41 @@ static var TAG_DATABASE = {
 	},
 	
 	# Tags problématiques (cachés, révélés dans des conditions spéciales)
+	"hardcore_gamer": {
+		"category": TagCategory.PERFORMANCE,
+		"reveal_condition": RevealCondition.SUCCESS,
+		"reveal_threshold": 2,
+		"visible_chance": 0.18,
+		"description": "Joue de longues sessions et revient fort aux patchs"
+	},
+	"nocturne": {
+		"category": TagCategory.BEHAVIOR,
+		"reveal_condition": RevealCondition.TIME,
+		"reveal_threshold": 5,
+		"visible_chance": 0.18,
+		"description": "Se connecte surtout tard le soir"
+	},
+	"diurne": {
+		"category": TagCategory.BEHAVIOR,
+		"reveal_condition": RevealCondition.TIME,
+		"reveal_threshold": 5,
+		"visible_chance": 0.15,
+		"description": "Prefere les sessions en fin d'apres-midi"
+	},
+	"joueur_weekend": {
+		"category": TagCategory.BEHAVIOR,
+		"reveal_condition": RevealCondition.TIME,
+		"reveal_threshold": 5,
+		"visible_chance": 0.22,
+		"description": "Beaucoup plus present le week-end"
+	},
+	"planning_chaotique": {
+		"category": TagCategory.BEHAVIOR,
+		"reveal_condition": RevealCondition.TIME,
+		"reveal_threshold": 10,
+		"visible_chance": 0.08,
+		"description": "Disponible par pics, difficile a prevoir"
+	},
 	"ninja_looter": {
 		"category": TagCategory.SPECIAL,
 		"reveal_condition": RevealCondition.LOOT_CONFLICT,
@@ -125,6 +160,13 @@ static var TAG_DATABASE = {
 		"reveal_threshold": 1,
 		"visible_chance": 0.2,
 		"description": "Supporte mal l'attente et les échecs répétés (recrutement plus difficile)"
+	},
+	"insomniaque": {
+		"category": TagCategory.SPECIAL,
+		"reveal_condition": RevealCondition.TIME,
+		"reveal_threshold": 12,
+		"visible_chance": 0.03,
+		"description": "Peut vraiment se connecter pendant les heures mortes"
 	}
 }
 
