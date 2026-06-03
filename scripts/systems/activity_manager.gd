@@ -127,7 +127,10 @@ func _update_player_activity(player) -> void:
 	
 	# Applique les effets de l'activité proportionnellement au temps écoulé
 	# clamp [0,100] : certaines activités (repos/offline) ont un coût négatif (restaurent l'énergie)
-	player.energy = clampf(player.energy - (activity.energy_cost_per_hour * time_factor), 0.0, 100.0)
+	var energy_cost: float = activity.energy_cost_per_hour
+	if energy_cost > 0.0 and ServerVersion and ServerVersion.has_method("get_hype_energy_drain_multiplier"):
+		energy_cost *= ServerVersion.get_hype_energy_drain_multiplier()
+	player.energy = clampf(player.energy - (energy_cost * time_factor), 0.0, 100.0)
 	player.mood = clamp(player.mood + (activity.mood_change_per_hour * time_factor), 0, 100)
 	player.update_integration(activity.integration_gain_per_hour * time_factor)
 	

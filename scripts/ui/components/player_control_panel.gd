@@ -15,9 +15,11 @@ var header_label: Label
 var energy_progress: CustomProgressBarScript
 var energy_label: Label
 var activity_option: OptionButton
+var organize_button: Button
 var disconnect_button: Button
 var status_label: Label
 var session_info_label: Label
+var is_resting: bool = false
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(300, 200)
@@ -107,7 +109,7 @@ func _setup_activity_selector(parent: VBoxContainer) -> void:
 	_populate_activity_options()
 
 	# Contenu de groupe : ouvre la fenêtre d'organisation (vrai flow PvE)
-	var organize_button := Button.new()
+	organize_button = Button.new()
 	organize_button.text = "⚔️ Donjon / Raid"
 	organize_button.tooltip_text = "Organiser un groupe pour lancer un donjon ou un raid"
 	organize_button.custom_minimum_size = Vector2(0, 32)
@@ -211,7 +213,10 @@ func _update_status_display() -> void:
 	if not player_character:
 		return
 
-	if not player_character.is_online:
+	if is_resting:
+		status_label.text = "Repos en cours..."
+		status_label.modulate = Color(0.55, 0.75, 1.0)
+	elif not player_character.is_online:
 		status_label.text = "🔌 Déconnecté"
 		status_label.modulate = Color.GRAY
 	elif player_character.current_activity:
@@ -249,8 +254,13 @@ func _update_available_activities() -> void:
 	for i in range(activity_option.get_item_count()):
 		var metadata = activity_option.get_item_metadata(i)
 		if metadata != null:
-			var is_available: bool = metadata in available
+			var is_available: bool = not is_resting and metadata in available
 			activity_option.set_item_disabled(i, not is_available)
+	activity_option.disabled = is_resting
+	if organize_button:
+		organize_button.disabled = is_resting
+	if disconnect_button:
+		disconnect_button.disabled = is_resting
 
 func _format_duration(minutes: int) -> String:
 	if minutes < 60:
@@ -263,6 +273,8 @@ func _format_duration(minutes: int) -> String:
 		return "%dh%02dmin" % [hours, mins]
 
 func _on_activity_selected(index: int) -> void:
+	if is_resting:
+		return
 	var metadata = activity_option.get_item_metadata(index)
 	if metadata == null or not player_character:
 		return
@@ -279,7 +291,7 @@ func _on_activity_selected(index: int) -> void:
 		_show_error_message("Énergie insuffisante pour cette activité")
 
 func _on_disconnect_pressed() -> void:
-	if not player_character:
+	if is_resting or not player_character:
 		return
 
 	# Émettre directement le signal pour demander une déconnexion manuelle
@@ -336,6 +348,10 @@ func show_reconnection_dialog() -> void:
 # Méthodes publiques pour intégration
 func refresh_display() -> void:
 	"""Force une mise à jour de l'affichage"""
+	_update_display()
+
+func set_resting_state(active: bool, _forced: bool = false, _hours: int = 8) -> void:
+	is_resting = active
 	_update_display()
 
 func is_player_online() -> bool:

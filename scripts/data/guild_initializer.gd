@@ -76,6 +76,7 @@ static func create_initial_members() -> void:
 		if randf() < 0.3:
 			member.or_actuel = randi_range(50, 200)
 
+		member.regenerate_play_schedule_from_traits()
 		GuildManager.add_member(member)
 
 		GameLog.d("Membre initial créé: %s - %s %s Niv.%d" % [

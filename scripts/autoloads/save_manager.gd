@@ -364,6 +364,12 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		"tags_comportement": player.tags_comportement,
 		"tags_caches": player.tags_caches,
 		"planning": player.planning,
+		"active_days": player.active_days,
+		"schedule_archetype": player.schedule_archetype,
+		"schedule_reliability": player.schedule_reliability,
+		"schedule_spontaneity": player.schedule_spontaneity,
+		"preferred_start_hour": player.preferred_start_hour,
+		"preferred_session_hours": player.preferred_session_hours,
 		"is_online": player.is_online,
 		"connaissance_donjons": player.connaissance_donjons,
 		"connaissance_raids": player.connaissance_raids,
@@ -393,6 +399,9 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		data["session_xp_gained"] = pc.get("session_xp_gained") if pc.get("session_xp_gained") != null else 0
 		data["session_gold_gained"] = pc.get("session_gold_gained") if pc.get("session_gold_gained") != null else 0
 		data["last_activity_choice"] = pc.get("last_activity_choice") if pc.get("last_activity_choice") != null else ""
+		data["session_start_time"] = pc.get("session_start_time") if pc.get("session_start_time") != null else {}
+		data["disconnect_start_time"] = pc.get("disconnect_start_time") if pc.get("disconnect_start_time") != null else {}
+		data["manual_control_enabled"] = pc.get("manual_control_enabled") if pc.get("manual_control_enabled") != null else true
 
 	return data
 
@@ -418,12 +427,19 @@ func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 	player.tags_comportement = data.get("tags_comportement", [])
 	player.tags_caches = data.get("tags_caches", [])
 	player.planning = data.get("planning", {})
+	player.active_days = data.get("active_days", [])
+	player.schedule_archetype = data.get("schedule_archetype", "regular")
+	player.schedule_reliability = data.get("schedule_reliability", 0.75)
+	player.schedule_spontaneity = data.get("schedule_spontaneity", 0.08)
+	player.preferred_start_hour = data.get("preferred_start_hour", 19.5)
+	player.preferred_session_hours = data.get("preferred_session_hours", 2.5)
 	player.is_online = data.get("is_online", false)
 	player.connaissance_donjons = data.get("connaissance_donjons", {})
 	player.connaissance_raids = data.get("connaissance_raids", {})
 	player.fatigue_accumulated = data.get("fatigue_accumulated", 0.0)
 	player.burnout_level = data.get("burnout_level", 0)
 	player.circadian_type = data.get("circadian_type", "flexible")
+	player.ensure_play_schedule()
 	player.activity_preferences = data.get("activity_preferences", {})
 	player.last_raid_success_day = data.get("last_raid_success_day", -1)
 	player.last_epic_loot_day = data.get("last_epic_loot_day", -1)
@@ -453,8 +469,10 @@ func _deserialize_player_character(player, data: Dictionary) -> void:
 	player.session_xp_gained = data.get("session_xp_gained", 0)
 	player.session_gold_gained = data.get("session_gold_gained", 0)
 	player.last_activity_choice = data.get("last_activity_choice", "")
+	player.session_start_time = data.get("session_start_time", player.session_start_time)
+	player.disconnect_start_time = data.get("disconnect_start_time", player.disconnect_start_time)
 	player.is_player_controlled = true
-	player.manual_control_enabled = true
+	player.manual_control_enabled = data.get("manual_control_enabled", player.is_online)
 
 # --- Sérialisation Equipment ---
 

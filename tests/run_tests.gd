@@ -32,6 +32,7 @@ func _run_all() -> void:
 	_suite_phase(tf)
 	_suite_random(tf)
 	_suite_recruitment_economy(tf)
+	_suite_recruitment_rework(tf)
 	_suite_calendar(tf)
 	_suite_economy(tf)
 	_suite_facades(tf)
@@ -117,6 +118,11 @@ func _suite_player(tf) -> void:
 		p.trigger_raid_success()
 		tf.ok(p.behavior_profile.achievement_drive > 0.5, "un succès de raid fait évoluer le profil comportemental")
 
+	p.tags_comportement = ["hardcore_gamer", "nocturne"]
+	p.regenerate_play_schedule_from_traits()
+	tf.ok(p.active_days.size() >= 4, "profil planning genere des jours actifs")
+	tf.ok(p.preferred_session_hours >= 2.0, "hardcore/nocturne allonge la session probable")
+
 func _suite_player_flow(tf) -> void:
 	tf.suite("PlayerCharacter (flow)")
 	var PC = load("res://scripts/resources/player_character.gd")
@@ -135,12 +141,17 @@ func _suite_player_flow(tf) -> void:
 
 	# Drain d'énergie sur 1h de leveling (9/h, adouci C4)
 	var before_energy: float = pc.player_energy_pool
+	var expected_drain: float = 9.0 * (ServerVersion.get_hype_energy_drain_multiplier() if ServerVersion and ServerVersion.has_method("get_hype_energy_drain_multiplier") else 1.0)
 	pc.update_player_energy(60.0)
 	tf.ok(pc.player_energy_pool < before_energy, "l'énergie baisse pendant l'activité")
-	tf.approx(pc.player_energy_pool, before_energy - 9.0, "drain leveling = 9/h", 0.5)
+	tf.approx(pc.player_energy_pool, before_energy - expected_drain, "drain leveling module par hype", 0.5)
 
 	# Déconnexion : conserve la dernière activité pour la reprise auto
+	pc.set_meta("is_player", true)
 	pc.disconnect_player("Test")
+	tf.ok(pc.disconnect_start_time.has("hour"), "instant de deconnexion memorise")
+	var offline_data: Dictionary = SaveManager._serialize_player(pc)
+	tf.ok(offline_data.get("disconnect_start_time", {}).has("hour"), "disconnect_start_time serialise offline")
 	tf.ok(not pc.is_online, "déconnecté après disconnect_player")
 	tf.eq(pc.last_activity_choice, "LEVELING", "dernière activité conservée à la déconnexion")
 
@@ -211,6 +222,39 @@ func _suite_simulation_depth(tf) -> void:
 		p4.is_online = true
 		bs.trigger_personal_event(p4, "great_news")  # mood_modifier +40
 		tf.ok(p4.mood > 50.0, "great_news (mood_modifier) améliore l'humeur")
+
+		var saved_hour: int = GameTime.current_hour
+		var saved_minute: int = GameTime.current_minute
+		var saved_day: int = GameTime.current_day
+		var saved_hype: float = ServerVersion.current_hype
+		var planner := SimulatedPlayer.new()
+		planner.tags_comportement = ["ponctuel"]
+		planner.tags_caches = []
+		planner.schedule_archetype = "regular"
+		planner.circadian_type = "flexible"
+		planner.active_days = [GameTime.get_day_name().to_lower()]
+		planner.preferred_start_hour = 20.0
+		planner.preferred_session_hours = 3.0
+		planner.schedule_reliability = 0.9
+		GameTime.current_hour = 20
+		GameTime.current_minute = 0
+		var prime_score: float = planner.get_connection_score_for_time(GameTime)
+		tf.ok(prime_score > 0.45, "planning: score fort pendant le prime time")
+		GameTime.current_hour = 4
+		var dead_score: float = planner.get_connection_score_for_time(GameTime)
+		tf.eq(dead_score, 0.0, "planning: pas de connexion a 4h sans trait insomniaque")
+		planner.tags_comportement.append("insomniaque")
+		var night_score: float = planner.get_connection_score_for_time(GameTime)
+		tf.ok(night_score >= 0.0, "planning: insomniaque autorise les heures mortes sans crash")
+		ServerVersion.current_hype = 100.0
+		var high_hype_mod: float = bs._get_server_hype_modifier()
+		ServerVersion.current_hype = 35.0
+		var low_hype_mod: float = bs._get_server_hype_modifier()
+		tf.ok(high_hype_mod > low_hype_mod, "hype serveur augmente la presence")
+		GameTime.current_hour = saved_hour
+		GameTime.current_minute = saved_minute
+		GameTime.current_day = saved_day
+		ServerVersion.current_hype = saved_hype
 
 func _suite_bank(tf) -> void:
 	tf.suite("Banque & équipement")
@@ -343,6 +387,16 @@ func _suite_save(tf) -> void:
 	tf.eq(p2.skill, 77, "round-trip skill")
 	tf.ok(p.player_id != "", "player_id généré à la création")
 	tf.eq(p2.player_id, p.player_id, "round-trip player_id stable")
+	p.active_days = ["vendredi", "samedi"]
+	p.schedule_archetype = "late_evening"
+	p.schedule_reliability = 0.88
+	p.schedule_spontaneity = 0.12
+	p.preferred_start_hour = 21.0
+	p.preferred_session_hours = 4.0
+	data = SaveManager._serialize_player(p)
+	SaveManager._deserialize_player(p2, data)
+	tf.eq(p2.active_days, p.active_days, "round-trip jours actifs planning")
+	tf.approx(p2.preferred_start_hour, 21.0, "round-trip heure preferee planning")
 	if p.behavior_profile and p2.behavior_profile:
 		tf.approx(p2.behavior_profile.stress_tolerance, p.behavior_profile.stress_tolerance, "round-trip profil comportemental via SaveManager")
 	var cdata = GuildCultureManager.serialize()
@@ -587,7 +641,12 @@ func _suite_recruitment_economy(tf) -> void:
 	var pool = RecruitmentPool
 	var guild = GuildManager.guild
 	var saved_gold: int = guild.gold
+	var saved_xp: int = guild.xp
+	var saved_reputation: float = guild.reputation
 	var saved_pool: Array = pool.available_players.duplicate()
+	var saved_members: Array = GuildManager.guild_members.duplicate()
+	var saved_activities: Dictionary = ActivityManager.active_activities.duplicate() if ActivityManager else {}
+	guild.xp = GuildPerksData.get_xp_for_level(5)
 
 	# Recrue nationale avec agent : la commission est prélevée à la signature.
 	var recruit := SimulatedPlayer.new()
@@ -603,6 +662,8 @@ func _suite_recruitment_economy(tf) -> void:
 	tf.eq(result.get("step", ""), "accepted", "offre >= demande acceptée")
 	tf.eq(int(result.get("agent_cost", -1)), 80, "commission d'agent retournée")
 	tf.eq(guild.gold, 920, "commission d'agent prélevée sur l'or (1000 -> 920)")
+	tf.ok(GuildManager.guild_members.has(recruit), "acceptation nationale ajoute vraiment le membre")
+	tf.ok(not pool.available_players.has(recruit), "recrue signee retiree du pool")
 
 	# Solvabilité : commission inabordable -> échec, pas de recrutement, pas d'or dépensé.
 	var recruit2 := SimulatedPlayer.new()
@@ -620,7 +681,69 @@ func _suite_recruitment_economy(tf) -> void:
 
 	# Nettoyage
 	pool.available_players = saved_pool
+	GuildManager.guild_members = saved_members
+	if ActivityManager:
+		ActivityManager.active_activities = saved_activities
 	guild.gold = saved_gold
+	guild.xp = saved_xp
+	guild.reputation = saved_reputation
+
+func _suite_recruitment_rework(tf) -> void:
+	tf.suite("Recrutement (refonte)")
+	if not (GuildManager and GuildManager.guild and RecruitmentPool):
+		return
+	var pool = RecruitmentPool
+	var guild = GuildManager.guild
+	var saved_pool: Array = pool.available_players.duplicate()
+	var saved_members: Array = GuildManager.guild_members.duplicate()
+	var saved_activities: Dictionary = ActivityManager.active_activities.duplicate() if ActivityManager else {}
+	var saved_xp: int = guild.xp
+	var saved_rep: float = guild.reputation
+	guild.xp = GuildPerksData.get_xp_for_level(5)
+
+	var varied_levels: Array[int] = []
+	for i in range(12):
+		var generated: SimulatedPlayer = pool._create_random_player()
+		varied_levels.append(generated.personnage_niveau)
+	var highest_level: int = 1
+	for level in varied_levels:
+		highest_level = maxi(highest_level, level)
+	tf.ok(highest_level > 1, "les candidats generes ne restent pas tous niveau 1")
+
+	var recruit := SimulatedPlayer.new()
+	recruit.nom = "AtomicRecruit"
+	pool._initialize_market_candidate(recruit, false)
+	pool.available_players = [recruit]
+	var finalized: Dictionary = pool._finalize_recruitment(recruit, {"step": "accepted"})
+	tf.ok(finalized.get("success", false), "finalisation atomique reussit")
+	tf.ok(GuildManager.guild_members.has(recruit), "finalisation atomique ajoute au roster")
+	tf.ok(not pool.available_players.has(recruit), "finalisation atomique retire du pool")
+
+	var refused := SimulatedPlayer.new()
+	refused.nom = "CooldownRecruit"
+	pool._initialize_market_candidate(refused, false)
+	pool.available_players = [refused]
+	var rejection: Dictionary = pool._mark_recruitment_refused(refused, "Test refus", 0.1)
+	tf.eq(rejection.get("step", ""), "rejected", "refus pose un etat rejected")
+	tf.ok(pool.is_player_on_recruitment_cooldown(refused), "refus => cooldown actif")
+	refused.set_meta("recruitment_cooldown_until_ts", pool._get_current_timestamp() - 1.0)
+	tf.ok(not pool.is_player_on_recruitment_cooldown(refused), "cooldown expire => recrue recontactable")
+
+	var expired := SimulatedPlayer.new()
+	expired.nom = "ExpiredRecruit"
+	pool._initialize_market_candidate(expired, false)
+	expired.set_meta("market_entered_day", pool._get_total_days_elapsed() - 10)
+	expired.set_meta("market_lifetime_days", 3)
+	pool.available_players = [expired]
+	pool._process_candidate_lifecycle()
+	tf.ok(not pool.available_players.has(expired), "candidat expire quitte le marche")
+
+	pool.available_players = saved_pool
+	GuildManager.guild_members = saved_members
+	if ActivityManager:
+		ActivityManager.active_activities = saved_activities
+	guild.xp = saved_xp
+	guild.reputation = saved_rep
 
 func _suite_calendar(tf) -> void:
 	tf.suite("Calendrier")

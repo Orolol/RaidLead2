@@ -111,8 +111,8 @@ func _connect_to_game_events():
 	# Connexion au RecruitmentPool pour les événements de recrutement
 	var recruitment_pool = RecruitmentPool
 	if recruitment_pool:
-		if recruitment_pool.has_signal("pool_updated"):
-			recruitment_pool.pool_updated.connect(_on_recruitment_pool_updated)
+		if recruitment_pool.has_signal("pool_refreshed"):
+			recruitment_pool.pool_refreshed.connect(_on_recruitment_pool_updated)
 	
 	# Connexion à l'EventManager pour les événements aléatoires
 	var event_manager = EventManager
@@ -470,7 +470,7 @@ func _on_dungeon_ended(dungeon_instance) -> void:
 	else:
 		show_warning("Donjon %s échoué (%d/%d boss vaincus)" % [dname, defeated, total], "Défaite")
 
-func _on_recruitment_pool_updated(_pool) -> void:
+func _on_recruitment_pool_updated() -> void:
 	"""Quand le pool de recrutement est mis à jour"""
 	show_info("Nouveaux candidats disponibles !", "Recrutement")
 

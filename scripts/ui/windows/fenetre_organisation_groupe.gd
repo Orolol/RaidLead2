@@ -413,7 +413,7 @@ func _get_role_icon(role: String) -> String:
 		_: return "👥"
 
 # Gestionnaire pour le drop d'un membre
-func _on_member_dropped(slot_id: String, item: DraggableItem, _zone: DropZone) -> void:
+func _on_member_dropped(item: DraggableItem, _zone: DropZone, slot_id: String) -> void:
 	var slot = group_slots[slot_id]
 	var item_data = item.get_drag_data()
 	var member = item_data.member
@@ -430,7 +430,7 @@ func _on_member_dropped(slot_id: String, item: DraggableItem, _zone: DropZone) -
 	_check_launch_button()
 
 # Validation pour le drop
-func _validate_member_drop(slot_id: String, item: DraggableItem, _data: Dictionary, _zone: DropZone) -> bool:
+func _validate_member_drop(item: DraggableItem, _data: Dictionary, _zone: DropZone, slot_id: String) -> bool:
 	var item_data = item.get_drag_data()
 	if item_data.type != "guild_member":
 		return false
@@ -442,7 +442,7 @@ func _validate_member_drop(slot_id: String, item: DraggableItem, _data: Dictiona
 	return _can_fill_role(member, slot.role)
 
 # Gestionnaire d'input pour le double-clic sur slot
-func _on_slot_gui_input(slot_id: String, event: InputEvent) -> void:
+func _on_slot_gui_input(event: InputEvent, slot_id: String) -> void:
 	if event is InputEventMouseButton:
 		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
 		if mouse_event.pressed and mouse_event.double_click and mouse_event.button_index == MOUSE_BUTTON_LEFT:

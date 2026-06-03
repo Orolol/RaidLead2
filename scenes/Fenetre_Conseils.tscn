@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://ccnsl0window01"]
+[gd_scene format=3 uid="uid://3gxevx3616ea"]
 
 [ext_resource type="Script" path="res://scripts/ui/windows/fenetre_conseils.gd" id="1_cns"]
 

@@ -7,6 +7,7 @@ const WindowManagerScript = preload("res://scripts/managers/window_manager.gd")
 const PlayerControlPanelScript = preload("res://scripts/ui/components/player_control_panel.gd")
 # const FastForwardDialog = preload("res://scripts/ui/windows/fast_forward_dialog.gd")  # Supprimé - système simplifié
 const NO_SAVE_AUTOLOAD_ARG: String = "--no-save-autoload"
+const REST_ACCELERATION_SPEED: float = 2880.0
 
 var window_manager: Node
 var menu_bar: Control
@@ -15,6 +16,7 @@ var chat_panel: ChatPanel = null
 var event_popup: EventPopupWindow = null
 var _pending_event_queue: Array = []  # événements en attente derrière un autre popup modal
 var _loot_dialog_active: bool = false
+var _pending_loot_conflicts: Array = []
 
 # Système joueur
 var player_control_panel: PlayerControlPanelScript = null
@@ -22,6 +24,14 @@ var player_character = null  # Référence au personnage joueur
 var is_in_forced_rest: bool = false  # Verrou pendant un repos (forcé ou volontaire)
 var _auto_paused_for_idle: bool = false  # Le temps a été mis en pause car le joueur attend un ordre
 var _activity_prompt: CanvasLayer = null  # Overlay thémé de choix d'activité (pause-si-oisif)
+var _rest_overlay: CanvasLayer = null
+var _rest_progress_bar: ProgressBar = null
+var _rest_status_label: Label = null
+var _rest_previous_speed: float = 60.0
+var _rest_previous_pause: bool = false
+var _rest_started_from_idle_pause: bool = false
+var _rest_started_timestamp: float = 0.0
+var _rest_end_timestamp: float = 0.0
 var _debug_menu: DebugMenuPanel = null  # Menu de debug (builds debug-only), extrait de main
 var _system_notifier: SystemNotifier = null  # Relais de notifications systèmes, extrait de main
 # var fast_forward_manager: Node = null  # Supprimé - système simplifié
@@ -202,7 +212,12 @@ func _on_window_opened(window_name: String) -> void:
 func _on_player_recruited(player: SimulatedPlayer) -> void:
 	var guild_manager_node: Node = GuildManager
 	if guild_manager_node:
-		guild_manager_node.add_member(player)
+		if player not in guild_manager_node.guild_members:
+			var added: bool = guild_manager_node.add_member(player)
+			if not added:
+				if NotificationManager:
+					NotificationManager.show_warning("Recrutement impossible : la guilde est pleine ou verrouillee.", "Recrutement")
+				return
 		# Rafraîchir les fenêtres ouvertes via leurs instances dans le WindowManager
 		var guilde_inst: Control = window_manager.get_window_instance("guilde")
 		if guilde_inst:
@@ -218,6 +233,11 @@ func _process(delta: float) -> void:
 		activity_manager.update_dungeons(delta)
 
 func _input(event: InputEvent) -> void:
+	if is_in_forced_rest:
+		if event is InputEventKey and event.pressed:
+			get_viewport().set_input_as_handled()
+		return
+
 	# Raccourcis clavier pour ouvrir les fenêtres
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
@@ -277,7 +297,7 @@ func show_event_popup(event: RandomEventResource) -> void:
 	GameLog.d("Main: show_event_popup appelé pour l'événement: %s" % event.title)
 	
 	# File d'attente : ne pas empiler sur un autre popup modal (loot, drama, ou un événement déjà affiché)
-	if event_popup != null or _drama_popup_active or _loot_dialog_active:
+	if is_in_forced_rest or event_popup != null or _drama_popup_active or _loot_dialog_active:
 		_pending_event_queue.append(event)
 		return
 	
@@ -302,11 +322,11 @@ func _on_event_choice_selected(choice: EventChoiceResource) -> void:
 		event_manager.resolve_event(event_manager.pending_event, choice)
 	
 	event_popup = null
-	_show_next_pending_event.call_deferred()
+	_process_deferred_rest_popups.call_deferred()
 
 func _on_event_popup_closed() -> void:
 	event_popup = null
-	_show_next_pending_event.call_deferred()
+	_process_deferred_rest_popups.call_deferred()
 
 func _show_next_pending_event() -> void:
 	"""Affiche le prochain événement en file, si plus aucun popup modal n'est ouvert."""
@@ -322,6 +342,10 @@ func _connect_loot_conflict_system() -> void:
 		gm.loot_conflict_occurred.connect(_on_loot_conflict)
 
 func _on_loot_conflict(conflict: Dictionary) -> void:
+	if is_in_forced_rest:
+		_pending_loot_conflicts.append(conflict)
+		return
+
 	"""Affiche un popup pour résoudre un conflit de loot"""
 	var item: Item = conflict.get("item", null)
 	var candidates: Array = conflict.get("candidates", [])
@@ -389,7 +413,7 @@ func _on_loot_conflict(conflict: Dictionary) -> void:
 			if game_time_node and not was_paused:
 				game_time_node.toggle_pause()
 			_loot_dialog_active = false
-			_show_next_pending_event.call_deferred()
+			_process_deferred_rest_popups.call_deferred()
 		)
 		vbox.add_child(btn)
 
@@ -403,12 +427,20 @@ func _on_loot_conflict(conflict: Dictionary) -> void:
 		if game_time_node and not was_paused:
 			game_time_node.toggle_pause()
 		_loot_dialog_active = false
-		_show_next_pending_event.call_deferred()
+		_process_deferred_rest_popups.call_deferred()
 	)
 
 	_loot_dialog_active = true
 	add_child(dialog)
 	dialog.popup_centered(Vector2(500, 300))
+
+func _process_next_loot_conflict() -> void:
+	if _pending_loot_conflicts.is_empty():
+		return
+	if event_popup != null or _drama_popup_active or _loot_dialog_active or is_in_forced_rest:
+		return
+	var conflict: Dictionary = _pending_loot_conflicts.pop_front()
+	_on_loot_conflict(conflict)
 
 func _resolve_loot_conflict(item: Item, winner: SimulatedPlayer, candidates: Array, dungeon_name: String, boss_name: String) -> void:
 	"""Résout un conflit de loot en attribuant l'item au gagnant"""
@@ -447,7 +479,7 @@ func _setup_system_notifier() -> void:
 
 func _on_drama_response_needed(drama) -> void:
 	# File d'attente pour éviter les popups simultanées
-	if _drama_popup_active:
+	if is_in_forced_rest or _drama_popup_active or event_popup != null or _loot_dialog_active:
 		_pending_dramas.append(drama)
 		return
 	_show_drama_popup(drama)
@@ -510,7 +542,7 @@ func _show_drama_popup(drama) -> void:
 				game_time_node.toggle_pause()
 			_drama_popup_active = false
 			_process_next_drama()
-			_show_next_pending_event.call_deferred()
+			_process_deferred_rest_popups.call_deferred()
 		)
 		vbox.add_child(btn)
 
@@ -531,7 +563,7 @@ func _show_drama_popup(drama) -> void:
 			game_time_node.toggle_pause()
 		_drama_popup_active = false
 		_process_next_drama()
-		_show_next_pending_event.call_deferred()
+		_process_deferred_rest_popups.call_deferred()
 	)
 
 	add_child(dialog)
@@ -539,6 +571,8 @@ func _show_drama_popup(drama) -> void:
 
 func _process_next_drama() -> void:
 	"""Affiche le prochain drama en attente, s'il en reste."""
+	if event_popup != null or _loot_dialog_active or is_in_forced_rest:
+		return
 	while not _pending_dramas.is_empty():
 		var next = _pending_dramas.pop_front()
 		if next and next.active:
@@ -655,36 +689,57 @@ func _on_player_forced_disconnect(recovery_hours: int) -> void:
 	_perform_rest(recovery_hours, true)
 
 func _perform_rest(recovery_hours: int, forced: bool) -> void:
-	"""Repos unifié (forcé ou volontaire), NON bloquant : avance le temps
-	instantanément, restaure l'énergie, reconnecte et reprend la dernière activité.
-	Un toast informe le joueur — plus de modale « Épuisement total » qui interrompt
-	la partie (C4)."""
 	if is_in_forced_rest:
 		return
 	is_in_forced_rest = true
+	_run_accelerated_rest(recovery_hours, forced)
 
-	# Fermer un éventuel prompt d'oisiveté (il est remplacé par le repos)
+func _run_accelerated_rest(recovery_hours: int, forced: bool) -> void:
+	var game_time_node: Node = GameTime
+	_rest_previous_speed = game_time_node.time_speed if game_time_node else 60.0
+	_rest_previous_pause = game_time_node.is_paused if game_time_node else false
+	_rest_started_from_idle_pause = _auto_paused_for_idle
+	_auto_paused_for_idle = false
+
 	if is_instance_valid(_activity_prompt):
 		_activity_prompt.queue_free()
 		_activity_prompt = null
 
-	# Déconnecter le joueur s'il est encore en ligne (cas du repos volontaire)
 	if player_character and player_character.is_online:
 		player_character.disconnect_player("Repos")
 
-	# Avance le temps de jeu instantanément
-	if GameTime:
-		GameTime.fast_forward_hours(recovery_hours)
+	if player_control_panel and player_control_panel.has_method("set_resting_state"):
+		player_control_panel.set_resting_state(true, forced, recovery_hours)
 
-	# Récupération complète + reconnexion
+	if game_time_node:
+		_rest_started_timestamp = game_time_node.get_current_timestamp()
+		_rest_end_timestamp = _rest_started_timestamp + float(recovery_hours) * 3600.0
+	else:
+		_rest_started_timestamp = 0.0
+		_rest_end_timestamp = float(recovery_hours) * 3600.0
+
+	_show_rest_overlay(recovery_hours, forced)
+
+	if game_time_node:
+		game_time_node.set_time_speed(REST_ACCELERATION_SPEED)
+		game_time_node.resume()
+		_update_rest_overlay()
+		while game_time_node.get_current_timestamp() < _rest_end_timestamp:
+			await game_time_node.minute_changed
+			_update_rest_overlay()
+		game_time_node.set_time_speed(_rest_previous_speed)
+
 	if player_character:
 		player_character.player_energy_pool = player_character.max_energy_pool
 		player_character.energy = 100.0
 		player_character.reconnect_player()
 
 	is_in_forced_rest = false
+	_hide_rest_overlay()
 
-	# Informe via un toast non bloquant (au lieu d'une modale)
+	if player_control_panel and player_control_panel.has_method("set_resting_state"):
+		player_control_panel.set_resting_state(false, forced, recovery_hours)
+
 	if NotificationManager:
 		if forced:
 			NotificationManager.show_warning(
@@ -693,15 +748,131 @@ func _perform_rest(recovery_hours: int, forced: bool) -> void:
 			NotificationManager.show_info(
 				"Repos de %dh : énergie restaurée." % recovery_hours, "Repos")
 
-	# Reprise automatique de la dernière activité (sinon, demander un ordre)
 	if player_character and not player_character.resume_last_activity():
 		_auto_paused_for_idle = false
 		_on_player_state_changed()
 	else:
 		_exit_idle_prompt()
+		_restore_post_rest_pause_state()
 
 	if player_control_panel:
 		player_control_panel.refresh_display()
+
+	_process_deferred_rest_popups()
+
+func _show_rest_overlay(recovery_hours: int, forced: bool) -> void:
+	if is_instance_valid(_rest_overlay):
+		return
+
+	var overlay := CanvasLayer.new()
+	overlay.layer = 240
+
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.78)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(480, 0)
+	var style := StyleBoxFlat.new()
+	style.bg_color = UITheme.BG_PANEL
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(2)
+	style.border_color = UITheme.ACCENT_DIM
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 22)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Repos forcé" if forced else "Repos en cours"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", UITheme.FONT_NORMAL + 6)
+	title.add_theme_color_override("font_color", UITheme.ACCENT)
+	vbox.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "%dh de repos accéléré" % recovery_hours
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	vbox.add_child(subtitle)
+
+	_rest_progress_bar = ProgressBar.new()
+	_rest_progress_bar.min_value = 0.0
+	_rest_progress_bar.max_value = 100.0
+	_rest_progress_bar.value = 0.0
+	_rest_progress_bar.show_percentage = true
+	_rest_progress_bar.custom_minimum_size = Vector2(0, 28)
+	vbox.add_child(_rest_progress_bar)
+
+	_rest_status_label = Label.new()
+	_rest_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rest_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_rest_status_label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	vbox.add_child(_rest_status_label)
+
+	add_child(overlay)
+	_rest_overlay = overlay
+	_update_rest_overlay()
+
+func _update_rest_overlay() -> void:
+	if not is_instance_valid(_rest_overlay) or not GameTime:
+		return
+	var total_seconds: float = maxf(1.0, _rest_end_timestamp - _rest_started_timestamp)
+	var elapsed_seconds: float = clampf(GameTime.get_current_timestamp() - _rest_started_timestamp, 0.0, total_seconds)
+	var remaining_seconds: float = maxf(0.0, _rest_end_timestamp - GameTime.get_current_timestamp())
+	var percent: float = clampf((elapsed_seconds / total_seconds) * 100.0, 0.0, 100.0)
+	if _rest_progress_bar:
+		_rest_progress_bar.value = percent
+	if _rest_status_label:
+		_rest_status_label.text = "%s restants - retour vers %s - vitesse x%.0f" % [
+			_format_rest_duration(remaining_seconds),
+			GameTime.get_current_time_string(),
+			GameTime.time_speed
+		]
+
+func _hide_rest_overlay() -> void:
+	if is_instance_valid(_rest_overlay):
+		_rest_overlay.queue_free()
+	_rest_overlay = null
+	_rest_progress_bar = null
+	_rest_status_label = null
+
+func _format_rest_duration(seconds: float) -> String:
+	var total_minutes: int = int(ceil(seconds / 60.0))
+	@warning_ignore("integer_division")
+	var hours: int = total_minutes / 60
+	var minutes: int = total_minutes % 60
+	if hours > 0:
+		return "%dh%02d" % [hours, minutes]
+	return "%dmin" % minutes
+
+func _restore_post_rest_pause_state() -> void:
+	if not GameTime:
+		return
+	if _rest_previous_pause and not _rest_started_from_idle_pause:
+		GameTime.pause()
+	else:
+		GameTime.resume()
+
+func _process_deferred_rest_popups() -> void:
+	_process_next_loot_conflict()
+	if not _loot_dialog_active:
+		_process_next_drama()
+	if not _loot_dialog_active and not _drama_popup_active:
+		_show_next_pending_event.call_deferred()
 
 func _on_player_activity_changed(_activity_type: String) -> void:
 	"""Le joueur a changé d'activité depuis le panneau : rafraîchit l'affichage."""

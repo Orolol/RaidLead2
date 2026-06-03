@@ -1,0 +1,17 @@
+sandbox_mode = "workspace-write"
+[mcp_servers.comfyui]
+command = "node"
+args = ["/home/orolol/tools/comfyui-mcp/dist/index.js"]
+
+[mcp_servers.comfyui.env]
+COMFYUI_PATH = "/home/orolol/tools/ComfyUI"
+
+[mcp_servers.godot-mcp-pro]
+command = "node"
+args = ["C:/Users/gaeta/Downloads/godot-mcp-pro-v1.10.1/server/build/index.js"]
+
+[mcp_servers.godot-mcp-pro.env]
+GODOT_MCP_PORT = "6505"
+
+[sandbox_workspace_write]
+network_access = true
