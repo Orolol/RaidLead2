@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://d22hljmd3jhcm"]
 
-[ext_resource type="Script" uid="uid://0wuj37jeo8mr" path="res://scripts/ui/windows/fenetre_guilde.gd" id="1_3yp4h"]
+[ext_resource type="Script" path="res://scripts/ui/windows/fenetre_guilde.gd" id="1_3yp4h"]
 
 [node name="root" type="PanelContainer"]
 script = ExtResource("1_3yp4h")

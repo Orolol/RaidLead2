@@ -17,6 +17,7 @@ var guild_manager: Node
 var guild_ranking: Node
 
 signal player_recruited(player)
+signal candidate_selected(player)
 signal close_requested
 
 func _ready() -> void:
@@ -223,6 +224,14 @@ func _setup_recruitment_tab() -> void:
 	recruitment_panel = panel
 	# Réémet le signal du panel pour que main.gd (branché sur la fenêtre) reste informé.
 	panel.player_recruited.connect(func(p): player_recruited.emit(p))
+	panel.candidate_selected.connect(func(p): candidate_selected.emit(p))
+
+func focus_candidate(player: SimulatedPlayer) -> void:
+	if not recruitment_panel:
+		return
+	if advanced_tabs:
+		advanced_tabs.select_tab(1)
+	recruitment_panel.focus_candidate(player)
 
 func _generate_competing_guilds() -> void:
 	# Cette fonction ne génère plus les guildes - elles sont maintenant gérées par le système IA

@@ -292,7 +292,7 @@ func _deserialize_guild(data: Dictionary) -> void:
 		return
 	g.name = data.get("name", "Ma Guilde")
 	g.xp = data.get("xp", 0)
-	g.gold = data.get("gold", 0)
+	g.set_gold(data.get("gold", 0))
 	g.reputation = data.get("reputation", 50.0)
 	g.reputation_history = data.get("reputation_history", [])
 	g.bank_items = []

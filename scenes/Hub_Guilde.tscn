@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://bmg5t4r4fr0pi"]
+
+[ext_resource type="Script" path="res://scripts/ui/windows/hub_window.gd" id="1_hub"]
+
+[node name="root" type="PanelContainer"]
+script = ExtResource("1_hub")
+hub_id = "guild"

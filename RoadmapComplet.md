@@ -12,6 +12,18 @@
 - ✅ **Refactoring majeur** : WindowManager, GuildManager, autoloads, save/load
 - 🎯 **Progression** : ~55% du projet total terminé
 
+### Mise a jour - HUD gameplay persistant (4 juin 2026)
+- ✅ **ResourceBar** : or, reputation, moral, membres en ligne, serveur/hype, date/heure et vitesse sont visibles en permanence dans une top bar reactive.
+- ✅ **ObjectiveTracker** : objectif de phase et progression globale visibles en HUD, recalcules au chargement et sur les signaux de progression/roster/ranking.
+- ✅ **AlertRail** : rail d'alertes persistant branche sur dramas, conseils prioritaires, recrues qui expirent et risques burnout/stress, avec routage vers les fenetres existantes.
+- ✅ **Navigation hubs** : barre basse reduite a 5 entrees (Guilde, Competition, Business, Recrutement, Conseil) avec scenes Hub_* servant de facade vers les fenetres existantes.
+- ✅ **Sections embarquees ciblees** : les hubs embarquent les fenetres legacy compatibles dans leurs onglets, avec relais des signaux critiques comme le recrutement ; les vues roster/equipement restent en facade jusqu'a extraction en composants dedies.
+- ✅ **Signal economie** : `Guild.gold_changed(old_gold, new_gold)` ajoute sur `add_gold`, `spend_gold` et `set_gold`, pour eviter le polling UI.
+- ✅ **Inspecteur contextuel** : selection partagee via `GuildManager.member_selected`, panneau `MemberInspector` persistant, actions directes roster/cohesion/equipement/PvE.
+- ✅ **Deep-links UI** : ResourceBar, ObjectiveTracker, AlertRail et anciens raccourcis routent vers hub + section ; les alertes burnout/recrutement transmettent le membre ou candidat concerne.
+- ✅ **Polish hubs** : sections non embarquees converties en syntheses jouables (roster, equipement, profil joueur, groupe PvE, progression, besoins roster), raccourcis internes Tab/1-9 et refresh reactif.
+- 📋 **Reste a faire** : extraction complete des dernieres fenetres legacy lourdes en composants dedies et screenshots MCP quand l'editeur est connecte.
+
 ---
 
 # PARTIE A : CE QUI EST FAIT ✅
@@ -661,6 +673,19 @@
 RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les **fondations sont excellentes** avec tous les systèmes core opérationnels, les 2 premières milestones complètes et **l'infrastructure UI moderne** implémentée.
 
 ## Accomplissements Récents ✅
+
+### Specs refonte UI — 2 chantiers (3 juin 2026)
+*Deux documents de design prêts à arbitrage/phasage. Décisions verrouillées avec le dev.*
+- 📋 **Chantier 1 — Refonte visuelle « MMO pixel-art »** : `docs/design/2026-06-03-ui-refonte-visuelle-mmo.md`. Sortir du thème `StyleBoxFlat` plat + police système → identité MMO fantasy (or/pierre/parchemin) **rendue en pixel-art** cohérent avec `umempart`. **Décidé** : chrome via **kits tiers licenciés/CC0** (pas de rip WoW), **style pixel-art unifié**. Couvre : police pixel (⚠ accents FR), 9-slice `StyleBoxTexture`, pixel-perfect (`Nearest`), inventaire d'assets exhaustif, manifeste de licences Steam, phasage A→E.
+- 📋 **Chantier 2 — UI au service du gameplay** : `docs/design/2026-06-03-ui-architecture-gameplay.md`. **Décidé en scope** : (1) **HUD permanent persistant** (or/réput/moral/online/temps + tracker d'objectif de phase + rail d'alertes actionnables) ; (2) **refonte navigation** (8+ fenêtres → ~5 hubs par boucle de jeu). **Non-goals** : pas de docking/multi-fenêtres (reste mono-fenêtre), pas de multi-résolution. Note technique : `Guild.gold` doit gagner un `signal gold_changed` (pas de polling).
+- 🔗 **Séquencement croisé** : Chantier 2 Phases 1-2 (HUD additif) + Chantier 1 Phases A-C (skin) en parallèle → Chantier 2 Phase 3 (regroupement) → Chantier 1 Phases D-E (icônes) → Chantier 2 Phases 4-5.
+
+### Spec système de quêtes de guidage (3 juin 2026)
+*Document de design prêt à implémenter : `docs/design/2026-06-03-systeme-quetes-guidage.md`.*
+- 📋 **Objectif produit cadré** : onboarding fort en Phase 0, puis objectifs de campagne de plus en plus espacés, centrés sur la découverte des nouvelles UI et la compréhension des caps de phase.
+- 📋 **Architecture proposée** : `QuestManager` comme surcouche d'orientation, branchée sur `PhaseManager`, `WindowManager`, `GuildManager`, `RecruitmentPool`, PvE, ranking et managers avancés, sans dupliquer les sources de vérité.
+- 📋 **UX spécifiée** : tracker compact, fenêtre Objectifs, bouton "Aller", highlights sémantiques par fenêtre, auto-completion rétroactive et quêtes optionnelles/non bloquantes.
+- 📋 **Roadmap d'implémentation** : socle data/manager, tracker minimal, chaîne Phase 0 complète, fenêtre Objectifs, puis quêtes Serveur/National/Esport.
 
 ### Chat de guilde vivant — moteur + scènes à branches (2 juin 2026)
 *Branche `feat/chat-vivant` (worktree). Implémenté en 7 phases A→G. Validé : CheckScripts 108 scripts OK + TestRunner 220/220 + soak headless. Doc : `docs/design/2026-06-02-chat-guilde-vivant.md`.*

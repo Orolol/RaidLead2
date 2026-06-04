@@ -126,9 +126,24 @@ func get_dungeon_banner(dungeon_id: String) -> Texture2D:
 func _load_cached(path: String) -> Texture2D:
 	if _cache.has(path):
 		return _cache[path]
+	if not _import_artifact_available(path):
+		_cache[path] = null
+		return null
 	if not ResourceLoader.exists(path):
 		_cache[path] = null
 		return null
 	var tex: Texture2D = load(path)
 	_cache[path] = tex
 	return tex
+
+func _import_artifact_available(path: String) -> bool:
+	var import_path: String = path + ".import"
+	if not FileAccess.file_exists(import_path):
+		return true
+	var config := ConfigFile.new()
+	if config.load(import_path) != OK:
+		return true
+	var remap_path: String = str(config.get_value("remap", "path", ""))
+	if remap_path == "":
+		return true
+	return FileAccess.file_exists(remap_path)

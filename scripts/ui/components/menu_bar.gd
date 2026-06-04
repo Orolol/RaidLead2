@@ -1,19 +1,39 @@
 extends Control
 class_name GameMenuBar
 
-signal personnage_button_pressed
-signal guilde_button_pressed
-signal monde_button_pressed
-signal organisation_button_pressed
-signal national_button_pressed
-signal esport_button_pressed
-signal cohesion_button_pressed
-signal conseils_button_pressed
+signal guild_hub_button_pressed
+signal competition_hub_button_pressed
+signal business_hub_button_pressed
+signal recruitment_hub_button_pressed
+signal advice_hub_button_pressed
 
-var _buttons: Dictionary = {}  # window_name -> Button
+var _buttons: Dictionary = {}
 
-# Fenêtres débloquées à partir d'une phase (window_name -> phase min). Les autres restent toujours accessibles.
-const PHASE_LOCKS := {"national": 2, "esport": 3}
+const PHASE_LOCKS := {"hub_business": 2}
+
+const ACTIVE_WINDOW_TO_HUB := {
+	"hub_guild": "hub_guild",
+	"hub_competition": "hub_competition",
+	"hub_business": "hub_business",
+	"hub_recruitment": "hub_recruitment",
+	"hub_advice": "hub_advice",
+	"personnage": "hub_guild",
+	"guilde": "hub_guild",
+	"cohesion": "hub_guild",
+	"organisation": "hub_competition",
+	"monde": "hub_competition",
+	"national": "hub_business",
+	"esport": "hub_business",
+	"conseils": "hub_advice",
+}
+
+const SHORTCUTS := {
+	"hub_guild": "G",
+	"hub_competition": "C",
+	"hub_business": "B",
+	"hub_recruitment": "R",
+	"hub_advice": "A",
+}
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -28,25 +48,12 @@ func _ready() -> void:
 	hbox.add_theme_constant_override("separation", 20)
 	panel.add_child(hbox)
 
-	var personnage_btn := _create_menu_button("Personnage", "personnage", _on_personnage_pressed)
-	var guilde_btn := _create_menu_button("Guilde", "guilde", _on_guilde_pressed)
-	var monde_btn := _create_menu_button("Monde", "monde", _on_monde_pressed)
-	var organisation_btn := _create_menu_button("Organisation", "organisation", _on_organisation_pressed)
-	var national_btn := _create_menu_button("National", "national", _on_national_pressed)
-	var esport_btn := _create_menu_button("Esport", "esport", _on_esport_pressed)
-	var cohesion_btn := _create_menu_button("Cohésion", "cohesion", _on_cohesion_pressed)
-	var conseils_btn := _create_menu_button("Conseils", "conseils", _on_conseils_pressed)
+	hbox.add_child(_create_menu_button("Guilde", "hub_guild", _on_guild_hub_pressed))
+	hbox.add_child(_create_menu_button("Competition", "hub_competition", _on_competition_hub_pressed))
+	hbox.add_child(_create_menu_button("Business", "hub_business", _on_business_hub_pressed))
+	hbox.add_child(_create_menu_button("Recrutement", "hub_recruitment", _on_recruitment_hub_pressed))
+	hbox.add_child(_create_menu_button("Conseil", "hub_advice", _on_advice_hub_pressed))
 
-	hbox.add_child(personnage_btn)
-	hbox.add_child(guilde_btn)
-	hbox.add_child(monde_btn)
-	hbox.add_child(organisation_btn)
-	hbox.add_child(national_btn)
-	hbox.add_child(esport_btn)
-	hbox.add_child(cohesion_btn)
-	hbox.add_child(conseils_btn)
-
-	# Verrouillage des fenêtres selon la phase de jeu
 	if PhaseManager and not PhaseManager.phase_changed.is_connected(_on_phase_changed_lock):
 		PhaseManager.phase_changed.connect(_on_phase_changed_lock)
 	_update_phase_locks()
@@ -55,7 +62,6 @@ func _on_phase_changed_lock(_new_phase, _old_phase) -> void:
 	_update_phase_locks()
 
 func _update_phase_locks() -> void:
-	"""Grise les boutons des fenêtres non encore débloquées par la phase actuelle."""
 	if not PhaseManager:
 		return
 	var current: int = PhaseManager.get_current_phase()
@@ -65,16 +71,8 @@ func _update_phase_locks() -> void:
 		var btn: Button = _buttons[wname]
 		var locked: bool = current < int(PHASE_LOCKS[wname])
 		btn.disabled = locked
-		if locked:
-			btn.tooltip_text = "Débloqué en %s" % PhaseManager.get_phase_name(PHASE_LOCKS[wname])
-		else:
-			btn.tooltip_text = _shortcut_tooltip(wname, btn.text)
-
-## Raccourcis clavier d'ouverture (gérés dans main.gd) — exposés en tooltip pour la découvrabilité.
-const SHORTCUTS := {
-	"personnage": "P", "guilde": "G", "monde": "M", "organisation": "O",
-	"national": "N", "esport": "E", "cohesion": "K", "social": "K", "conseils": "A",
-}
+		btn.visible = not locked
+		btn.tooltip_text = "Debloque en %s" % PhaseManager.get_phase_name(PHASE_LOCKS[wname]) if locked else _shortcut_tooltip(wname, btn.text)
 
 func _shortcut_tooltip(window_name: String, text: String) -> String:
 	if SHORTCUTS.has(window_name):
@@ -84,58 +82,66 @@ func _shortcut_tooltip(window_name: String, text: String) -> String:
 func _create_menu_button(text: String, window_name: String, callback: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(150, 50)
+	button.custom_minimum_size = Vector2(160, 50)
 	button.tooltip_text = _shortcut_tooltip(window_name, text)
-	var icon_tex: Texture2D = AssetLoader.get_menu_icon(text)
-	if icon_tex:
-		button.icon = icon_tex
-		button.expand_icon = true
 	button.pressed.connect(callback)
 	button.toggle_mode = true
 	_buttons[window_name] = button
 	return button
 
 func set_active_window(window_name: String) -> void:
-	"""Surligne le bouton de la fenêtre active et estompe les autres."""
+	var active_button_name: String = ACTIVE_WINDOW_TO_HUB.get(window_name, window_name)
 	for wname in _buttons:
 		var btn: Button = _buttons[wname]
-		var is_active: bool = wname == window_name
+		var is_active: bool = wname == active_button_name
 		btn.button_pressed = is_active
 		btn.modulate = Color(1, 1, 1, 1) if is_active else Color(0.60, 0.63, 0.70, 1.0)
 
-func _on_personnage_pressed() -> void:
-	personnage_button_pressed.emit()
-
-func _on_guilde_pressed() -> void:
-	guilde_button_pressed.emit()
-
-func _on_monde_pressed() -> void:
-	monde_button_pressed.emit()
-
-func _on_organisation_pressed() -> void:
-	organisation_button_pressed.emit()
-
 func _is_window_locked(window_name: String) -> bool:
-	"""Vrai si la fenêtre est verrouillée par la phase courante (source de vérité
-	partagée entre le clic bouton ET les raccourcis clavier — évite le contournement)."""
 	if not PHASE_LOCKS.has(window_name):
 		return false
 	if not PhaseManager:
 		return false
 	return PhaseManager.get_current_phase() < int(PHASE_LOCKS[window_name])
 
-func _on_national_pressed() -> void:
-	if _is_window_locked("national"):
+func _on_guild_hub_pressed() -> void:
+	guild_hub_button_pressed.emit()
+
+func _on_competition_hub_pressed() -> void:
+	competition_hub_button_pressed.emit()
+
+func _on_business_hub_pressed() -> void:
+	if _is_window_locked("hub_business"):
 		return
-	national_button_pressed.emit()
+	business_hub_button_pressed.emit()
+
+func _on_recruitment_hub_pressed() -> void:
+	recruitment_hub_button_pressed.emit()
+
+func _on_advice_hub_pressed() -> void:
+	advice_hub_button_pressed.emit()
+
+# Compatibility aliases for old shortcuts/tests while the legacy windows still exist.
+func _on_personnage_pressed() -> void:
+	_on_guild_hub_pressed()
+
+func _on_guilde_pressed() -> void:
+	_on_guild_hub_pressed()
+
+func _on_monde_pressed() -> void:
+	_on_competition_hub_pressed()
+
+func _on_organisation_pressed() -> void:
+	_on_competition_hub_pressed()
+
+func _on_national_pressed() -> void:
+	_on_business_hub_pressed()
 
 func _on_esport_pressed() -> void:
-	if _is_window_locked("esport"):
-		return
-	esport_button_pressed.emit()
+	_on_business_hub_pressed()
 
 func _on_cohesion_pressed() -> void:
-	cohesion_button_pressed.emit()
+	_on_guild_hub_pressed()
 
 func _on_conseils_pressed() -> void:
-	conseils_button_pressed.emit()
+	_on_advice_hub_pressed()

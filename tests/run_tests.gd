@@ -804,6 +804,73 @@ func _suite_ui_smoke(tf) -> void:
 		"onglet 'Cette semaine' peuplé au runtime")
 	win.queue_free()
 
+	var resource_bar_script: Script = load("res://scripts/ui/components/resource_bar.gd")
+	var resource_bar: Control = resource_bar_script.new()
+	add_child(resource_bar)
+	tf.ok(is_instance_valid(resource_bar), "ResourceBar s'instancie sans crash")
+	tf.ok(resource_bar.get("_gold_button") != null, "ResourceBar construit les ressources HUD")
+	remove_child(resource_bar)
+	resource_bar.free()
+
+	var tracker_script: Script = load("res://scripts/ui/components/objective_tracker.gd")
+	var tracker: Control = tracker_script.new()
+	add_child(tracker)
+	tf.ok(is_instance_valid(tracker), "ObjectiveTracker s'instancie sans crash")
+	tf.ok(tracker.get("_progress_bar") != null, "ObjectiveTracker construit la progression")
+	remove_child(tracker)
+	tracker.free()
+
+	var alert_rail_script: Script = load("res://scripts/ui/components/alert_rail.gd")
+	var alert_rail: Control = alert_rail_script.new()
+	add_child(alert_rail)
+	tf.ok(is_instance_valid(alert_rail), "AlertRail s'instancie sans crash")
+	tf.ok(alert_rail.get("_list") != null, "AlertRail construit la liste d'alertes")
+	remove_child(alert_rail)
+	alert_rail.free()
+
+	var inspector_script: Script = load("res://scripts/ui/components/member_inspector.gd")
+	var inspector: Control = inspector_script.new()
+	add_child(inspector)
+	tf.ok(is_instance_valid(inspector), "MemberInspector s'instancie sans crash")
+	if GuildManager and not GuildManager.guild_members.is_empty():
+		var member: SimulatedPlayer = GuildManager.guild_members[0]
+		GuildManager.select_member(member, "test")
+		tf.ok(inspector.visible, "MemberInspector s'affiche quand un membre est selectionne")
+		tf.eq(GuildManager.get_selected_member(), member, "GuildManager expose le membre selectionne")
+		GuildManager.clear_selected_member()
+		tf.ok(not inspector.visible, "MemberInspector se replie quand la selection est vide")
+	remove_child(inspector)
+	inspector.free()
+
+	var menu_script: Script = load("res://scripts/ui/components/menu_bar.gd")
+	var menu: Control = menu_script.new()
+	add_child(menu)
+	tf.ok(is_instance_valid(menu), "MenuBar hub s'instancie sans crash")
+	tf.ok(menu.get("_buttons").has("hub_guild"), "MenuBar expose le hub Guilde")
+	tf.ok(menu.get("_buttons").has("hub_recruitment"), "MenuBar expose le hub Recrutement")
+	remove_child(menu)
+	menu.free()
+
+	var hub_scene: PackedScene = load("res://scenes/Hub_Guilde.tscn")
+	var hub: Control = hub_scene.instantiate()
+	add_child(hub)
+	tf.ok(is_instance_valid(hub), "Hub_Guilde s'instancie sans crash")
+	tf.ok(hub.get("advanced_tabs") != null, "Hub_Guilde construit ses sections")
+	tf.ok(hub.call("select_section", "equipment"), "Hub_Guilde selectionne une section par id")
+	remove_child(hub)
+	hub.free()
+
+	var advice_hub_scene: PackedScene = load("res://scenes/Hub_Conseil.tscn")
+	var advice_hub: Control = advice_hub_scene.instantiate()
+	add_child(advice_hub)
+	var advice_tabs: AdvancedTabs = advice_hub.get("advanced_tabs")
+	var advice_first_tab: Dictionary = advice_tabs.get_tab_data(0)
+	var advice_first_content: Control = advice_first_tab.get("content", null)
+	tf.ok(advice_first_content != null and advice_first_content.has_meta("embedded_window"),
+		"Hub_Conseil embarque une section legacy dans son onglet")
+	remove_child(advice_hub)
+	advice_hub.free()
+
 func _suite_economy(tf) -> void:
 	tf.suite("Économie")
 	# C7 : le signal de départ de membre doit exister (NotificationManager s'y abonne).
@@ -816,12 +883,22 @@ func _suite_economy(tf) -> void:
 	var g = GuildManager.guild
 	var saved_xp: int = g.xp
 	var saved_gold: int = g.gold
+	var gold_changes: Array = []
+	var on_gold_changed := func(old_gold: int, new_gold: int) -> void:
+		gold_changes.append({"old": old_gold, "new": new_gold})
+	if not g.gold_changed.is_connected(on_gold_changed):
+		g.gold_changed.connect(on_gold_changed)
 
 	# Le cap de trésorerie est respecté au niveau 3 (stockage 8000).
 	g.xp = GuildPerks.get_xp_for_level(3)
 	g.gold = 500
 	g.add_gold(10000)
 	tf.eq(g.gold, 8000, "add_gold plafonne au stockage (niv 3)")
+	tf.eq(gold_changes.back(), {"old": 500, "new": 8000}, "add_gold emet gold_changed avec ancien/nouveau montant")
+
+	gold_changes.clear()
+	g.spend_gold(250)
+	tf.eq(gold_changes.back(), {"old": 8000, "new": 7750}, "spend_gold emet gold_changed avec ancien/nouveau montant")
 
 	# Un clear de donjon crédite la trésorerie de guilde (revenu PvE).
 	g.xp = 0  # niveau 1 -> stockage 0 -> non plafonné
@@ -839,6 +916,8 @@ func _suite_economy(tf) -> void:
 	GuildRanking.player_recent_clears = saved_recent
 	GuildRanking.player_run_history = saved_history
 	GuildRanking.server_firsts = saved_firsts
+	if g.gold_changed.is_connected(on_gold_changed):
+		g.gold_changed.disconnect(on_gold_changed)
 	g.xp = saved_xp
 	g.gold = saved_gold
 
@@ -938,9 +1017,11 @@ func _suite_chat_director(tf) -> void:
 	var chatty := SimulatedPlayer.new()
 	chatty.mood = 80.0
 	chatty.tags_comportement = ["social"]
+	chatty.tags_caches = []
 	var quiet := SimulatedPlayer.new()
 	quiet.mood = 80.0
 	quiet.tags_comportement = ["solitaire"]
+	quiet.tags_caches = []
 	tf.ok(ChatDirector._talkativeness(chatty) > ChatDirector._talkativeness(quiet), "social plus bavard que solitaire")
 
 	# Emission de bout en bout : 2 membres en ligne -> une ligne sort
@@ -986,9 +1067,11 @@ func _suite_chat_scoring(tf) -> void:
 	# score_line : bonus de trait (base 1.0 + 1.5)
 	var dq := SimulatedPlayer.new()
 	dq.tags_comportement = ["drama_queen"]
+	dq.tags_caches = []
 	dq.mood = 50.0
 	var calm := SimulatedPlayer.new()
 	calm.tags_comportement = []
+	calm.tags_caches = []
 	calm.mood = 50.0
 	var line := {"weight": 1.0, "considerations": [{"axis": "speaker.has_trait", "param": "drama_queen", "curve": "boolean", "kind": "bonus", "weight": 1.5}]}
 	var s_dq: float = CS.score_line(line, {"speaker": dq})["score"]
@@ -1023,6 +1106,7 @@ func _suite_chat_scoring(tf) -> void:
 	ex.mood = 60.0
 	ex.personnage_classe = "Guerrier"
 	ex.tags_comportement = ["drama_queen"]
+	ex.tags_caches = []
 	GuildManager.guild_members.append(ex)
 	var explain: Dictionary = ChatDirector.debug_explain_ambient(5)
 	tf.ok(explain.has("rows") and explain["rows"].size() > 0, "explain renvoie des lignes scorees")
@@ -1035,9 +1119,11 @@ func _suite_chat_scoring(tf) -> void:
 	var toxic_line := {"weight": 1.0, "vibe": [-0.3, 0.8, 0.2]}
 	var grumpy := SimulatedPlayer.new()
 	grumpy.tags_comportement = ["drama_queen"]
+	grumpy.tags_caches = []
 	grumpy.mood = 20.0
 	var sweet := SimulatedPlayer.new()
 	sweet.tags_comportement = ["serviable"]
+	sweet.tags_caches = []
 	sweet.mood = 90.0
 	var s_grumpy: float = CS.score_line(toxic_line, ChatDirector._build_ctx(grumpy, null))["score"]
 	var s_sweet: float = CS.score_line(toxic_line, ChatDirector._build_ctx(sweet, null))["score"]

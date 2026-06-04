@@ -1,6 +1,7 @@
 extends PanelContainer
 
 signal close_requested
+signal member_selected(player)
 
 const PlayerTagsData = preload("res://scripts/data/player_tags.gd")
 const EquipmentWindow = preload("res://scenes/Fenetre_Equipement.tscn")
@@ -210,13 +211,36 @@ func _refresh_member_list() -> void:
 			members_list.set_item_custom_fg_color(idx, Color(0.5, 0.5, 0.5))
 		else:
 			members_list.set_item_custom_fg_color(idx, Color(0.90, 0.90, 0.93))
+	if selected_member and selected_member in guild_members:
+		var selected_index: int = guild_members.find(selected_member)
+		members_list.select(selected_index)
 
 func _on_member_selected(index: int) -> void:
 	if index < 0 or index >= guild_members.size():
 		return
 
 	selected_member = guild_members[index]
+	member_selected.emit(selected_member)
+	if guild_manager and guild_manager.has_method("select_member"):
+		guild_manager.select_member(selected_member, "roster")
 	_update_member_details()
+
+func focus_member(member, open_equipment: bool = false) -> void:
+	if member == null:
+		return
+	if guild_manager:
+		guild_members = guild_manager.guild_members.duplicate()
+	var index: int = guild_members.find(member)
+	if index < 0:
+		return
+	selected_member = member
+	if members_list:
+		members_list.select(index)
+	if guild_manager and guild_manager.has_method("select_member"):
+		guild_manager.select_member(member, "roster")
+	_update_member_details()
+	if open_equipment:
+		_show_equipment_window(member)
 
 func _update_member_details() -> void:
 	for child in member_details.get_children():

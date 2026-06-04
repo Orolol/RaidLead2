@@ -12,6 +12,7 @@ signal guild_perk_unlocked(perk_name)
 signal member_leveled_up(player, new_level)
 signal member_recruited(player)
 signal member_left(player)
+signal member_selected(player, context: String)
 # réservé : non encore émis (la popup de conflit de loot s'y abonne)
 @warning_ignore("unused_signal")
 signal loot_conflict_occurred(conflict)
@@ -19,6 +20,8 @@ signal bank_changed()
 
 var guild_members: Array = []
 var loot_history: Array = []
+var selected_member: SimulatedPlayer = null
+var selected_member_context: String = ""
 var guild: Guild
 var activity_manager
 var game_time: Node
@@ -265,8 +268,26 @@ func remove_member(player, was_voluntary: bool = true) -> void:
 		guild_members.erase(player)
 		if behavior_system and behavior_system.has_method("forget_player"):
 			behavior_system.forget_player(player)
+		if selected_member == player:
+			clear_selected_member()
 		# Notifie le départ (NotificationManager y est abonné)
 		member_left.emit(player)
+
+func select_member(player: SimulatedPlayer, context: String = "manual") -> void:
+	if player == null:
+		clear_selected_member()
+		return
+	selected_member = player
+	selected_member_context = context
+	member_selected.emit(player, context)
+
+func clear_selected_member() -> void:
+	selected_member = null
+	selected_member_context = ""
+	member_selected.emit(null, "")
+
+func get_selected_member() -> SimulatedPlayer:
+	return selected_member
 
 func get_online_members() -> Array:
 	var online = []
