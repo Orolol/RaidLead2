@@ -662,6 +662,19 @@ RaidLead a franchi une **étape majeure** avec **~50% du projet terminé**. Les 
 
 ## Accomplissements Récents ✅
 
+### Specs refonte UI — 2 chantiers (3 juin 2026)
+*Deux documents de design prêts à arbitrage/phasage. Décisions verrouillées avec le dev.*
+- 📋 **Chantier 1 — Refonte visuelle « MMO pixel-art »** : `docs/design/2026-06-03-ui-refonte-visuelle-mmo.md`. Sortir du thème `StyleBoxFlat` plat + police système → identité MMO fantasy (or/pierre/parchemin) **rendue en pixel-art** cohérent avec `umempart`. **Décidé** : chrome via **kits tiers licenciés/CC0** (pas de rip WoW), **style pixel-art unifié**. Couvre : police pixel (⚠ accents FR), 9-slice `StyleBoxTexture`, pixel-perfect (`Nearest`), inventaire d'assets exhaustif, manifeste de licences Steam, phasage A→E.
+- 📋 **Chantier 2 — UI au service du gameplay** : `docs/design/2026-06-03-ui-architecture-gameplay.md`. **Décidé en scope** : (1) **HUD permanent persistant** (or/réput/moral/online/temps + tracker d'objectif de phase + rail d'alertes actionnables) ; (2) **refonte navigation** (8+ fenêtres → ~5 hubs par boucle de jeu). **Non-goals** : pas de docking/multi-fenêtres (reste mono-fenêtre), pas de multi-résolution. Note technique : `Guild.gold` doit gagner un `signal gold_changed` (pas de polling).
+- 🔗 **Séquencement croisé** : Chantier 2 Phases 1-2 (HUD additif) + Chantier 1 Phases A-C (skin) en parallèle → Chantier 2 Phase 3 (regroupement) → Chantier 1 Phases D-E (icônes) → Chantier 2 Phases 4-5.
+
+### Spec système de quêtes de guidage (3 juin 2026)
+*Document de design prêt à implémenter : `docs/design/2026-06-03-systeme-quetes-guidage.md`.*
+- 📋 **Objectif produit cadré** : onboarding fort en Phase 0, puis objectifs de campagne de plus en plus espacés, centrés sur la découverte des nouvelles UI et la compréhension des caps de phase.
+- 📋 **Architecture proposée** : `QuestManager` comme surcouche d'orientation, branchée sur `PhaseManager`, `WindowManager`, `GuildManager`, `RecruitmentPool`, PvE, ranking et managers avancés, sans dupliquer les sources de vérité.
+- 📋 **UX spécifiée** : tracker compact, fenêtre Objectifs, bouton "Aller", highlights sémantiques par fenêtre, auto-completion rétroactive et quêtes optionnelles/non bloquantes.
+- 📋 **Roadmap d'implémentation** : socle data/manager, tracker minimal, chaîne Phase 0 complète, fenêtre Objectifs, puis quêtes Serveur/National/Esport.
+
 ### Chat de guilde vivant — moteur + scènes à branches (2 juin 2026)
 *Branche `feat/chat-vivant` (worktree). Implémenté en 7 phases A→G. Validé : CheckScripts 108 scripts OK + TestRunner 220/220 + soak headless. Doc : `docs/design/2026-06-02-chat-guilde-vivant.md`.*
 
