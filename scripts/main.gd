@@ -5,12 +5,21 @@ const WindowManagerScript = preload("res://scripts/managers/window_manager.gd")
 # RandomEventResource / EventChoiceResource / EventPopupWindow : résolus via leur class_name global
 # (les preloads redondants masquaient l'identifiant global → SHADOWED_GLOBAL_IDENTIFIER).
 const PlayerControlPanelScript = preload("res://scripts/ui/components/player_control_panel.gd")
+const ResourceBarScript = preload("res://scripts/ui/components/resource_bar.gd")
+const ObjectiveTrackerScript = preload("res://scripts/ui/components/objective_tracker.gd")
+const AlertRailScript = preload("res://scripts/ui/components/alert_rail.gd")
+const MemberInspectorScript = preload("res://scripts/ui/components/member_inspector.gd")
 # const FastForwardDialog = preload("res://scripts/ui/windows/fast_forward_dialog.gd")  # Supprimé - système simplifié
 const NO_SAVE_AUTOLOAD_ARG: String = "--no-save-autoload"
 const REST_ACCELERATION_SPEED: float = 2880.0
 
 var window_manager: Node
 var menu_bar: Control
+var hud_layer: CanvasLayer = null
+var resource_bar: ResourceBar = null
+var objective_tracker: ObjectiveTracker = null
+var alert_rail: Control = null
+var member_inspector: Control = null
 
 var chat_panel: ChatPanel = null
 var event_popup: EventPopupWindow = null
@@ -45,7 +54,7 @@ func _ready() -> void:
 	window_manager = $VBoxContainer/window_manager
 	
 	_setup_background()
-	_setup_time_display()
+	_setup_hud()
 	_setup_chat_panel()
 	_connect_phase_notifications()
 	if _is_debug_ui_enabled():
@@ -96,6 +105,125 @@ func _setup_time_display() -> void:
 	time_display.offset_right = time_display.custom_minimum_size.x / 2
 	time_display.offset_bottom = 10 + time_display.custom_minimum_size.y
 
+func _setup_hud() -> void:
+	hud_layer = CanvasLayer.new()
+	hud_layer.layer = 40
+	add_child(hud_layer)
+
+	resource_bar = ResourceBarScript.new()
+	hud_layer.add_child(resource_bar)
+	resource_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	resource_bar.offset_left = 16
+	resource_bar.offset_top = 10
+	resource_bar.offset_right = -16
+	resource_bar.offset_bottom = 66
+	resource_bar.resource_action_requested.connect(_on_hud_resource_action_requested)
+
+	objective_tracker = ObjectiveTrackerScript.new()
+	hud_layer.add_child(objective_tracker)
+	objective_tracker.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	objective_tracker.offset_left = -280
+	objective_tracker.offset_top = 78
+	objective_tracker.offset_right = 280
+	objective_tracker.offset_bottom = 154
+	objective_tracker.open_requested.connect(_on_objective_tracker_open_requested)
+
+	alert_rail = AlertRailScript.new()
+	hud_layer.add_child(alert_rail)
+	alert_rail.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	alert_rail.offset_left = -316
+	alert_rail.offset_top = 82
+	alert_rail.offset_right = -16
+	alert_rail.offset_bottom = 442
+	alert_rail.alert_action_requested.connect(_on_alert_action_requested)
+
+	member_inspector = MemberInspectorScript.new()
+	hud_layer.add_child(member_inspector)
+	member_inspector.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	member_inspector.offset_left = 20
+	member_inspector.offset_top = 320
+	member_inspector.offset_right = 320
+	member_inspector.offset_bottom = 650
+	member_inspector.action_requested.connect(_on_member_inspector_action_requested)
+
+func _on_hud_resource_action_requested(action: String) -> void:
+	if not window_manager:
+		return
+	match action:
+		"gold":
+			if PhaseManager and PhaseManager.get_current_phase() >= PhaseManager.GamePhase.NATIONAL:
+				_open_hub_section("hub_business", "national")
+			else:
+				_open_hub_section("hub_advice", "stats")
+		"reputation":
+			_open_hub_section("hub_guild", "player")
+		"morale":
+			_open_hub_section("hub_guild", "cohesion")
+		"roster":
+			_open_hub_section("hub_guild", "roster")
+		_:
+			_open_hub_section("hub_advice", "weekly")
+
+func _on_objective_tracker_open_requested() -> void:
+	if window_manager:
+		_open_hub_section("hub_competition", "progression")
+
+func _on_alert_action_requested(action: String, context: Dictionary) -> void:
+	if not window_manager:
+		return
+	var member: SimulatedPlayer = context.get("member", null) as SimulatedPlayer
+	if member and GuildManager and GuildManager.has_method("select_member"):
+		GuildManager.select_member(member, str(context.get("context", action)))
+	var target_hub: String = str(context.get("hub", ""))
+	if target_hub != "":
+		_open_hub_section(target_hub, str(context.get("section", "")), context)
+		return
+	var target_window: String = str(context.get("window", ""))
+	if target_window != "":
+		window_manager.show_window(target_window)
+		return
+	match action:
+		"drama":
+			_open_hub_section("hub_guild", "cohesion")
+		"recruitment":
+			_open_hub_section("hub_recruitment", "recruitment", context)
+		"burnout", "cohesion":
+			_open_hub_section("hub_guild", "cohesion", context)
+		"finance":
+			_open_hub_section("hub_advice", "stats")
+		_:
+			_open_hub_section("hub_advice", "weekly")
+
+func _on_member_inspector_action_requested(action: String, player) -> void:
+	var context: Dictionary = {"member": player}
+	match action:
+		"roster":
+			_open_hub_section("hub_guild", "roster", context)
+		"cohesion":
+			_open_hub_section("hub_guild", "cohesion", context)
+		"equipment":
+			var inst: Control = window_manager.show_window("guilde")
+			if inst and inst.has_method("focus_member"):
+				inst.call_deferred("focus_member", player, true)
+		"pve":
+			_open_organization("dungeon")
+		_:
+			_open_hub_section("hub_guild", "roster", context)
+
+func _open_hub_section(hub_name: String, section_id: String = "", context: Dictionary = {}) -> Control:
+	if not window_manager:
+		return null
+	var instance: Control = window_manager.show_window(hub_name)
+	if not instance:
+		return null
+	if context.has("member") and context["member"] != null and GuildManager and GuildManager.has_method("select_member"):
+		GuildManager.select_member(context["member"], str(context.get("context", section_id)))
+	if section_id != "" and instance.has_method("select_section"):
+		instance.call_deferred("select_section", section_id)
+	if instance.has_method("apply_context"):
+		instance.call_deferred("apply_context", context)
+	return instance
+
 func _setup_chat_panel() -> void:
 	var chat_scene = load("res://scenes/ChatPanel.tscn")
 	chat_panel = chat_scene.instantiate()
@@ -139,40 +267,57 @@ func _should_auto_load_save() -> bool:
 	return not args.has(NO_SAVE_AUTOLOAD_ARG) and not user_args.has(NO_SAVE_AUTOLOAD_ARG)
 
 func _connect_menu_signals() -> void:
-	menu_bar.personnage_button_pressed.connect(_on_personnage_button_pressed)
-	menu_bar.guilde_button_pressed.connect(_on_guilde_button_pressed)
-	menu_bar.monde_button_pressed.connect(_on_monde_button_pressed)
-	menu_bar.organisation_button_pressed.connect(_on_organisation_button_pressed)
-	menu_bar.national_button_pressed.connect(_on_national_button_pressed)
-	menu_bar.esport_button_pressed.connect(_on_esport_button_pressed)
-	menu_bar.cohesion_button_pressed.connect(_on_cohesion_button_pressed)
-	menu_bar.conseils_button_pressed.connect(_on_conseils_button_pressed)
+	menu_bar.guild_hub_button_pressed.connect(_on_guild_hub_button_pressed)
+	menu_bar.competition_hub_button_pressed.connect(_on_competition_hub_button_pressed)
+	menu_bar.business_hub_button_pressed.connect(_on_business_hub_button_pressed)
+	menu_bar.recruitment_hub_button_pressed.connect(_on_recruitment_hub_button_pressed)
+	menu_bar.advice_hub_button_pressed.connect(_on_advice_hub_button_pressed)
+
+func _on_guild_hub_button_pressed() -> void:
+	window_manager.show_window("hub_guild")
+
+func _on_competition_hub_button_pressed() -> void:
+	window_manager.show_window("hub_competition")
+
+func _on_business_hub_button_pressed() -> void:
+	window_manager.show_window("hub_business")
+
+func _on_recruitment_hub_button_pressed() -> void:
+	window_manager.show_window("hub_recruitment")
+
+func _on_advice_hub_button_pressed() -> void:
+	window_manager.show_window("hub_advice")
 
 func _on_personnage_button_pressed() -> void:
-	window_manager.show_window("personnage")
+	_open_hub_section("hub_guild", "player")
 
 func _on_guilde_button_pressed() -> void:
-	window_manager.show_window("guilde")
+	_open_hub_section("hub_guild", "roster")
 
 func _on_monde_button_pressed() -> void:
-	window_manager.show_window("monde")
+	_open_hub_section("hub_competition", "rankings")
 
 func _on_organisation_button_pressed() -> void:
-	window_manager.show_window("organisation")
+	_open_hub_section("hub_competition", "group")
 
 func _on_national_button_pressed() -> void:
-	window_manager.show_window("national")
+	_open_hub_section("hub_business", "national")
 
 func _on_esport_button_pressed() -> void:
-	window_manager.show_window("esport")
+	_open_hub_section("hub_business", "esport")
 
 func _on_cohesion_button_pressed() -> void:
-	window_manager.show_window("cohesion")
+	_open_hub_section("hub_guild", "cohesion")
 
 func _on_conseils_button_pressed() -> void:
-	window_manager.show_window("conseils")
+	_open_hub_section("hub_advice", "weekly")
 
 func _register_windows() -> void:
+	window_manager.register_window("hub_guild", "res://scenes/Hub_Guilde.tscn")
+	window_manager.register_window("hub_competition", "res://scenes/Hub_Competition.tscn")
+	window_manager.register_window("hub_business", "res://scenes/Hub_Business.tscn")
+	window_manager.register_window("hub_recruitment", "res://scenes/Hub_Recrutement.tscn")
+	window_manager.register_window("hub_advice", "res://scenes/Hub_Conseil.tscn")
 	window_manager.register_window("personnage", "res://scenes/Fenetre_Personnage.tscn")
 	window_manager.register_window("guilde", "res://scenes/Fenetre_Guilde.tscn")
 	window_manager.register_window("monde", "res://scenes/Fenetre_Monde.tscn")
@@ -191,7 +336,7 @@ func _connect_window_signals() -> void:
 
 	# Ouvrir la fenêtre Personnage par défaut après que le tree soit stabilisé
 	get_tree().create_timer(0.1).timeout.connect(func():
-		window_manager.show_window("personnage")
+		window_manager.show_window("hub_guild")
 	)
 
 func _on_window_opened(window_name: String) -> void:
@@ -201,6 +346,11 @@ func _on_window_opened(window_name: String) -> void:
 		return
 
 	match window_name:
+		"hub_guild", "hub_competition", "hub_business", "hub_recruitment", "hub_advice":
+			if instance.has_signal("section_requested") and not instance.section_requested.is_connected(_on_hub_section_requested):
+				instance.section_requested.connect(_on_hub_section_requested)
+			if instance.has_signal("legacy_player_recruited") and not instance.legacy_player_recruited.is_connected(_on_player_recruited):
+				instance.legacy_player_recruited.connect(_on_player_recruited)
 		"monde":
 			if not instance.player_recruited.is_connected(_on_player_recruited):
 				instance.player_recruited.connect(_on_player_recruited)
@@ -208,6 +358,33 @@ func _on_window_opened(window_name: String) -> void:
 			var guild_manager_node: Node = GuildManager
 			if guild_manager_node:
 				instance.set_guild_members(guild_manager_node.guild_members)
+
+func _on_hub_section_requested(window_name: String, section_id: String) -> void:
+	if window_name == "":
+		return
+	var instance: Control = window_manager.show_window(window_name)
+	_focus_legacy_section.call_deferred(window_name, section_id, instance)
+
+func _focus_legacy_section(window_name: String, section_id: String, instance: Control) -> void:
+	if not is_instance_valid(instance):
+		instance = window_manager.get_window_instance(window_name)
+	if not is_instance_valid(instance) or not instance.get("advanced_tabs"):
+		return
+	var tabs: AdvancedTabs = instance.get("advanced_tabs")
+	if not tabs:
+		return
+	var tab_index: int = 0
+	match section_id:
+		"recruitment":
+			tab_index = 1
+		"progression":
+			tab_index = 1
+		"advice":
+			tab_index = 1
+		"stats":
+			tab_index = 2
+	if tab_index < tabs.get_tab_count():
+		tabs.select_tab(tab_index)
 
 func _on_player_recruited(player: SimulatedPlayer) -> void:
 	var guild_manager_node: Node = GuildManager
@@ -218,6 +395,8 @@ func _on_player_recruited(player: SimulatedPlayer) -> void:
 				if NotificationManager:
 					NotificationManager.show_warning("Recrutement impossible : la guilde est pleine ou verrouillee.", "Recrutement")
 				return
+		if guild_manager_node.has_method("select_member"):
+			guild_manager_node.select_member(player, "recruitment")
 		# Rafraîchir les fenêtres ouvertes via leurs instances dans le WindowManager
 		var guilde_inst: Control = window_manager.get_window_instance("guilde")
 		if guilde_inst:
@@ -243,28 +422,37 @@ func _input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_P:  # P pour Personnage
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_personnage_pressed()
+					_on_personnage_button_pressed()
 			KEY_G:  # G pour Guilde
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_guilde_pressed()
+					menu_bar._on_guild_hub_pressed()
+			KEY_C:  # C pour Competition
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_competition_hub_pressed()
+			KEY_B:  # B pour Business
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_business_hub_pressed()
+			KEY_R:  # R pour Recrutement
+				if Input.is_key_pressed(KEY_CTRL):
+					menu_bar._on_recruitment_hub_pressed()
 			KEY_M:  # M pour Monde
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_monde_pressed()
+					_on_monde_button_pressed()
 			KEY_O:  # O pour Organisation
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_organisation_pressed()
+					_on_organisation_button_pressed()
 			KEY_N:  # N pour National
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_national_pressed()
+					_on_national_button_pressed()
 			KEY_E:  # E pour Esport
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_esport_pressed()
+					_on_esport_button_pressed()
 			KEY_K:  # K pour Cohésion
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_cohesion_pressed()
+					_on_cohesion_button_pressed()
 			KEY_A:  # A pour Conseils (conseiller / aide)
 				if Input.is_key_pressed(KEY_CTRL):
-					menu_bar._on_conseils_pressed()
+					menu_bar._on_advice_hub_pressed()
 			KEY_SPACE:  # Espace pour pause
 				var game_time_node = GameTime
 				if game_time_node:
@@ -608,9 +796,9 @@ func _setup_player_control_panel() -> void:
 	# Ancrage top-left pour supporter toutes les résolutions
 	player_control_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	player_control_panel.offset_left = 20
-	player_control_panel.offset_top = 20
+	player_control_panel.offset_top = 92
 	player_control_panel.offset_right = 20 + player_control_panel.custom_minimum_size.x
-	player_control_panel.offset_bottom = 20 + player_control_panel.custom_minimum_size.y
+	player_control_panel.offset_bottom = 92 + player_control_panel.custom_minimum_size.y
 	player_control_panel.z_index = 15  # Au-dessus des autres éléments
 
 	# Configurer avec le personnage du joueur

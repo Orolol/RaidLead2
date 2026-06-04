@@ -15,6 +15,7 @@ const Singletons = preload("res://scripts/utils/singletons.gd")
 signal xp_gained(amount: int, source: String)
 signal level_up(new_level: int)
 signal perk_unlocked(perk_name: String, level: int)
+signal gold_changed(old_gold: int, new_gold: int)
 signal reputation_changed(old_reputation: float, new_reputation: float, reason: String)
 
 func _init() -> void:
@@ -76,7 +77,14 @@ func get_availability_bonus() -> float:
 func get_recruitment_quality_bonus() -> float:
 	return get_guild_effects()["recruitment_quality_bonus"]
 
+func set_gold(value: int) -> void:
+	var old_gold: int = gold
+	gold = maxi(0, value)
+	if gold != old_gold:
+		gold_changed.emit(old_gold, gold)
+
 func add_gold(amount: int) -> void:
+	var old_gold: int = gold
 	var max_gold = get_guild_effects()["gold_storage"]
 	if max_gold > 0:
 		var new_gold: int = gold + amount
@@ -92,6 +100,8 @@ func add_gold(amount: int) -> void:
 	else:
 		# Avant le palier de stockage (bas niveau), trésorerie non plafonnée.
 		gold += amount
+	if gold != old_gold:
+		gold_changed.emit(old_gold, gold)
 
 func _notify_gold_overflow(lost: int, cap: int) -> void:
 	"""Signale (best-effort) l'or perdu par débordement de la trésorerie."""
@@ -103,7 +113,10 @@ func _notify_gold_overflow(lost: int, cap: int) -> void:
 
 func spend_gold(amount: int) -> bool:
 	if gold >= amount:
+		var old_gold: int = gold
 		gold -= amount
+		if gold != old_gold:
+			gold_changed.emit(old_gold, gold)
 		return true
 	return false
 

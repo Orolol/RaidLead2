@@ -12,6 +12,18 @@
 - ✅ **Refactoring majeur** : WindowManager, GuildManager, autoloads, save/load
 - 🎯 **Progression** : ~55% du projet total terminé
 
+### Mise a jour - HUD gameplay persistant (4 juin 2026)
+- ✅ **ResourceBar** : or, reputation, moral, membres en ligne, serveur/hype, date/heure et vitesse sont visibles en permanence dans une top bar reactive.
+- ✅ **ObjectiveTracker** : objectif de phase et progression globale visibles en HUD, recalcules au chargement et sur les signaux de progression/roster/ranking.
+- ✅ **AlertRail** : rail d'alertes persistant branche sur dramas, conseils prioritaires, recrues qui expirent et risques burnout/stress, avec routage vers les fenetres existantes.
+- ✅ **Navigation hubs** : barre basse reduite a 5 entrees (Guilde, Competition, Business, Recrutement, Conseil) avec scenes Hub_* servant de facade vers les fenetres existantes.
+- ✅ **Sections embarquees ciblees** : les hubs embarquent les fenetres legacy compatibles dans leurs onglets, avec relais des signaux critiques comme le recrutement ; les vues roster/equipement restent en facade jusqu'a extraction en composants dedies.
+- ✅ **Signal economie** : `Guild.gold_changed(old_gold, new_gold)` ajoute sur `add_gold`, `spend_gold` et `set_gold`, pour eviter le polling UI.
+- ✅ **Inspecteur contextuel** : selection partagee via `GuildManager.member_selected`, panneau `MemberInspector` persistant, actions directes roster/cohesion/equipement/PvE.
+- ✅ **Deep-links UI** : ResourceBar, ObjectiveTracker, AlertRail et anciens raccourcis routent vers hub + section ; les alertes burnout/recrutement transmettent le membre ou candidat concerne.
+- ✅ **Polish hubs** : sections non embarquees converties en syntheses jouables (roster, equipement, profil joueur, groupe PvE, progression, besoins roster), raccourcis internes Tab/1-9 et refresh reactif.
+- 📋 **Reste a faire** : extraction complete des dernieres fenetres legacy lourdes en composants dedies et screenshots MCP quand l'editeur est connecte.
+
 ---
 
 # PARTIE A : CE QUI EST FAIT ✅

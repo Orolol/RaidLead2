@@ -2,6 +2,7 @@ extends PanelContainer
 class_name RecruitmentPanel
 
 signal player_recruited(player)
+signal candidate_selected(player)
 
 var recruitment_list: ItemList
 var details_scroll: ScrollContainer
@@ -190,6 +191,20 @@ func _on_recruit_selected(index: int) -> void:
 	if index < 0 or index >= _visible_recruits.size():
 		return
 	selected_recruit = _visible_recruits[index]
+	candidate_selected.emit(selected_recruit)
+	_update_recruit_details()
+
+func focus_candidate(player: SimulatedPlayer) -> void:
+	if player == null:
+		return
+	_refresh_recruitment_from_pool()
+	var index: int = _visible_recruits.find(player)
+	if index < 0:
+		return
+	selected_recruit = player
+	if recruitment_list:
+		recruitment_list.select(index)
+	candidate_selected.emit(selected_recruit)
 	_update_recruit_details()
 
 

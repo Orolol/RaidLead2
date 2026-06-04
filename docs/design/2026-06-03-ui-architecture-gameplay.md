@@ -3,6 +3,13 @@
 *Spec **v1** — 3 juin 2026. Statut : brouillon prêt à arbitrage / phasage.*
 *Pendant de [Chantier 1 — Refonte visuelle MMO](2026-06-03-ui-refonte-visuelle-mmo.md).*
 
+> **Statut implementation — 4 juin 2026**
+> - HUD persistant implemente : `ResourceBar`, `ObjectiveTracker`, `AlertRail`.
+> - Navigation principale remplacee par 5 hubs : Guilde, Competition, Business, Recrutement, Conseil.
+> - `MemberInspector` et selection partagee ajoutes via `GuildManager.member_selected`.
+> - Deep-links HUD/rail/raccourcis vers hub + section branches.
+> - Dernier reste technique : extraire totalement les anciennes fenetres lourdes en sous-composants natifs.
+
 > **Décisions verrouillées** (arbitrées avec le dev, 3 juin 2026)
 > - **En scope** : (1) **HUD permanent persistant** — l'état vital toujours visible sans ouvrir de
 >   fenêtre ; (2) **refonte navigation / regroupement** — collapser 8+ fenêtres en quelques hubs

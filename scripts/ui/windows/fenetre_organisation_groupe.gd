@@ -23,6 +23,8 @@ var guild_members: Array = []
 var selected_activity: String = ""
 var selected_instance: String = ""
 
+signal member_selected(player)
+
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(900, 700)
@@ -356,6 +358,10 @@ func _add_role_slot(role: String, count: int) -> void:
 func _create_draggable_member(member) -> void:
 	var draggable: DraggableItem = DraggableItem.new()
 	draggable.custom_minimum_size = Vector2(240, 40)
+	draggable.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_select_member(member, "group_pool")
+	)
 
 	# Configurer les données du drag
 	var drag_data: Dictionary = {
@@ -424,6 +430,7 @@ func _on_member_dropped(item: DraggableItem, _zone: DropZone, slot_id: String) -
 	
 	# Assigner le nouveau membre
 	slot.member = member
+	_select_member(member, "group_slot")
 	slot.drop_zone.set_content_text("%s\n%s" % [member.nom, member.personnage_classe])
 	
 	_refresh_available_members()
@@ -445,8 +452,19 @@ func _validate_member_drop(item: DraggableItem, _data: Dictionary, _zone: DropZo
 func _on_slot_gui_input(event: InputEvent, slot_id: String) -> void:
 	if event is InputEventMouseButton:
 		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
-		if mouse_event.pressed and mouse_event.double_click and mouse_event.button_index == MOUSE_BUTTON_LEFT:
-			_unassign_member_from_slot(slot_id)
+		if mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			var slot = group_slots[slot_id]
+			if slot.member:
+				_select_member(slot.member, "group_slot")
+			if mouse_event.double_click:
+				_unassign_member_from_slot(slot_id)
+
+func _select_member(member, context: String) -> void:
+	if member == null:
+		return
+	member_selected.emit(member)
+	if GuildManager and GuildManager.has_method("select_member"):
+		GuildManager.select_member(member, context)
 
 # Fonction pour désassigner un membre d'un slot
 func _unassign_member_from_slot(slot_id: String) -> void:
