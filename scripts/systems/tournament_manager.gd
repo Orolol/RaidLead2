@@ -33,6 +33,11 @@ func _ready() -> void:
 	_seed_offers()
 
 func _on_week_changed(_week: int, _year: int) -> void:
+	# Garde de phase : les tournois internationaux n'existent qu'en phase Esport.
+	# Avant, la génération d'offres et la décroissance de réputation tournaient dès
+	# la Phase 0 (offres et décote qui s'accumulaient hors-contexte).
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.ESPORT:
+		return
 	weeks_since_offer += 1
 	if available_tournaments.size() < MAX_OFFERS and weeks_since_offer >= OFFER_INTERVAL_WEEKS:
 		var t: Tournament = _generate_tournament()

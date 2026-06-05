@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://dutna3w2ik501"]
+[gd_scene format=3 uid="uid://dutna3w2ik501"]
 
 [ext_resource type="Script" path="res://scripts/ui/windows/hub_window.gd" id="1_hub"]
 

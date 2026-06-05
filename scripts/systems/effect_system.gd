@@ -112,6 +112,22 @@ func remove_effect_instance(target, effect_instance: EffectInstanceResource) -> 
 	var target_id: String = _get_target_id(target)
 	return _remove_effect_internal(target_id, effect_instance, false)
 
+func reset_all() -> void:
+	"""Vide complètement l'état du système : déconnecte les signaux des instances
+	encore actives et purge active_effects ET _effect_callables. Utilisé au chargement
+	d'une sauvegarde pour repartir d'un état propre sans fuir les Callables des effets
+	créés au boot (un simple active_effects.clear() laisserait _effect_callables orphelin)."""
+	for effect_instance in _effect_callables.keys():
+		var callables: Dictionary = _effect_callables[effect_instance]
+		var expired_cb: Callable = callables["expired"]
+		var stack_changed_cb: Callable = callables["stack_changed"]
+		if effect_instance.expired.is_connected(expired_cb):
+			effect_instance.expired.disconnect(expired_cb)
+		if effect_instance.stack_changed.is_connected(stack_changed_cb):
+			effect_instance.stack_changed.disconnect(stack_changed_cb)
+	_effect_callables.clear()
+	active_effects.clear()
+
 func _remove_effect_internal(target_id: String, effect_instance: EffectInstanceResource, is_expired: bool) -> bool:
 	if not active_effects.has(target_id):
 		return false

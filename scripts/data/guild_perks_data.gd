@@ -106,6 +106,12 @@ static func get_active_perks(level: int) -> Array:
 			active_perks.append(perk_data)
 	return active_perks
 
+# Clés numériques qui représentent un SEUIL/PLAFOND non cumulatif (le palier le plus
+# élevé débloqué prime) plutôt qu'un bonus à additionner. Combiner ces clés avec max()
+# au lieu de += évite que les paliers s'accumulent (ex. gold_storage atteignait 257000
+# au niv 10 au lieu de 200000 ; max_members 30 au lieu de 20).
+const THRESHOLD_KEYS := ["gold_storage", "max_members"]
+
 static func get_combined_effects(level: int) -> Dictionary:
 	var effects: Dictionary = {
 		"max_members": 10,  # Commence avec 10 membres au niveau 1
@@ -119,15 +125,20 @@ static func get_combined_effects(level: int) -> Dictionary:
 		"availability_bonus": 0.0,
 		"recruitment_quality_bonus": 0.0
 	}
-	
+
 	for perk_level in PERKS.keys():
 		if perk_level <= level:
 			var perk_effects: Dictionary = PERKS[perk_level]["effects"]
 			for effect_key in perk_effects:
 				if effect_key in effects:
 					if typeof(effects[effect_key]) == TYPE_FLOAT or typeof(effects[effect_key]) == TYPE_INT:
-						effects[effect_key] += perk_effects[effect_key]
+						if effect_key in THRESHOLD_KEYS:
+							# Seuil : on garde le palier le plus élevé débloqué (pas d'accumulation).
+							effects[effect_key] = max(effects[effect_key], perk_effects[effect_key])
+						else:
+							# Bonus réellement cumulatif (ex. raid_success_bonus +5% +5%).
+							effects[effect_key] += perk_effects[effect_key]
 					else:
 						effects[effect_key] = perk_effects[effect_key]
-	
+
 	return effects

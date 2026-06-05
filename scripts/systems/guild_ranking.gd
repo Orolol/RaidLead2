@@ -421,6 +421,9 @@ func register_server_first(guild_name: String, content_id: String) -> void:
 	var is_player_guild: bool = (GuildManager != null and GuildManager.guild != null) and guild_name == GuildManager.guild.name
 	if is_player_guild:
 		GameLog.d("🏆 SERVER FIRST! Nous avons fait le premier clear de %s!" % content_id)
+		# Réputation : un server first récompense UNIQUEMENT la guilde joueur (+15).
+		# Les guildes IA passent aussi par ici mais ne doivent pas gagner de réputation joueur.
+		GuildManager.guild.on_server_first(content_id)
 	else:
 		GameLog.d("📢 %s a fait le server first de %s" % [guild_name, content_id])
 	

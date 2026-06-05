@@ -87,59 +87,6 @@ func _on_day_changed(_day: int, _week: int, _year: int) -> void:
 		if not member.get_meta("is_player", false) and not member.is_online:
 			_schedule_next_connection_time(member)
 
-func should_connect_dynamic(player) -> bool:
-	return randf() < _get_connection_chance(player)
-
-func should_disconnect_dynamic(player) -> bool:
-	"""Détermine si un joueur devrait se déconnecter avec le système dynamique"""
-	
-	# Déconnexion forcée si épuisé
-	if player.energy <= 5:
-		return true
-	
-	# Déconnexion si burnout sévère
-	if (player.burnout_level if player.burnout_level != null else 0) >= 3 and randf() < 0.3:
-		return true
-	
-	# Vérifier les horaires de base
-	var base_should_disconnect = _should_disconnect_by_schedule(player)
-	
-	# Événement personnel de déconnexion
-	if player.has_urgent_event:
-		player.has_urgent_event = false
-		return true
-	
-	# Modificateurs selon l'état
-	if base_should_disconnect:
-		var stay_probability = 0.0
-		
-		# Peut rester plus longtemps si activité intéressante
-		if player.current_activity:
-			match player.current_activity.type:
-				Activity.ActivityType.DUNGEON, Activity.ActivityType.RAID:
-					stay_probability = 0.7  # 70% chance de finir l'activité
-				Activity.ActivityType.FUN:
-					if player.mood > 70:
-						stay_probability = 0.4  # 40% chance de rester si s'amuse
-		
-		# Influence sociale
-		if social_dynamics:
-			var friends_online = social_dynamics.get_online_friends(player)
-			if friends_online.size() > 0:
-				stay_probability += 0.1 * friends_online.size()  # +10% par ami
-		
-		return randf() > stay_probability
-	
-	# Déconnexion aléatoire si très tard
-	if game_time.current_hour >= 2 and game_time.current_hour < 6:
-		var tags: Array = player.get_all_tags() if player and player.has_method("get_all_tags") else []
-		if "insomniaque" in tags:
-			return false
-		var tiredness_factor = (player.energy / 100.0)
-		return randf() > tiredness_factor
-	
-	return false
-
 func get_activity_preference(player, activity_type: String) -> float:
 	"""Retourne la préférence d'un joueur pour un type d'activité"""
 	
@@ -172,10 +119,13 @@ func get_activity_preference(player, activity_type: String) -> float:
 				base_pref *= 0.3
 			if (player.burnout_level if player.burnout_level != null else 0) > 2:
 				base_pref *= 0.2
-			# Boost si récent succès
+			# Boost si récent succès. Le sentinel "jamais" est -1 ; un vrai succès écrit
+			# le jour absolu qui peut valoir 0. On teste donc >= 0 (et non > 0, qui
+			# ignorerait à tort un succès survenu le jour 0), aligné sur
+			# _get_player_motivation_modifier.
 			var last_raid_success_day = player.last_raid_success_day if player.last_raid_success_day != null else -1
-			if last_raid_success_day > 0:
-				var days_since = game_time.current_day - last_raid_success_day
+			if last_raid_success_day >= 0:
+				var days_since = _absolute_day() - last_raid_success_day
 				if days_since <= 2:
 					base_pref *= 1.4
 	
@@ -271,6 +221,9 @@ func trigger_personal_event(player, event_type: String) -> void:
 
 		"bonus_time":
 			player.bonus_session_hours = event.get("bonus_hours", 2)
+			# Armer le bonus de motivation : il est lu par _get_player_motivation_modifier (+12%)
+			# et desarme a la consommation de bonus_session_hours (_schedule_next_disconnection_time).
+			player.bonus_session_active = true
 			behavior_changed.emit(player, "bonus_time")
 
 		"mood_modifier":
@@ -514,12 +467,26 @@ func _get_connection_chance(player) -> float:
 		var variance: float = player.behavior_profile.get_schedule_variance() * 0.08
 		final_prob += randf_range(-variance, variance)
 
+	# Phase 0 (LEVELING) : bonus de connexion (config "connection_bonus", ~+20%).
+	# Modélise l'engouement de début de serveur sur les horaires de connexion.
+	final_prob *= 1.0 + _get_leveling_connection_bonus()
+
 	return clampf(final_prob, 0.0, 0.98)
+
+func _get_leveling_connection_bonus() -> float:
+	"""Retourne le bonus de connexion de la Phase 0 (LEVELING), 0.0 hors LEVELING.
+	Lit la valeur "connection_bonus" de la config de phase via PhaseManager."""
+	if not PhaseManager:
+		return 0.0
+	if PhaseManager.current_phase != PhaseManager.GamePhase.LEVELING:
+		return 0.0
+	var config: Dictionary = PhaseManager.get_current_phase_config()
+	return float(config.get("connection_bonus", 0.0))
 
 func _connection_state_modifier(player) -> float:
 	"""Multiplicateur de présence selon l'état dynamique du membre (1.0 = neutre).
 	C'est ce qui fait que fatigue / burnout / humeur / amis en ligne influencent
-	réellement la connexion (le moteur `should_connect_dynamic` n'était pas branché)."""
+	réellement la connexion."""
 	var m: float = 1.0
 
 	# Fatigue
@@ -745,6 +712,7 @@ func _schedule_next_disconnection_time(member) -> void:
 	if bonus_hours > 0.0:
 		session_duration += int(bonus_hours * 60.0)
 		member.bonus_session_hours = 0
+		member.bonus_session_active = false
 
 	var burnout: int = member.burnout_level if member.burnout_level != null else 0
 	if burnout > 0:

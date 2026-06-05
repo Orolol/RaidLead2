@@ -421,7 +421,7 @@ func _get_role_icon(role: String) -> String:
 # Gestionnaire pour le drop d'un membre
 func _on_member_dropped(item: DraggableItem, _zone: DropZone, slot_id: String) -> void:
 	var slot = group_slots[slot_id]
-	var item_data = item.get_drag_data()
+	var item_data = item.drag_data
 	var member = item_data.member
 	
 	# Désassigner l'ancien membre si présent
@@ -438,7 +438,7 @@ func _on_member_dropped(item: DraggableItem, _zone: DropZone, slot_id: String) -
 
 # Validation pour le drop
 func _validate_member_drop(item: DraggableItem, _data: Dictionary, _zone: DropZone, slot_id: String) -> bool:
-	var item_data = item.get_drag_data()
+	var item_data = item.drag_data
 	if item_data.type != "guild_member":
 		return false
 	
@@ -625,14 +625,14 @@ func _refresh_available_members() -> void:
 
 	# Créer de nouveaux DraggableItems pour les membres disponibles
 	for member in guild_members:
-		# Only show online players who are available
-		if member.is_online and member.is_available_now():
+		# Online + disponible + apte au contenu sélectionné (les blessés sont exclus)
+		if member.is_online and member.is_available_now() and _member_can_join_selected_activity(member):
 			var assigned: bool = false
 			for slot_id in group_slots:
 				if group_slots[slot_id].member == member:
 					assigned = true
 					break
-			
+
 			if not assigned:
 				_create_draggable_member(member)
 
@@ -654,6 +654,19 @@ func _launch_dungeon_or_raid() -> void:
 		dialog.popup_centered()
 		return
 
+	# Refuser avec feedback si un membre assigné est devenu inapte (ex. blessé après
+	# son assignation) : il ne peut pas partir en donjon/raid.
+	var injured_names: Array[String] = []
+	for member in group:
+		if not _member_can_join_selected_activity(member):
+			injured_names.append(member.nom)
+	if not injured_names.is_empty():
+		var dialog: AcceptDialog = AcceptDialog.new()
+		dialog.dialog_text = "Impossible de lancer : %s ne peu(ven)t pas participer (blessé(s))." % ", ".join(injured_names)
+		get_tree().root.add_child(dialog)
+		dialog.popup_centered()
+		return
+
 	# Utiliser le nouveau système de donjons via l'ActivityManager
 	var activity_manager = ActivityManager
 	if activity_manager:
@@ -667,57 +680,6 @@ func _launch_dungeon_or_raid() -> void:
 			dialog.dialog_text = "Impossible de démarrer le donjon!"
 			get_tree().root.add_child(dialog)
 			dialog.popup_centered()
-
-func _simulate_dungeon_run(dungeon_run) -> void:
-	var instance_data = dungeon_run.instance_data
-	var result_text: String = "=== %s ===\n\n" % instance_data.name
-
-	# Simule chaque boss
-	for i in range(instance_data.bosses.size()):
-		if not dungeon_run.can_continue():
-			result_text += "\nLe groupe abandonne après trop de wipes!\n"
-			break
-
-		var result = dungeon_run.simulate_boss_fight(i)
-
-		if result.success:
-			result_text += "✓ %s vaincu!\n" % result.boss_name
-		else:
-			result_text += "✗ Wipe sur %s: %s\n" % [result.boss_name, result.wipe_reason]
-
-	# Finalise le run
-	var success = dungeon_run.defeated_bosses.size() == instance_data.bosses.size()
-	dungeon_run.complete_run(success)
-	
-	if success:
-		result_text += "\n🎉 Donjon complété avec succès!\n"
-	else:
-		result_text += "\n💀 Échec du donjon (%d/%d boss vaincus)\n" % [dungeon_run.defeated_bosses.size(), instance_data.bosses.size()]
-	
-	# Affiche le loot
-	if not dungeon_run.loot_collected.is_empty():
-		result_text += "\nLoot obtenu:\n"
-		for member_name in dungeon_run.loot_collected.keys():
-			var items: Array = dungeon_run.loot_collected[member_name]
-			var item_strings: Array[String] = []
-			for item in items:
-				if item is ItemScript:
-					item_strings.append(item.get_display_name())
-				else:
-					item_strings.append(str(item))
-			var loot_line: String = "Aucun objet"
-			if not item_strings.is_empty():
-				loot_line = ", ".join(item_strings)
-			result_text += "- %s: %s\n" % [member_name, loot_line]
-
-	# Affiche les résultats
-	var dialog: AcceptDialog = AcceptDialog.new()
-	dialog.dialog_text = result_text
-	dialog.title = "Résultat du donjon"
-	get_tree().root.add_child(dialog)
-	dialog.popup_centered(Vector2(500, 400))
-	
-	hide()
 
 func _open_dungeon_window(dungeon_instance) -> void:
 	# Charger et afficher la fenêtre de donjon
@@ -756,8 +718,22 @@ func set_guild_members(members: Array) -> void:
 # func _get_available_member_at_index - supprimée
 
 func _can_fill_role(member: SimulatedPlayer, role: String) -> bool:
-	# Pour l'instant, on vérifie juste que le rôle correspond
+	# Le rôle doit correspondre ET le membre doit pouvoir effectuer le contenu
+	# (un membre blessé a un effet « injured » qui bloque raid/donjon, cf. can_perform_action).
+	if not _member_can_join_selected_activity(member):
+		return false
 	return member.get_role() == role
+
+func _member_can_join_selected_activity(member) -> bool:
+	# selected_activity vaut "dungeon" ou "raid", ce qui correspond aux entrées
+	# blocks_actions de l'effet « injured ». Hors composition active, autorise par défaut.
+	if member == null:
+		return false
+	if selected_activity == "":
+		return true
+	if member.has_method("can_perform_action"):
+		return member.can_perform_action(selected_activity)
+	return true
 
 # Fonction remplacée par le système de drag & drop
 # func _on_member_double_clicked - supprimée
@@ -775,7 +751,8 @@ func _on_auto_assign_pressed() -> void:
 	}
 	
 	for member in guild_members:
-		if member.is_online and member.is_available_now():
+		# Exclure les blessés (effet « injured » bloquant le contenu sélectionné)
+		if member.is_online and member.is_available_now() and _member_can_join_selected_activity(member):
 			var role = member.get_role()
 			if role in available_by_role:
 				available_by_role[role].append(member)

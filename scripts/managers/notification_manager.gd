@@ -51,7 +51,6 @@ var notification_container: Control = null
 # Signaux
 signal notification_shown(notification_data)
 signal notification_dismissed(notification_data)
-signal history_updated()
 
 func _ready() -> void:
 	# Créer le container pour les notifications
@@ -138,7 +137,6 @@ func show_notification(text: String, type: NotificationType = NotificationType.I
 	notification_history.append(notification_data)
 	if notification_history.size() > 100:  # Limiter l'historique
 		notification_history.pop_front()
-	history_updated.emit()
 
 	# Si on a déjà trop de notifications visibles, ajouter à la queue
 	if active_notifications.size() >= MAX_VISIBLE_NOTIFICATIONS:

@@ -4,8 +4,10 @@ extends PanelContainer
 ## des sponsors et des dramas. Branchée sur MediaManager, SponsorshipManager,
 ## DramaManager (autoloads).
 
-const ACCENT := Color(0.30, 0.64, 0.96)
-const DIM := Color(0.62, 0.65, 0.71)
+# Palette : ACCENT/DIM dérivés de UITheme (source canonique). GOLD n'a pas
+# d'équivalent dans UITheme et reste littéral (couleur d'accent dorée locale).
+const ACCENT := UITheme.ACCENT
+const DIM := UITheme.TEXT_DIM
 const GOLD := Color(1.0, 0.82, 0.30)
 
 var advanced_tabs: AdvancedTabs

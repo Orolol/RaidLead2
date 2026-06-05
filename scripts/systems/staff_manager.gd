@@ -91,6 +91,11 @@ func fire_staff(staff) -> void:
 # --- Salaires & bien-etre ---
 
 func _pay_staff_salaries() -> void:
+	# Garde de phase : le staff professionnel est une mécanique Esport. La masse salariale
+	# ne se prélève qu'en phase Esport (en pratique on ne peut embaucher qu'en Esport,
+	# mais cette garde rend l'intention explicite et protège des saves/états anciens).
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.ESPORT:
+		return
 	var total: int = get_total_weekly_salary()
 	if total <= 0:
 		return

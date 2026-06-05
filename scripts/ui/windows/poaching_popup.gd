@@ -27,8 +27,19 @@ func _ready():
 	size = Vector2(600, 500)
 	unresizable = false
 	initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
-	
+
+	# Le X natif d'une Window non-exclusive émet close_requested dont l'action par
+	# défaut est de cacher (visible=false), pas de libérer : tree_exited ne se
+	# déclencherait jamais et _pending_poaching fuiterait. On résout par défaut
+	# « membre conservé » (poaching_ignored) puis on libère pour déclencher le nettoyage.
+	close_requested.connect(_on_close_requested)
+
 	_setup_ui()
+
+func _on_close_requested() -> void:
+	"""Fermeture via le X natif : résolution sûre (membre conservé) + libération."""
+	poaching_ignored.emit()
+	queue_free()
 
 func _setup_ui():
 	"""Configure l'interface utilisateur"""
@@ -310,7 +321,8 @@ func _simulate_counter_offer_response():
 	})
 	
 	if response:
-		# La guilde IA abandonne
+		# La guilde IA abandonne : le membre reste et profite des bénéfices de la contre-offre.
+		_apply_counter_offer_benefits()
 		_show_result("✅ Succès ! La guilde concurrente a abandonné ses tentatives de débauchage.")
 		get_tree().create_timer(3.0).timeout.connect(queue_free)
 	else:

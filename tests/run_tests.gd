@@ -22,6 +22,7 @@ func _run_all() -> void:
 	_suite_simulation_depth(tf)
 	_suite_bank(tf)
 	_suite_balance(tf)
+	_suite_lot2_equilibrage(tf)
 	_suite_advisor(tf)
 	_suite_save(tf)
 	_suite_save_migration(tf)
@@ -30,6 +31,10 @@ func _run_all() -> void:
 	_suite_pve_loop(tf)
 	_suite_activity_manager(tf)
 	_suite_phase(tf)
+	_suite_phase_advance(tf)
+	_suite_phase0_modifiers(tf)
+	_suite_lot1_branchement(tf)
+	_suite_pve_reputation(tf)
 	_suite_random(tf)
 	_suite_recruitment_economy(tf)
 	_suite_recruitment_rework(tf)
@@ -342,6 +347,71 @@ func _suite_balance(tf) -> void:
 	BalanceManager.deserialize(data)
 	tf.eq(BalanceManager.get_difficulty(), BalanceManager.Difficulty.NORMAL, "serialize/deserialize difficulté")
 
+func _suite_lot2_equilibrage(tf) -> void:
+	tf.suite("Lot 2 (équilibrage)")
+	var GuildPerks = load("res://scripts/data/guild_perks_data.gd")
+
+	# --- 1) Cap gold_storage : seuil non cumulatif (le palier le plus haut prime) ---
+	# Au niv 10, le bug additif sommait 8000+9000+40000+200000 = 257000. Avec max()
+	# on garde uniquement le palier le plus élevé débloqué : 200000.
+	tf.ok("gold_storage" in GuildPerks.THRESHOLD_KEYS, "gold_storage marqué comme clé de seuil (non cumulatif)")
+	tf.eq(int(GuildPerks.get_combined_effects(10).get("gold_storage", -1)), 200000,
+		"gold_storage niv 10 = 200000 (palier max, pas la somme)")
+	tf.ok(int(GuildPerks.get_combined_effects(10).get("gold_storage", -1)) != 257000,
+		"gold_storage niv 10 n'est PAS la somme additive 257000")
+	# Au niv 9 : paliers gold_storage débloqués = {8000(niv3), 9000(niv5), 40000(niv8)} -> max 40000.
+	# (additif aurait donné 57000.)
+	tf.eq(int(GuildPerks.get_combined_effects(9).get("gold_storage", -1)), 40000,
+		"gold_storage niv 9 = 40000 (palier niv 8, pas la somme 57000)")
+
+	# --- 2) Cap max_members : autre clé de seuil (base 10, palier niv 5 = 20) ---
+	# Le bug additif donnait 10 + 20 = 30 ; avec max() on garde 20.
+	tf.ok("max_members" in GuildPerks.THRESHOLD_KEYS, "max_members marqué comme clé de seuil (non cumulatif)")
+	tf.eq(int(GuildPerks.get_combined_effects(10).get("max_members", -1)), 20,
+		"max_members niv 10 = 20 (palier max, pas la somme 30)")
+
+	# --- 3) TOTAL_GUILDS lu au runtime : (nb réel de guildes IA + 1), pas une constante 10 ---
+	# On vérifie que BalanceManager._total_guilds() reflète AIGuildManager.ai_guilds.size()+1
+	# en faisant varier le nombre réel de guildes IA (état global restauré ensuite).
+	if AIGuildManager and BalanceManager and BalanceManager.has_method("_total_guilds"):
+		var saved_ai_guilds: Array = AIGuildManager.ai_guilds.duplicate()
+		# 5 guildes IA -> total attendu 6 (et surtout != 10, donc != FALLBACK_TOTAL_GUILDS).
+		var fake_guilds: Array[AIGuild] = []
+		for i in range(5):
+			fake_guilds.append(AIGuild.new("Lot2Guild%d" % i, AIGuild.Strategy.BALANCED, false))
+		AIGuildManager.ai_guilds = fake_guilds
+		tf.eq(BalanceManager._total_guilds(), AIGuildManager.ai_guilds.size() + 1,
+			"_total_guilds = ai_guilds.size()+1 (lu au runtime)")
+		tf.eq(BalanceManager._total_guilds(), 6, "_total_guilds suit le compte réel (5 IA -> 6)")
+		tf.ok(BalanceManager._total_guilds() != BalanceManager.FALLBACK_TOTAL_GUILDS,
+			"_total_guilds n'est pas figé sur la constante de repli (10)")
+
+		# Comportement observable : compute_standing() utilise ce total pour la fraction de rang.
+		# Avec peu de guildes, un rang moyen (3e sur 6) produit une fraction de galère cohérente.
+		var saved_rankings: Array = GuildRanking.server_rankings.duplicate(true) if GuildRanking else []
+		var saved_national: Array = GuildRanking.national_rankings.duplicate(true) if GuildRanking else []
+		var saved_world: Array = GuildRanking.world_rankings.duplicate(true) if GuildRanking else []
+		var saved_phase = PhaseManager.current_phase if PhaseManager else null
+		if GuildRanking and GuildManager and GuildManager.guild and PhaseManager:
+			var gname: String = GuildManager.guild.name
+			PhaseManager.current_phase = PhaseManager.GamePhase.SERVEUR
+			# Joueur 3e sur 6 -> frac = (3-1)/(6-1) = 0.4 -> struggle += 0.4*0.5 = 0.2.
+			GuildRanking.server_rankings = [
+				{"name": "A", "position": 1},
+				{"name": "B", "position": 2},
+				{"name": gname, "position": 3},
+			]
+			var standing: Dictionary = BalanceManager.compute_standing()
+			tf.eq(int(standing.get("rank", 0)), 3, "compute_standing lit le rang joueur (3e)")
+			tf.between(float(standing.get("struggle", -1.0)), 0.0, 1.0, "struggle borné [0,1] avec total runtime")
+			GuildRanking.server_rankings = saved_rankings
+			GuildRanking.national_rankings = saved_national
+			GuildRanking.world_rankings = saved_world
+			PhaseManager.current_phase = saved_phase
+
+		# Restauration de l'état global AIGuildManager.
+		AIGuildManager.ai_guilds = saved_ai_guilds
+
 func _suite_advisor(tf) -> void:
 	tf.suite("AdvisorManager")
 	var advice = AdvisorManager.get_advice()
@@ -519,6 +589,382 @@ func _suite_phase(tf) -> void:
 	tf.ok(PhaseManager._check_requirement_met("national_rank_position", 1, 1), "rang 1 satisfait l'exigence")
 	tf.ok(not PhaseManager._check_requirement_met("national_rank_position", 0, 1), "non classé (rang 0) échoue")
 
+func _suite_phase_advance(tf) -> void:
+	tf.suite("Progression de phase (chemin réel)")
+
+	# Sauvegarde de tout l'état PhaseManager susceptible d'être muté.
+	var saved_phase = PhaseManager.current_phase
+	var saved_heroic: int = PhaseManager.heroic_dungeons_completed
+	# Tache 1.6 : days_at_rank_1 a ete scinde en deux compteurs separes par phase.
+	var saved_server_rank_days: int = PhaseManager.server_days_at_rank_1
+	var saved_national_rank_days: int = PhaseManager.national_days_at_rank_1
+	var saved_phase_progress: Dictionary = PhaseManager.phase_progress.duplicate(true)
+
+	# --- 1) can_advance_phase() est faux quand les requirements ne sont pas remplis ---
+	PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+	PhaseManager.heroic_dungeons_completed = 0
+	tf.ok(not PhaseManager.can_advance_phase(), "can_advance_phase faux sans donjon héroïque")
+
+	# --- 2) Chemin réel Phase 0 -> 1 via complete_heroic_dungeon (pas force_phase_change) ---
+	# complete_heroic_dungeon incrémente le compteur puis, en phase LEVELING, tente
+	# automatiquement la vraie transition (unlock_next_phase -> check_phase_progression).
+	PhaseManager.complete_heroic_dungeon("Donjon Test")
+	tf.eq(PhaseManager.current_phase, PhaseManager.GamePhase.SERVEUR,
+		"clear héroïque fait passer la phase LEVELING -> SERVEUR (transition réelle)")
+
+	# --- 3) Phase >= 1 : SERVEUR -> NATIONAL via unlock_next_phase() (sans debug) ---
+	# On alimente de façon déterministe les vraies sources lues par PhaseManager
+	# (cf. _get_requirement_current_value) : rang serveur, durée au rang 1, effectif
+	# en ligne, intégration moyenne, pourcentage de contenu clear.
+	var can_test_serveur: bool = GuildManager != null and GuildManager.guild != null and GuildRanking != null
+	if can_test_serveur:
+		var guild_name: String = GuildManager.guild.name
+		var saved_members: Array = GuildManager.guild_members.duplicate()
+		var saved_server_rankings: Array = GuildRanking.server_rankings.duplicate(true)
+		var saved_cleared: Dictionary = GuildRanking.player_cleared_content.duplicate(true)
+
+		PhaseManager.current_phase = PhaseManager.GamePhase.SERVEUR
+
+		# server_rank_position = 1 (plus petit = meilleur) : on place la guilde joueur en tête.
+		GuildRanking.server_rankings = [{"name": guild_name, "position": 1}]
+		# server_rank_duration : 14 jours consécutifs au rang 1 (compteur SERVEUR dédié).
+		PhaseManager.server_days_at_rank_1 = 14
+
+		# active_members_min (>=15) + integration_threshold (>=70) : roster temporaire en ligne.
+		var temp_members: Array = []
+		for i in range(16):
+			var tm := SimulatedPlayer.new()
+			tm.nom = "PhaseTest%d" % i
+			tm.is_online = true
+			tm.integration = 100.0
+			temp_members.append(tm)
+		GuildManager.guild_members = temp_members
+
+		# content_cleared_percent (>=80) : on marque tout le contenu disponible comme clear.
+		var available: Dictionary = DungeonData.get_available_instances()
+		var cleared: Dictionary = {}
+		for content_id in available:
+			cleared[content_id] = true
+		GuildRanking.player_cleared_content = cleared
+
+		tf.ok(PhaseManager.can_advance_phase(), "SERVEUR : tous les requirements remplis -> can_advance_phase vrai")
+		var advanced: bool = PhaseManager.unlock_next_phase()
+		tf.ok(advanced, "unlock_next_phase réussit quand les requirements sont remplis")
+		tf.eq(PhaseManager.current_phase, PhaseManager.GamePhase.NATIONAL,
+			"unlock_next_phase fait passer SERVEUR -> NATIONAL (transition réelle)")
+
+		# Restauration des sources externes mutées.
+		GuildManager.guild_members = saved_members
+		GuildRanking.server_rankings = saved_server_rankings
+		GuildRanking.player_cleared_content = saved_cleared
+
+	# Restauration complète de l'état PhaseManager (ne pas polluer les autres suites).
+	PhaseManager.current_phase = saved_phase
+	PhaseManager.heroic_dungeons_completed = saved_heroic
+	PhaseManager.server_days_at_rank_1 = saved_server_rank_days
+	PhaseManager.national_days_at_rank_1 = saved_national_rank_days
+	PhaseManager.phase_progress = saved_phase_progress
+
+func _suite_phase0_modifiers(tf) -> void:
+	tf.suite("Modificateurs Phase 0 (LEVELING)")
+	# Les trois modificateurs de la phase LEVELING (skill_malus, connection_bonus,
+	# tag_reveal_rate) doivent etre OBSERVABLES et DETERMINISTES. On compare donc
+	# systematiquement le comportement en LEVELING vs hors LEVELING (SERVEUR),
+	# toutes choses egales par ailleurs. Etat global PhaseManager restaure en fin.
+	var saved_phase = PhaseManager.current_phase
+
+	# Valeurs de config de reference (source unique : PHASE_CONFIG[LEVELING]).
+	var lvl_config: Dictionary = PhaseManager.get_phase_config(PhaseManager.GamePhase.LEVELING)
+	var cfg_skill_malus: float = float(lvl_config.get("skill_malus", 0.0))
+	var cfg_connection_bonus: float = float(lvl_config.get("connection_bonus", 0.0))
+	var cfg_tag_reveal_rate: float = float(lvl_config.get("tag_reveal_rate", 1.0))
+	tf.ok(cfg_skill_malus > 0.0, "config LEVELING expose un skill_malus > 0")
+	tf.ok(cfg_connection_bonus > 0.0, "config LEVELING expose un connection_bonus > 0")
+	tf.ok(cfg_tag_reveal_rate < 1.0, "config LEVELING expose un tag_reveal_rate < 1")
+
+	# --- 1) skill_malus : reduit le skill effectif en LEVELING, neutre en SERVEUR ---
+	var sp := SimulatedPlayer.new()
+	sp.skill = 80
+	PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+	var eff_leveling: float = sp.get_effective_skill()
+	tf.ok(eff_leveling < float(sp.skill), "LEVELING : get_effective_skill < skill brut (malus applique)")
+	# Valeur derivee du MEME chemin de config (pas un nombre code en dur perime).
+	tf.approx(eff_leveling, float(sp.skill) * (1.0 - cfg_skill_malus),
+		"LEVELING : skill effectif = skill * (1 - skill_malus)", 0.001)
+	PhaseManager.current_phase = PhaseManager.GamePhase.SERVEUR
+	var eff_serveur: float = sp.get_effective_skill()
+	tf.eq(eff_serveur, float(sp.skill), "SERVEUR : get_effective_skill == skill brut (pas de malus)")
+	tf.ok(eff_leveling < eff_serveur, "skill effectif LEVELING < skill effectif SERVEUR (meme membre)")
+
+	# --- 2) connection_bonus : applique en LEVELING, nul hors LEVELING ---
+	# Source deterministe : behavior_system._get_leveling_connection_bonus() est lu
+	# par _get_connection_chance (final_prob *= 1.0 + bonus). On evite le hasard de
+	# _get_connection_chance (variance/jitter) en testant ce facteur directement.
+	var bs = GuildManager.behavior_system if GuildManager else null
+	if bs and bs.has_method("_get_leveling_connection_bonus"):
+		PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+		var bonus_leveling: float = bs._get_leveling_connection_bonus()
+		tf.approx(bonus_leveling, cfg_connection_bonus,
+			"LEVELING : bonus de connexion = connection_bonus de la config", 0.001)
+		# Observable : le facteur applique (1 + bonus) augmente bien la chance de connexion.
+		tf.ok((1.0 + bonus_leveling) > 1.0, "LEVELING : (1 + connection_bonus) > 1 (presence accrue)")
+		PhaseManager.current_phase = PhaseManager.GamePhase.SERVEUR
+		var bonus_serveur: float = bs._get_leveling_connection_bonus()
+		tf.eq(bonus_serveur, 0.0, "SERVEUR : aucun bonus de connexion de phase")
+		tf.ok(bonus_leveling > bonus_serveur,
+			"chance de connexion en LEVELING > hors LEVELING (toutes choses egales)")
+	else:
+		tf.ok(false, "behavior_system._get_leveling_connection_bonus introuvable")
+
+	# --- 3) tag_reveal_rate : moins de tags reveles en LEVELING qu'en phase superieure ---
+	# get_revealed_tags_count() est DETERMINISTE (aucun hasard) : en LEVELING il borne
+	# le nombre de tags visibles au budget (= round(total * tag_reveal_rate)) ; hors
+	# LEVELING il retourne le nombre complet de tags visibles.
+	var tagged := SimulatedPlayer.new()
+	tagged.tags_comportement = [
+		"ambitieux", "social", "perfectionniste", "ponctuel", "serviable",
+		"tryhard", "casual", "hardcore_gamer", "nocturne", "diurne",
+	]
+	tagged.tags_caches = []
+	var total_tags: int = tagged.tags_comportement.size() + tagged.tags_caches.size()
+	var expected_budget: int = maxi(1, int(round(float(total_tags) * cfg_tag_reveal_rate)))
+
+	PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+	var revealed_leveling: int = tagged.get_revealed_tags_count()
+	PhaseManager.current_phase = PhaseManager.GamePhase.SERVEUR
+	var revealed_serveur: int = tagged.get_revealed_tags_count()
+
+	tf.eq(revealed_serveur, tagged.tags_comportement.size(),
+		"SERVEUR : tous les tags visibles sont reveles (pas de bride)")
+	tf.eq(revealed_leveling, expected_budget,
+		"LEVELING : nombre de tags reveles = budget round(total * tag_reveal_rate)")
+	tf.ok(revealed_leveling < revealed_serveur,
+		"LEVELING : moins de tags reveles qu'en phase superieure (a tags egaux)")
+
+	# Restauration de l'etat global PhaseManager.
+	PhaseManager.current_phase = saved_phase
+
+func _suite_lot1_branchement(tf) -> void:
+	tf.suite("Lot 1 (branchement)")
+
+	# --- 1) Garde is_player : remove_member est un no-op sur le personnage joueur ---
+	var saved_members_guard: Array = GuildManager.guild_members.duplicate()
+	var protege := SimulatedPlayer.new()
+	protege.nom = "Lot1Protege"
+	protege.set_meta("is_player", true)
+	GuildManager.guild_members.append(protege)
+	GuildManager.remove_member(protege)
+	tf.ok(GuildManager.guild_members.has(protege), "garde is_player : remove_member ignore le personnage joueur")
+	# Restauration de l'etat roster.
+	GuildManager.guild_members = saved_members_guard
+
+	# --- 2) Effet injured : bloque raid et dungeon, can_perform_action faux ---
+	var injured_def = EffectsData.get_effect_by_id("injured")
+	tf.ok(injured_def != null, "definition de l'effet injured disponible")
+	var blesse := SimulatedPlayer.new()
+	blesse.nom = "Lot1Blesse"  # nom unique -> target_id "player_Lot1Blesse" isole
+	var sain := SimulatedPlayer.new()
+	sain.nom = "Lot1Sain"
+	tf.ok(sain.can_perform_action("raid"), "membre sain peut faire un raid")
+	tf.ok(sain.can_perform_action("dungeon"), "membre sain peut faire un donjon")
+	if injured_def != null:
+		EffectSystem.apply_effect(blesse, injured_def, "test")
+		tf.ok(not blesse.can_perform_action("raid"), "injured bloque le raid")
+		tf.ok(not blesse.can_perform_action("dungeon"), "injured bloque le donjon")
+		# Nettoyage : retirer l'effet du membre blesse (etat global EffectSystem).
+		EffectSystem.clear_effects(blesse)
+		tf.ok(blesse.can_perform_action("raid"), "raid re-autorise apres retrait de l'effet")
+
+	# --- 3) Effets consommes sans regression (pas d'effet -> getter brut) ---
+	var fresh_guild := Guild.new()
+	tf.approx(fresh_guild.get_effective_raid_success_bonus(), fresh_guild.get_raid_success_bonus(),
+		"sans effet : bonus de raid effectif == getter brut")
+	var fresh_player := SimulatedPlayer.new()
+	fresh_player.skill = 64
+	# Sans effet EffectSystem, get_modified_skill() doit egaler sa base (skill
+	# effectif = skill brut + malus de phase eventuel), pas le skill brut : le
+	# malus de phase (skill_malus en LEVELING) est applique dans get_effective_skill
+	# et ne traduit PAS un effet EffectSystem. On compare donc a la base attendue,
+	# tronquee en int comme le fait le getter, pour rester deterministe quelle que
+	# soit la phase active.
+	tf.eq(fresh_player.get_modified_skill(), int(fresh_player.get_effective_skill()),
+		"sans effet : skill modifie == skill effectif (base, sans modif EffectSystem)")
+	# Avec un lucky_streak actif, le bonus de raid effectif depasse la base.
+	var lucky_def = EffectsData.get_effect_by_id("lucky_streak")
+	if lucky_def != null:
+		var lucky_guild := Guild.new()
+		lucky_guild.name = "Lot1LuckyGuild"  # nom unique -> target_id "guild_Lot1LuckyGuild" isole
+		var base_bonus: float = lucky_guild.get_raid_success_bonus()
+		EffectSystem.apply_effect(lucky_guild, lucky_def, "test")
+		tf.ok(lucky_guild.get_effective_raid_success_bonus() > base_bonus,
+			"lucky_streak actif augmente le bonus de raid effectif")
+		EffectSystem.clear_effects(lucky_guild)
+
+	# --- 4) Signal gold_changed : add_gold/spend_gold emettent, set_gold idempotent non ---
+	var signal_guild := Guild.new()  # niveau 1 -> stockage 0 -> tresorerie non plafonnee
+	var changes: Array = []
+	var on_changed := func(old_gold: int, new_gold: int) -> void:
+		changes.append({"old": old_gold, "new": new_gold})
+	signal_guild.gold_changed.connect(on_changed)
+	signal_guild.set_gold(200)
+	tf.eq(changes.back(), {"old": 0, "new": 200}, "set_gold initial emet gold_changed (0 -> 200)")
+	changes.clear()
+	signal_guild.add_gold(100)
+	tf.eq(changes.back(), {"old": 200, "new": 300}, "add_gold emet gold_changed (200 -> 300)")
+	changes.clear()
+	tf.ok(signal_guild.spend_gold(50), "spend_gold reussit quand l'or suffit")
+	tf.eq(changes.back(), {"old": 300, "new": 250}, "spend_gold emet gold_changed (300 -> 250)")
+	changes.clear()
+	signal_guild.set_gold(250)  # meme valeur
+	tf.eq(changes.size(), 0, "set_gold a la meme valeur n'emet pas gold_changed")
+	signal_guild.gold_changed.disconnect(on_changed)
+
+	# --- 5) Compteurs days_at_rank_1 separes + gate par phase de _update_rank_duration ---
+	tf.eq(typeof(PhaseManager.server_days_at_rank_1), TYPE_INT, "champ server_days_at_rank_1 existe (int)")
+	tf.eq(typeof(PhaseManager.national_days_at_rank_1), TYPE_INT, "champ national_days_at_rank_1 existe (int)")
+	if GuildManager and GuildManager.guild and GuildRanking:
+		var saved_phase_r = PhaseManager.current_phase
+		var saved_server_r: int = PhaseManager.server_days_at_rank_1
+		var saved_national_r: int = PhaseManager.national_days_at_rank_1
+		var saved_server_rk: Array = GuildRanking.server_rankings.duplicate(true)
+		var saved_national_rk: Array = GuildRanking.national_rankings.duplicate(true)
+		var gname: String = GuildManager.guild.name
+
+		# Phase SERVEUR au rang 1 : seul le compteur serveur progresse.
+		PhaseManager.current_phase = PhaseManager.GamePhase.SERVEUR
+		PhaseManager.server_days_at_rank_1 = 0
+		PhaseManager.national_days_at_rank_1 = 0
+		GuildRanking.server_rankings = [{"name": gname, "position": 1}]
+		GuildRanking.national_rankings = [{"name": gname, "position": 1}]
+		PhaseManager._update_rank_duration()
+		tf.eq(PhaseManager.server_days_at_rank_1, 1, "phase SERVEUR : compteur serveur incremente")
+		tf.eq(PhaseManager.national_days_at_rank_1, 0, "phase SERVEUR : compteur national inchange")
+
+		# Phase NATIONAL au rang 1 : seul le compteur national progresse.
+		PhaseManager.current_phase = PhaseManager.GamePhase.NATIONAL
+		PhaseManager.server_days_at_rank_1 = 0
+		PhaseManager.national_days_at_rank_1 = 0
+		PhaseManager._update_rank_duration()
+		tf.eq(PhaseManager.national_days_at_rank_1, 1, "phase NATIONAL : compteur national incremente")
+		tf.eq(PhaseManager.server_days_at_rank_1, 0, "phase NATIONAL : compteur serveur inchange")
+
+		# Phase LEVELING : aucun compteur ne progresse (gate).
+		PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+		PhaseManager.server_days_at_rank_1 = 0
+		PhaseManager.national_days_at_rank_1 = 0
+		PhaseManager._update_rank_duration()
+		tf.eq(PhaseManager.server_days_at_rank_1, 0, "phase LEVELING : compteur serveur reste a 0")
+		tf.eq(PhaseManager.national_days_at_rank_1, 0, "phase LEVELING : compteur national reste a 0")
+
+		# Restauration de l'etat PhaseManager / GuildRanking.
+		PhaseManager.current_phase = saved_phase_r
+		PhaseManager.server_days_at_rank_1 = saved_server_r
+		PhaseManager.national_days_at_rank_1 = saved_national_r
+		GuildRanking.server_rankings = saved_server_rk
+		GuildRanking.national_rankings = saved_national_rk
+
+	# --- 6a) Round-trip membre : scheduled_absences conservees (SaveManager) ---
+	var with_abs := SimulatedPlayer.new()
+	with_abs.nom = "Lot1Absences"
+	with_abs.scheduled_absences = [
+		{"event": "vacances", "start_day": 12, "duration_days": 3},
+		{"event": "exam", "start_day": 30, "duration_days": 1},
+	]
+	var abs_data: Dictionary = SaveManager._serialize_player(with_abs)
+	var with_abs2 := SimulatedPlayer.new()
+	SaveManager._deserialize_player(with_abs2, abs_data)
+	tf.eq(with_abs2.scheduled_absences.size(), 2, "round-trip : 2 absences planifiees conservees")
+	if with_abs2.scheduled_absences.size() == 2:
+		tf.eq(int(with_abs2.scheduled_absences[0].get("start_day", -1)), 12, "round-trip : start_day de l'absence conserve")
+		tf.eq(int(with_abs2.scheduled_absences[0].get("duration_days", -1)), 3, "round-trip : duration_days de l'absence conserve")
+
+	# --- 6b) Round-trip effet actif (SaveManager._serialize/_deserialize_effects) ---
+	# Etat global EffectSystem + roster sauvegardes puis restaures (operation destructive).
+	# Duplicate non profond : on conserve les instances d'effets telles quelles (les
+	# Callables de signaux restent valides), seule la table de mapping est copiee.
+	var saved_active_effects: Dictionary = EffectSystem.active_effects.duplicate(false)
+	var saved_members_fx: Array = GuildManager.guild_members.duplicate()
+	if injured_def != null:
+		var fx_member := SimulatedPlayer.new()
+		fx_member.nom = "Lot1EffetRoundTrip"
+		GuildManager.guild_members = [fx_member]  # _deserialize_effects resout les cibles joueur par nom
+		EffectSystem.active_effects.clear()
+		EffectSystem.apply_effect(fx_member, injured_def, "test")
+		tf.ok(fx_member.has_effect("injured"), "effet injured applique avant serialisation")
+		var fx_data: Dictionary = SaveManager._serialize_effects()
+		EffectSystem.active_effects.clear()
+		tf.ok(not fx_member.has_effect("injured"), "etat effets vide apres clear")
+		SaveManager._deserialize_effects(fx_data)
+		tf.ok(fx_member.has_effect("injured"), "round-trip : effet injured restaure apres reload")
+	# Restauration de l'etat global.
+	EffectSystem.active_effects = saved_active_effects
+	GuildManager.guild_members = saved_members_fx
+
+	# --- 6c) load_phase_data n'ecrase pas un achievement existant ---
+	var saved_phase_pp = PhaseManager.current_phase
+	var saved_pp: Dictionary = PhaseManager.phase_progress.duplicate(true)
+	PhaseManager.current_phase = PhaseManager.GamePhase.LEVELING
+	PhaseManager.add_achievement("Lot1 Achievement", "marqueur de test")
+	# duplicate(true) : save_phase_data() renvoie le dict phase_progress LIVE ; on en
+	# prend une copie profonde pour simuler une vraie sauvegarde (JSON coupe les refs)
+	# avant de muter l'etat en memoire.
+	var phase_blob: Dictionary = PhaseManager.save_phase_data().duplicate(true)
+	# Simuler une perte d'etat en memoire avant rechargement.
+	PhaseManager.phase_progress[PhaseManager.GamePhase.LEVELING]["achievements"] = []
+	PhaseManager.load_phase_data(phase_blob)
+	var lvl_achievements: Array = PhaseManager.get_achievements_for_phase(PhaseManager.GamePhase.LEVELING)
+	var found_marker: bool = false
+	for ach in lvl_achievements:
+		if ach is Dictionary and String(ach.get("name", "")) == "Lot1 Achievement":
+			found_marker = true
+	tf.ok(found_marker, "load_phase_data conserve l'achievement existant (pas d'ecrasement)")
+	# Restauration complete de l'etat PhaseManager.
+	PhaseManager.current_phase = saved_phase_pp
+	PhaseManager.phase_progress = saved_pp
+
+func _suite_pve_reputation(tf) -> void:
+	tf.suite("Réputation PvE (succès de raid)")
+	# Test unitaire déterministe au niveau Guild : pas de dépendance aux autoloads.
+	var g = Guild.new()
+	g.reputation = 50.0
+
+	# Un succès de raid accorde de la réputation.
+	g.on_raid_success("Coeur du Magma", "Normal")
+	tf.ok(g.reputation > 50.0, "on_raid_success augmente la réputation")
+	var after_success: float = g.reputation
+
+	# Un succès héroïque accorde plus qu'un succès normal.
+	var g_normal = Guild.new()
+	g_normal.reputation = 50.0
+	g_normal.on_raid_success("Coeur du Magma", "Normal")
+	var g_heroic = Guild.new()
+	g_heroic.reputation = 50.0
+	g_heroic.on_raid_success("Coeur du Magma", "Héroïque")
+	tf.ok(g_heroic.reputation > g_normal.reputation, "un succès héroïque rapporte plus qu'un succès normal")
+
+	# Un server first accorde de la réputation.
+	g.on_server_first("Premier kill de Ragnaros")
+	tf.ok(g.reputation > after_success, "on_server_first augmente la réputation")
+
+	# Réputation bornée à 100 (ne dépasse jamais le maximum).
+	g.reputation = 98.0
+	g.on_server_first("Autre exploit")
+	tf.between(g.reputation, 0.0, 100.0, "réputation bornée [0,100] après gain")
+	tf.eq(g.reputation, 100.0, "le gain de réputation est plafonné à 100")
+
+	# Un échec de raid répété fait baisser la réputation.
+	var g_fail = Guild.new()
+	g_fail.reputation = 60.0
+	g_fail.on_raid_failure("Coeur du Magma", 12)  # >= 10 wipes -> pénalité
+	tf.ok(g_fail.reputation < 60.0, "on_raid_failure (échec répété) fait baisser la réputation")
+	tf.between(g_fail.reputation, 0.0, 60.0, "la baisse de réputation reste bornée (>= 0)")
+
+	# Réputation bornée à 0 (ne descend jamais sous le minimum).
+	g_fail.reputation = 1.0
+	g_fail.on_raid_failure("Coeur du Magma", 12)
+	tf.between(g_fail.reputation, 0.0, 100.0, "réputation bornée [0,100] après perte")
+	tf.eq(g_fail.reputation, 0.0, "la perte de réputation est plancher à 0")
+
 # --- Nouvelles suites (audit AuditAmeliorations.md) ---
 
 func _suite_save_migration(tf) -> void:
@@ -568,14 +1014,27 @@ func _suite_pve_loop(tf) -> void:
 	tf.ok(inst_bad._check_group_composition(comp_required) < 1.0, "composition sans tank = pénalité")
 
 	# Chance de réussite : bornée [0.1, 0.95], et un groupe fort > un groupe faible.
+	# NOTE (Tache 1.8) : _calculate_boss_success_chance lit desormais get_modified_skill
+	# -> get_effective_skill, donc le skill_malus de la phase LEVELING (phase par defaut
+	# en test) influence le score. On ne code donc PAS de valeur magique dependante du
+	# skill brut : on verifie des bornes + un comparatif (robuste face au malus) et la
+	# REPRODUCTIBILITE a graine fixe.
 	var strong = DI.new()
 	strong.initialize("deadmines", _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 40, 90))
 	var weak = DI.new()
 	weak.initialize("deadmines", _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 15, 20))
+	GameRandom.seed_rng(424242)
 	var sc_strong: float = strong._calculate_boss_success_chance(1.0)
 	var sc_weak: float = weak._calculate_boss_success_chance(1.0)
 	tf.between(sc_strong, 0.1, 0.95, "chance de réussite bornée")
 	tf.ok(sc_strong > sc_weak, "groupe fort a une meilleure chance que groupe faible")
+	# Reproductibilite : meme graine -> meme resultat (le calcul passe par get_effective_skill).
+	GameRandom.seed_rng(424242)
+	var sc_strong_again: float = strong._calculate_boss_success_chance(1.0)
+	var sc_weak_again: float = weak._calculate_boss_success_chance(1.0)
+	tf.approx(sc_strong_again, sc_strong, "chance de réussite reproductible (groupe fort, même graine)", 0.0001)
+	tf.approx(sc_weak_again, sc_weak, "chance de réussite reproductible (groupe faible, même graine)", 0.0001)
+	GameRandom.randomize_rng()
 
 	# Connaissance de donjon : un clear l'incrémente (familiarité progressive).
 	var grp = _make_group(["Tank", "Healer", "DPS", "DPS", "DPS"], 30, 70)
@@ -832,6 +1291,9 @@ func _suite_ui_smoke(tf) -> void:
 	var inspector: Control = inspector_script.new()
 	add_child(inspector)
 	tf.ok(is_instance_valid(inspector), "MemberInspector s'instancie sans crash")
+	var equipment_label: Label = inspector.get("_equipment_label")
+	tf.ok(equipment_label != null and equipment_label.custom_minimum_size.x >= 160.0,
+		"MemberInspector garde une colonne equipement lisible")
 	if GuildManager and not GuildManager.guild_members.is_empty():
 		var member: SimulatedPlayer = GuildManager.guild_members[0]
 		GuildManager.select_member(member, "test")
@@ -851,11 +1313,25 @@ func _suite_ui_smoke(tf) -> void:
 	remove_child(menu)
 	menu.free()
 
+	var tabs: AdvancedTabs = AdvancedTabs.create_simple_tabs(self)
+	var tab_panel := PanelContainer.new()
+	tabs.add_tab("Layout", tab_panel, false)
+	tf.eq(tab_panel.anchor_right, 1.0, "AdvancedTabs ancre le contenu en largeur")
+	tf.eq(tab_panel.anchor_bottom, 1.0, "AdvancedTabs ancre le contenu en hauteur")
+	tf.ok(tab_panel.clip_contents, "AdvancedTabs clippe le contenu d'onglet")
+	remove_child(tabs)
+	tabs.free()
+
 	var hub_scene: PackedScene = load("res://scenes/Hub_Guilde.tscn")
 	var hub: Control = hub_scene.instantiate()
 	add_child(hub)
 	tf.ok(is_instance_valid(hub), "Hub_Guilde s'instancie sans crash")
 	tf.ok(hub.get("advanced_tabs") != null, "Hub_Guilde construit ses sections")
+	var guild_tabs: AdvancedTabs = hub.get("advanced_tabs")
+	var roster_content: Control = guild_tabs.get_tab_data(0).get("content", null)
+	var metric_value: Label = _find_wide_metric_value_label(roster_content)
+	tf.ok(metric_value != null,
+		"Hub_Guilde garde les valeurs de metriques lisibles")
 	tf.ok(hub.call("select_section", "equipment"), "Hub_Guilde selectionne une section par id")
 	remove_child(hub)
 	hub.free()
@@ -1330,6 +1806,19 @@ func _chat_load_json(path: String) -> Dictionary:
 	var d: Variant = JSON.parse_string(f.get_as_text())
 	f.close()
 	return d if d is Dictionary else {}
+
+func _find_wide_metric_value_label(node: Node) -> Label:
+	if node == null:
+		return null
+	if node is Label:
+		var label := node as Label
+		if label.text.contains("/") and label.custom_minimum_size.x >= 160.0:
+			return label
+	for child in node.get_children():
+		var found := _find_wide_metric_value_label(child)
+		if found != null:
+			return found
+	return null
 
 func _chat_check_cons(cons: Variant, known_axes: Array, known_curves: Array, known_kinds: Array) -> int:
 	if not (cons is Array):

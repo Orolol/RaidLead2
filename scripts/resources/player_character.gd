@@ -368,9 +368,11 @@ func gain_experience(amount: int) -> void:
 		print("LEVEL UP! %s est maintenant niveau %d" % [nom, personnage_niveau])
 
 func add_session_gold(amount: int) -> void:
-	"""Ajoute de l'or gagné durant la session"""
+	"""Ajoute de l'or gagné durant la session (compteur de session uniquement).
+	La vraie source de vérité de l'or de la guilde est Guild.gold : l'appelant
+	(ActivityManager) crédite Guild.add_gold() en parallèle. On n'incrémente plus
+	or_actuel ici (ancienne double source de vérité morte qui double-comptait le farming)."""
 	session_gold_gained += amount
-	or_actuel += amount
 
 # Override des méthodes de connexion automatique pour les désactiver
 func should_connect(game_time: Node) -> bool:

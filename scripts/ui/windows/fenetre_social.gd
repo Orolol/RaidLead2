@@ -4,8 +4,10 @@ extends PanelContainer
 ## team-building, traditions et gestion des conflits.
 ## Branchée sur GuildCultureManager (autoload), qui pilote SocialDynamics.
 
-const ACCENT := Color(0.30, 0.64, 0.96)
-const DIM := Color(0.62, 0.65, 0.71)
+# Palette : ACCENT/DIM dérivés de UITheme (source canonique). GOLD/GREEN/RED
+# n'ont pas d'équivalent exact dans UITheme et restent littéraux.
+const ACCENT := UITheme.ACCENT
+const DIM := UITheme.TEXT_DIM
 const GOLD := Color(1.0, 0.82, 0.30)
 const GREEN := Color(0.55, 0.82, 0.55)
 const RED := Color(0.88, 0.45, 0.45)

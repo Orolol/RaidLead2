@@ -88,6 +88,8 @@ func _setup_ui() -> void:
 
 	# Zone de contenu
 	tab_content = Control.new()
+	tab_content.clip_contents = true
+	tab_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tab_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main_vbox.add_child(tab_content)
 
@@ -148,6 +150,7 @@ func add_tab(title: String, content: Control, closable: bool = true, icon: Textu
 	
 	# Ajouter le contenu (caché par défaut)
 	tab_content.add_child(content)
+	_fit_content_to_tab(content)
 	content.visible = false
 	
 	# Sélectionner le premier onglet
@@ -358,6 +361,19 @@ func _update_tab_element(index: int) -> void:
 			badge.visible = true
 		else:
 			badge.visible = false
+
+func _fit_content_to_tab(content: Control) -> void:
+	"""Force chaque contenu d'onglet à remplir sa zone et à rester clippé."""
+	if not is_instance_valid(content):
+		return
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 0
+	content.offset_top = 0
+	content.offset_right = 0
+	content.offset_bottom = 0
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.clip_contents = true
 
 func _update_all_tabs() -> void:
 	"""Met à jour tous les onglets"""

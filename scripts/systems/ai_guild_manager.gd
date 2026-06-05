@@ -198,29 +198,37 @@ func _attempt_poaching_by_guild(source_guild: AIGuild) -> void:
 			_process_successful_poaching_between_ai(result, source_guild, target_guild)
 
 func _process_successful_poaching_from_player(result: Dictionary, source_guild: AIGuild) -> void:
-	"""Traite un débauchage réussi depuis la guilde du joueur"""
-	var target_member = result.target
-	var offer = result.offer
+	"""Signale une tentative de débauchage visant la guilde du joueur.
 
-	# Calculer la probabilité que le membre accepte vraiment de partir
-	var leave_probability: float = _calculate_member_leave_probability(target_member, offer)
-	
-	if randf() < leave_probability:
-		# Le membre part réellement
-		if GuildManager:
-			GuildManager.remove_member(target_member)
-		
-		# Ajouter un membre similaire à la guilde IA
-		_add_recruited_member_to_ai_guild(source_guild, target_member)
-		
-		GameLog.d("🔄 %s a débauché %s de notre guilde !" % [source_guild.name, target_member.nom])
-		poaching_attempt.emit(target_member, source_guild, true)
-	else:
-		GameLog.d("🛡️ %s a tenté de débaucher %s, mais il a refusé" % [source_guild.name, target_member.nom])
-		poaching_attempt.emit(target_member, source_guild, false)
-		
-		# Le membre gagne en loyauté après avoir refusé
-		target_member.integration = min(100.0, target_member.integration + 5.0)
+	La décision (laisser partir / contre-offre / ignorer) appartient au joueur :
+	on émet `poaching_attempt(..., true)` AVANT toute mutation. Le membre reste
+	dans la guilde jusqu'à ce que le PoachingHandler/popup résolve le sort réel
+	(retrait + ajout IA uniquement si le membre part vraiment). Le calcul final
+	de la probabilité de départ se fait donc en aval de la décision joueur."""
+	var target_member = result.target
+
+	GameLog.d("⚠️ %s tente de débaucher %s — décision du joueur attendue" % [source_guild.name, target_member.nom])
+	# Aucune mutation ici : pas de remove_member, pas d'ajout à la guilde IA.
+	poaching_attempt.emit(target_member, source_guild, true)
+
+func finalize_poaching_departure(target_member, source_guild: AIGuild) -> void:
+	"""Effectue le départ RÉEL d'un membre débauché (appelé par PoachingHandler).
+
+	N'agit que si le membre est encore dans la guilde du joueur : retrait via
+	GuildManager (départ involontaire) puis ajout d'un clone à la guilde IA source.
+	Idempotent : un membre déjà parti (fantôme) n'est pas retraité."""
+	if target_member == null or source_guild == null:
+		return
+	if not GuildManager or target_member not in GuildManager.guild_members:
+		return
+
+	GuildManager.remove_member(target_member, false)
+	_add_recruited_member_to_ai_guild(source_guild, target_member)
+	GameLog.d("🔄 %s a débauché %s de notre guilde !" % [source_guild.name, target_member.nom])
+
+func get_member_leave_probability(member, offer: Dictionary) -> float:
+	"""Expose le calcul de probabilité de départ côté IA pour la décision différée."""
+	return _calculate_member_leave_probability(member, offer)
 
 func _calculate_member_leave_probability(member, offer: Dictionary) -> float:
 	"""Calcule la probabilité qu'un membre accepte une offre de débauchage"""

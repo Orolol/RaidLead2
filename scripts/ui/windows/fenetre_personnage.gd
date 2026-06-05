@@ -22,6 +22,11 @@ var requirements_container: VBoxContainer
 var achievements_list: ItemList
 var pve_best_clear_label: Label
 var pve_run_history_list: ItemList
+var advance_phase_button: Button
+# Dialog de confirmation d'avance de phase actuellement affiché. Évite d'empiler des
+# dialogs identiques quand phase_requirements_met est ré-émis (tick hebdo) alors que le
+# joueur temporise avec « Plus tard ».
+var _advance_dialog: ConfirmDialog = null
 
 # Éléments de réputation
 var reputation_value_label: Label
@@ -37,6 +42,9 @@ var energy_label: Label
 var mood_label: Label
 var session_label: Label
 var _state_signal_connected: bool = false
+# Référence au joueur actuellement connecté à player_state_changed. Permet de
+# déconnecter proprement l'ancien objet quand un chargement de save le remplace.
+var _connected_player = null
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -274,11 +282,17 @@ func _setup_phase_progression_tab() -> void:
 
 	phase_header.add_spacer(false)
 
+	advance_phase_button = Button.new()
+	advance_phase_button.text = "Passer à la phase suivante"
+	advance_phase_button.disabled = true
+	advance_phase_button.pressed.connect(_on_advance_phase_pressed)
+	phase_header.add_child(advance_phase_button)
+
 	var refresh_button: Button = Button.new()
 	refresh_button.text = "Actualiser"
 	refresh_button.pressed.connect(_refresh_phase_progression)
 	phase_header.add_child(refresh_button)
-	
+
 	progress_tab.add_child(HSeparator.new())
 	
 	# Container pour le contenu de progression
@@ -370,6 +384,9 @@ func _notification(what: int) -> void:
 	# On rafraîchit seulement à l'ouverture/apparition de la fenêtre.
 	if what == NOTIFICATION_VISIBILITY_CHANGED and visible:
 		update_character_info()
+		# Le bouton d'avance n'est recalculé que sur les ticks hebdo / signaux : si les
+		# requirements sont devenus satisfaits fenêtre fermée, le réactiver à l'ouverture.
+		_update_advance_phase_button()
 
 func _on_member_leveled_up(player: SimulatedPlayer, _new_level: int) -> void:
 	"""Rafraîchit l'affichage dès qu'un membre monte de niveau (joueur compris)."""
@@ -380,12 +397,26 @@ func _on_member_leveled_up(player: SimulatedPlayer, _new_level: int) -> void:
 	if player == guild_manager.get_player_character():
 		update_character_info()
 
+func reconnect_to_current_player() -> void:
+	"""Après un chargement de save, GuildManager.player_character est un NOUVEL objet.
+	Le garde _state_signal_connected pointait sur l'ancien (orphelin) : on déconnecte
+	proprement, on réarme le garde, puis update_character_info() se reconnecte au
+	joueur courant et rafraîchit l'affichage."""
+	if _connected_player and is_instance_valid(_connected_player) \
+			and _connected_player.has_signal("player_state_changed") \
+			and _connected_player.player_state_changed.is_connected(update_character_info):
+		_connected_player.player_state_changed.disconnect(update_character_info)
+	_connected_player = null
+	_state_signal_connected = false
+	update_character_info()
+	_refresh_phase_progression()
+
 func update_character_info() -> void:
 	"""Met à jour les informations du personnage joueur"""
 	var guild_manager = GuildManager
 	if not guild_manager:
 		return
-	
+
 	var player = guild_manager.get_player_character()
 	if not player:
 		return
@@ -399,6 +430,7 @@ func update_character_info() -> void:
 	# Rafraîchissement temps réel piloté par le signal d'état du joueur (énergie/activité)
 	if not _state_signal_connected and player.has_signal("player_state_changed"):
 		player.player_state_changed.connect(update_character_info)
+		_connected_player = player
 		_state_signal_connected = true
 
 	# Activité courante
@@ -483,9 +515,31 @@ func _refresh_phase_progression() -> void:
 	
 	# Mettre à jour les achievements
 	_update_achievements_display()
-	
+
 	# Mettre à jour l'historique PvE
 	_update_pve_run_history_display()
+
+	# Mettre à jour l'état du bouton d'avance de phase
+	_update_advance_phase_button()
+
+func _update_advance_phase_button() -> void:
+	"""Active le bouton d'avance de phase uniquement si la phase peut avancer.
+
+	Lecture PURE via can_advance_phase() (aucun effet de bord), donc sûre à appeler
+	à chaque rafraîchissement ou réception de signal."""
+	if advance_phase_button == null:
+		return
+	if not PhaseManager:
+		advance_phase_button.disabled = true
+		return
+	advance_phase_button.disabled = not PhaseManager.can_advance_phase()
+
+func _on_advance_phase_pressed() -> void:
+	"""Tente de passer à la phase suivante (action explicite du joueur)."""
+	if not PhaseManager:
+		return
+	if PhaseManager.unlock_next_phase():
+		_refresh_phase_progression()
 
 func _update_requirements_display() -> void:
 	"""Met à jour l'affichage des requirements"""
@@ -801,14 +855,55 @@ func _on_progression_updated(_phase, _progress: Dictionary) -> void:
 
 func _on_requirements_met(phase) -> void:
 	"""Réagit quand tous les requirements sont satisfaits"""
-	if visible:
-		var popup: AcceptDialog = AcceptDialog.new()
-		popup.dialog_text = "🎉 FÉLICITATIONS !\n\nTous les objectifs de la phase %s sont remplis !\nVous pouvez maintenant passer à la phase suivante." % PhaseManager.get_phase_name(phase)
-		get_tree().root.add_child(popup)
-		popup.popup_centered()
-		popup.confirmed.connect(popup.queue_free)
-		
+	# Toujours synchroniser l'état du bouton, même fenêtre cachée.
+	_update_advance_phase_button()
+
+	if not visible:
+		return
+
+	# Anti-empilement : phase_requirements_met est ré-émis périodiquement (tick hebdo).
+	# Si un dialog est déjà ouvert (joueur qui temporise), ne pas en créer un second.
+	if is_instance_valid(_advance_dialog):
 		_refresh_phase_progression()
+		return
+
+	# Décision produit : avance MANUELLE. On propose un vrai dialog de confirmation
+	# (et non un simple AcceptDialog informatif) qui déclenche réellement l'avance.
+	var dialog := ConfirmDialog.new()
+	# auto_close_on_action désactivé : on pilote nous-mêmes le cycle de vie du dialog
+	# (queue_free) pour éviter une course entre le tween de fermeture et queue_free().
+	dialog.auto_close_on_action = false
+	dialog.set_dialog_data(
+		"Phase terminée !",
+		"🎉 Félicitations !\n\nTous les objectifs de la phase %s sont remplis.\nVoulez-vous passer à la phase suivante maintenant ?" % PhaseManager.get_phase_name(phase),
+		ConfirmDialog.DialogType.SUCCESS
+	)
+	dialog.confirm_text = "Passer à la phase suivante"
+	dialog.cancel_text = "Plus tard"
+	dialog.confirmed.connect(_on_advance_phase_confirmed.bind(dialog))
+	dialog.cancelled.connect(_on_advance_dialog_dismissed.bind(dialog))
+	dialog.closed.connect(_on_advance_dialog_dismissed.bind(dialog))
+	_advance_dialog = dialog
+	get_tree().root.add_child(dialog)
+	dialog.show_dialog()
+
+	_refresh_phase_progression()
+
+func _on_advance_dialog_dismissed(dialog: ConfirmDialog) -> void:
+	"""Fermeture du dialog sans avancer (« Plus tard » / croix) : libère et oublie la réf."""
+	if dialog == _advance_dialog:
+		_advance_dialog = null
+	if is_instance_valid(dialog):
+		dialog.queue_free()
+
+func _on_advance_phase_confirmed(dialog: ConfirmDialog) -> void:
+	"""Confirmation du dialog : avance réellement la phase puis nettoie le dialog."""
+	if PhaseManager and PhaseManager.unlock_next_phase():
+		_refresh_phase_progression()
+	if dialog == _advance_dialog:
+		_advance_dialog = null
+	if is_instance_valid(dialog):
+		dialog.queue_free()
 func _setup_reputation_tab() -> void:
 	"""Configure l'onglet de réputation de guilde"""
 	var reputation_tab: VBoxContainer = VBoxContainer.new()

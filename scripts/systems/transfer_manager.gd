@@ -33,6 +33,11 @@ func _ready() -> void:
 	_refresh_pool()
 
 func _on_week_changed(week: int, _year: int) -> void:
+	# Garde de phase : les transferts internationaux n'existent qu'en phase Esport.
+	# Avant, les fenêtres de transfert s'ouvraient/fermaient et l'adaptation culturelle
+	# tournait dès la Phase 0 (signaux et effets émis hors-contexte).
+	if PhaseManager and PhaseManager.get_current_phase() < PhaseManager.GamePhase.ESPORT:
+		return
 	var was_open: bool = transfer_window_open
 	transfer_window_open = _is_window_week(week)
 	if transfer_window_open and not was_open:

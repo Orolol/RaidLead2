@@ -124,11 +124,18 @@ func resolve_drama(drama: Drama, resolution: String) -> void:
 			if GuildManager.guild:
 				GuildManager.guild.gain_reputation(5.0, "Sanctions disciplinaires")
 		"exclusion":
-			# Trouver et retirer le membre source
+			# Trouver le membre source
+			var target = null
 			for member in GuildManager.guild_members:
 				if member.nom == drama.source_member:
-					GuildManager.remove_member(member, false)
+					target = member
 					break
+			# Le personnage joueur ne peut pas etre exclu : on bascule sur des sanctions.
+			if target and target.get_meta("is_player", false):
+				resolve_drama(drama, "sanctions")
+				return
+			if target:
+				GuildManager.remove_member(target, false)
 			# Gros impact moral mais bonne reputation
 			for member in GuildManager.guild_members:
 				member.mood = maxf(0.0, member.mood - 25.0)

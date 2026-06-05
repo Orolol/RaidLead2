@@ -33,12 +33,16 @@ signal dismissed()
 signal clicked()
 
 # Couleurs par type
+# Les teintes sémantiques (succès/avertissement/erreur/achievement) dérivent de
+# la palette canonique UIConstants ; l'alpha d'origine (0.95) est réappliqué.
+# INFO garde sa teinte plus saturée (pas d'équivalent exact dans UIConstants) et
+# reste littérale.
 const TYPE_COLORS = {
 	Type.INFO: Color(0.2, 0.6, 0.9, 0.95),
-	Type.SUCCESS: Color(0.3, 0.8, 0.3, 0.95),
-	Type.WARNING: Color(0.9, 0.7, 0.2, 0.95),
-	Type.ERROR: Color(0.9, 0.3, 0.3, 0.95),
-	Type.ACHIEVEMENT: Color(0.8, 0.4, 0.9, 0.95)
+	Type.SUCCESS: Color(UIConstants.COLOR_SUCCESS, 0.95),
+	Type.WARNING: Color(UIConstants.COLOR_WARNING, 0.95),
+	Type.ERROR: Color(UIConstants.COLOR_ERROR, 0.95),
+	Type.ACHIEVEMENT: Color(UIConstants.COLOR_ACHIEVEMENT, 0.95)
 }
 
 # Icônes par type

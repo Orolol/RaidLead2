@@ -298,6 +298,19 @@ func _apply_consequences(consequences: Dictionary) -> void:
 			elif effect.target_type == EffectResource.TargetType.ALL_PLAYERS:
 				for member in guild_manager.guild_members:
 					effect_system.apply_effect(member, effect, "Événement")
+			elif effect.target_type == EffectResource.TargetType.PLAYER:
+				# Cible un membre NON-joueur aléatoire (ex. blessure « injured »).
+				# Le personnage du joueur est exclu (marqueur posé dans guild_manager.gd).
+				var eligible: Array = []
+				for member in guild_manager.guild_members:
+					if member.get_meta("is_player", false):
+						continue
+					eligible.append(member)
+				if eligible.is_empty():
+					GameLog.d("Événement: aucun membre éligible pour l'effet ciblé (joueur exclu)")
+					continue
+				var target = eligible[randi() % eligible.size()]
+				effect_system.apply_effect(target, effect, "Événement")
 	
 	# Appliquer les conséquences aléatoires
 	var random_consequence = consequences.get("random", null)

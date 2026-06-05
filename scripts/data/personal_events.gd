@@ -227,32 +227,6 @@ static func get_event(event_id: String) -> Dictionary:
 		return EVENTS_DATABASE[event_id].duplicate()
 	return {}
 
-static func get_random_event() -> Dictionary:
-	"""Retourne un événement aléatoire selon les probabilités"""
-	var total_prob: float = 0.0
-	var probabilities: Array = []
-
-	# Calculer les probabilités cumulées
-	for event_id in EVENTS_DATABASE:
-		var event: Dictionary = EVENTS_DATABASE[event_id]
-		if event.probability > 0:
-			total_prob += event.probability
-			probabilities.append({
-				"id": event_id,
-				"cumulative": total_prob
-			})
-
-	# Sélectionner un événement
-	var roll: float = randf() * total_prob
-
-	for prob_data in probabilities:
-		if roll <= prob_data.cumulative:
-			var event: Dictionary = get_event(prob_data.id)
-			event["id"] = prob_data.id
-			return event
-	
-	return {}
-
 static func should_trigger_event(player) -> bool:
 	"""Détermine si un événement devrait se déclencher pour un joueur"""
 	
@@ -402,38 +376,3 @@ static func detect_pattern(player_history: Array) -> Dictionary:
 			}
 	
 	return detected_patterns
-
-static func apply_event_effects(player, event: Dictionary) -> void:
-	"""Applique les effets d'un événement sur un joueur"""
-	
-	# Impact sur l'humeur
-	if event.has("mood_impact"):
-		player.mood = clamp(player.mood + event.mood_impact, 0, 100)
-	
-	# Impact sur l'énergie
-	if event.has("energy_boost"):
-		player.energy = clamp(player.energy + event.energy_boost, 0, 100)
-	
-	# Effets spéciaux selon le type
-	match event.get("effect_type", ""):
-		"immediate_disconnect":
-			player.has_urgent_event = true
-		
-		"schedule_absence":
-			if player.scheduled_absences == null:
-				player.scheduled_absences = []
-			player.scheduled_absences.append({
-				"event": event.get("id", "unknown"),
-				"start_day": event.get("delay_days", 0),
-				"duration_days": event.get("duration_days", 1)
-			})
-		
-		"bonus_time":
-			player.bonus_session_active = true
-			player.bonus_session_hours = event.get("bonus_hours", 2)
-		
-		"mood_modifier":
-			player.mood = clamp(player.mood + event.get("mood_change", 0), 0, 100)
-		
-		"energy_modifier":
-			player.energy = clamp(player.energy + event.get("energy_change", 0), 0, 100)

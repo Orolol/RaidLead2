@@ -26,7 +26,6 @@ jobs:
 
       - name: Import du projet (assets/ressources)
         run: godot --headless --path . --import
-        continue-on-error: true
 
       - name: Validation de la syntaxe des scripts
         run: godot --headless --path . res://tests/CheckScripts.tscn

@@ -33,7 +33,15 @@ const DIFFICULTY_PRESETS := {
 
 const STRUGGLE_THRESHOLD := 0.4
 const DOMINANCE_THRESHOLD := 0.5
-const TOTAL_GUILDS := 10  # joueur + 9 IA
+const FALLBACK_TOTAL_GUILDS := 10  # repli si AIGuildManager indisponible (joueur + 9 IA)
+
+func _total_guilds() -> int:
+	"""Nombre total de guildes classées (joueur + IA), lu au runtime.
+	En National (14 guildes) / Esport (16) le compte change : un cap codé en dur
+	fausserait la fraction de rang (struggle/dominance)."""
+	if AIGuildManager and AIGuildManager.has_method("get_all_guilds"):
+		return AIGuildManager.get_all_guilds().size() + 1
+	return FALLBACK_TOTAL_GUILDS
 
 ## Façade centrale des constantes d'équilibrage (audit Priorité 12).
 ## Regroupe les nombres « magiques » les plus susceptibles d'être ajustés, pour
@@ -55,13 +63,16 @@ const BALANCE := {
 	"pve.low_energy_penalty": 0.7,
 	"pve.low_morale_threshold": 40.0,
 	"pve.low_morale_penalty": 0.8,
-	# Classement (poids de score, miroir de GuildRanking.SCORE_WEIGHTS pour référence)
-	"ranking.weight.pve_progress": 0.4,
-	"ranking.weight.guild_level": 0.2,
-	"ranking.weight.member_activity": 0.15,
-	"ranking.weight.reputation": 0.15,
-	"ranking.weight.stability": 0.1,
+	# NB : les poids de score de classement ne sont PAS dupliqués ici ; la source unique
+	# de vérité est GuildRanking.SCORE_WEIGHTS. Lire via get_ranking_weights() ci-dessous.
 }
+
+func get_ranking_weights() -> Dictionary:
+	"""Poids de score de classement, lus depuis la source unique GuildRanking.SCORE_WEIGHTS
+	(plus de miroir documentaire susceptible de diverger). Repli vide si indisponible."""
+	if GuildRanking:
+		return GuildRanking.SCORE_WEIGHTS.duplicate()
+	return {}
 
 func tunable(key: String, fallback = null) -> Variant:
 	"""Lit une constante d'équilibrage centralisée (BALANCE), avec repli explicite."""
@@ -116,7 +127,8 @@ func compute_standing() -> Dictionary:
 	if GuildRanking and GuildRanking.has_method("get_player_guild_position"):
 		rank = GuildRanking.get_player_guild_position()
 	if rank > 0:
-		var frac: float = float(rank - 1) / float(max(1, TOTAL_GUILDS - 1))  # 0 = 1er, 1 = dernier
+		var total_guilds: int = _total_guilds()
+		var frac: float = clampf(float(rank - 1) / float(max(1, total_guilds - 1)), 0.0, 1.0)  # 0 = 1er, 1 = dernier
 		struggle += frac * 0.5
 		if rank == 1:
 			dominance += 0.5

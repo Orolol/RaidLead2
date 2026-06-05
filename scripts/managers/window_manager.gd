@@ -9,19 +9,19 @@ class_name WindowManager
 # a été retiré car non fonctionnel avec la navigation exclusive.
 
 # Configuration
-const SAVE_FILE_PATH = "user://window_layouts.save"
-const ANIMATION_DURATION = 0.3
+const SAVE_FILE_PATH: String = "user://window_layouts.save"
+const ANIMATION_DURATION: float = 0.3
 
 # Données des fenêtres
-var windows = {}  # nom -> config de base
-var open_windows = {}  # nom -> instances ouvertes
-var window_z_order = []  # ordre des fenêtres (Z-index)
-var window_positions = {}  # sauvegarde des positions/tailles par fenêtre
+var windows: Dictionary = {}  # nom -> config de base
+var open_windows: Dictionary = {}  # nom -> instances ouvertes
+var window_z_order: Array = []  # ordre des fenêtres (Z-index)
+var window_positions: Dictionary = {}  # sauvegarde des positions/tailles par fenêtre
 
 # État du gestionnaire
-var active_window = null
-var max_z_index = 100
-var use_animations = true
+var active_window = null  # String ou null (pas de fenêtre active)
+var max_z_index: int = 100
+var use_animations: bool = true
 
 # Signaux
 signal window_opened(window_name)
@@ -70,7 +70,7 @@ func open_window(window_name: String, force_new: bool = false) -> Control:
 		return null
 	
 	var instance = scene.instantiate()
-	var instance_id = _generate_instance_id(window_name)
+	var instance_id: String = _generate_instance_id(window_name)
 	
 	# Configurer l'instance
 	_setup_window_instance(instance, window_name, instance_id, window_config)
@@ -177,10 +177,10 @@ func hide_window(window_name: String, instance_id: String = "") -> void:
 	if not open_windows.has(window_name):
 		return
 	
-	var instance_data = _find_instance(window_name, instance_id)
+	var instance_data: Dictionary = _find_instance(window_name, instance_id)
 	if instance_data and instance_data.instance:
 		instance_data.instance.hide()
-		
+
 		if active_window == window_name:
 			_update_active_window()
 
@@ -188,7 +188,7 @@ func hide_window(window_name: String, instance_id: String = "") -> void:
 
 func bring_to_front(window_name: String, instance_id: String = "") -> void:
 	"""Amène une fenêtre au premier plan"""
-	var instance_data = _find_instance(window_name, instance_id)
+	var instance_data: Dictionary = _find_instance(window_name, instance_id)
 	if not instance_data:
 		return
 	
@@ -313,7 +313,7 @@ func _connect_window_signals(instance: Control, window_name: String, instance_id
 				bring_to_front(window_name, instance_id)
 		)
 
-func _center_window(window: Control):
+func _center_window(window: Control) -> void:
 	"""Centre une fenêtre dans la zone sûre (au-dessus de la barre de menu, sur l'écran)."""
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var menu_bar_h: float = 90.0
@@ -379,10 +379,10 @@ func _move_to_front_in_z_order(window_name: String, instance_id: String) -> void
 func _apply_z_order() -> void:
 	"""Applique les z-index selon l'ordre"""
 	for i in range(window_z_order.size()):
-		var key = window_z_order[i]
-		var parts = key.split(":")
-		var win_name = parts[0]
-		var instance_id = parts[1]
+		var key: String = window_z_order[i]
+		var parts: PackedStringArray = key.split(":")
+		var win_name: String = parts[0]
+		var instance_id: String = parts[1]
 
 		var inst_data: Dictionary = _find_instance(win_name, instance_id)
 		if inst_data and inst_data.instance:
@@ -394,12 +394,12 @@ func _update_active_window() -> void:
 		active_window = null
 		return
 
-	var key = window_z_order[0]
-	var parts = key.split(":")
+	var key: String = window_z_order[0]
+	var parts: PackedStringArray = key.split(":")
 	active_window = parts[0]
 	window_focused.emit(active_window)
 
-func _save_window_position(window_name: String, instance: Control):
+func _save_window_position(window_name: String, instance: Control) -> void:
 	"""Sauvegarde la position d'une fenêtre (format JSON-safe : tableaux [x, y],
 	car JSON.stringify ne sérialise pas les Vector2 — ils deviendraient des String
 	illisibles au rechargement)."""
@@ -420,11 +420,11 @@ func _to_vec2(value, fallback: Vector2) -> Vector2:
 
 func _save_layouts() -> void:
 	"""Sauvegarde les positions/tailles des fenêtres sur disque."""
-	var save_data = {
+	var save_data: Dictionary = {
 		"window_positions": window_positions
 	}
 
-	var file = FileAccess.open(SAVE_FILE_PATH, FileAccess.WRITE)
+	var file: FileAccess = FileAccess.open(SAVE_FILE_PATH, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(save_data))
 		file.close()
@@ -434,13 +434,13 @@ func _load_layouts() -> void:
 	if not FileAccess.file_exists(SAVE_FILE_PATH):
 		return
 
-	var file = FileAccess.open(SAVE_FILE_PATH, FileAccess.READ)
+	var file: FileAccess = FileAccess.open(SAVE_FILE_PATH, FileAccess.READ)
 	if file:
-		var json_text = file.get_as_text()
+		var json_text: String = file.get_as_text()
 		file.close()
 
-		var json = JSON.new()
-		var result = json.parse(json_text)
+		var json: JSON = JSON.new()
+		var result: int = json.parse(json_text)
 
 		if result == OK and json.data is Dictionary:
 			var save_data: Dictionary = json.data
@@ -450,20 +450,20 @@ func _load_layouts() -> void:
 
 # ==================== ANIMATIONS ====================
 
-func _animate_window_open(window: Control):
+func _animate_window_open(window: Control) -> void:
 	"""Animation d'ouverture de fenêtre"""
-	var original_size = window.size
+	var original_size: Vector2 = window.size
 	window.size = Vector2.ZERO
 	window.modulate.a = 0.0
-	
-	var tween = create_tween()
+
+	var tween: Tween = create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(window, "size", original_size, ANIMATION_DURATION).set_ease(Tween.EASE_OUT)
 	tween.tween_property(window, "modulate:a", 1.0, ANIMATION_DURATION).set_ease(Tween.EASE_OUT)
 
-func _animate_window_close(window: Control, callback: Callable):
+func _animate_window_close(window: Control, callback: Callable) -> void:
 	"""Animation de fermeture de fenêtre"""
-	var tween = create_tween()
+	var tween: Tween = create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(window, "size", Vector2.ZERO, ANIMATION_DURATION).set_ease(Tween.EASE_IN)
 	tween.tween_property(window, "modulate:a", 0.0, ANIMATION_DURATION).set_ease(Tween.EASE_IN)

@@ -46,7 +46,7 @@ func _run_test() -> void:
 	if gm:
 		for m in gm.guild_members:
 			m.celebrity_level = 70.0
-	pm.days_at_rank_1 = 12
+	pm.national_days_at_rank_1 = 12
 
 	print("=== Compteurs progression NATIONAL ===")
 	print("active_sponsors      = ", pm._get_requirement_current_value("active_sponsors"), " (placeholder=0)")
