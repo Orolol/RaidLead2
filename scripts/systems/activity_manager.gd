@@ -85,7 +85,9 @@ func start_activity(player, activity_type, params: Dictionary = {}) -> void:
 		"week": game_time.current_week
 	}
 	activity.set_meta("start_timestamp", game_time.current_hour * 60 + game_time.current_minute)
-	
+	activity.set_meta("start_level", player.personnage_niveau)
+	activity.set_meta("start_mood", player.mood)
+
 	active_activities[player] = activity
 	player.current_activity = activity
 	
@@ -506,7 +508,7 @@ func _evaluate_activity_experience(player, activity) -> float:
 	match activity.type:
 		ActivityScript.ActivityType.LEVELING:
 			# Positif si gain de niveau, négatif si trop lent
-			if player.personnage_niveau > activity.get("start_level", player.personnage_niveau):
+			if player.personnage_niveau > activity.get_meta("start_level", player.personnage_niveau):
 				quality = 0.5
 			else:
 				quality = -0.2
@@ -517,7 +519,7 @@ func _evaluate_activity_experience(player, activity) -> float:
 		
 		ActivityScript.ActivityType.FUN:
 			# Positif si amélioration du moral
-			if player.mood > activity.get("start_mood", player.mood):
+			if player.mood > activity.get_meta("start_mood", player.mood):
 				quality = 0.7
 			else:
 				quality = 0.2  # Légèrement positif même sans gain

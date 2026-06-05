@@ -71,10 +71,10 @@ func _get_current_pool_limits() -> Dictionary:
 		base_min = pool_size
 		base_max = min(pool_size + 10, BASE_MAX_POOL_SIZE)
 
-	# Ajouter le bonus de perks de guilde
+	# Ajouter le bonus de perks de guilde (variante effective : prend en compte les effets actifs)
 	var guild_manager = GuildManager
 	if guild_manager and guild_manager.guild:
-		var bonus = guild_manager.guild.get_recruitment_pool_bonus()
+		var bonus = guild_manager.guild.get_effective_recruitment_pool_bonus()
 		base_min += bonus
 		base_max += bonus
 
@@ -585,8 +585,9 @@ func _can_finalize_recruitment(player: SimulatedPlayer) -> Dictionary:
 		return {"ok": false, "reason": "Joueur non disponible"}
 	if not GuildManager.guild.can_recruit():
 		return {"ok": false, "reason": "Votre guilde doit atteindre le niveau 2 pour recruter"}
-	if GuildManager.guild_members.size() >= GuildManager.guild.get_max_members():
-		return {"ok": false, "reason": "La guilde est pleine (%d/%d)" % [GuildManager.guild_members.size(), GuildManager.guild.get_max_members()]}
+	var max_members: int = GuildManager.guild.get_effective_max_members()
+	if GuildManager.guild_members.size() >= max_members:
+		return {"ok": false, "reason": "La guilde est pleine (%d/%d)" % [GuildManager.guild_members.size(), max_members]}
 	if player in GuildManager.guild_members:
 		return {"ok": false, "reason": "Joueur deja membre de la guilde"}
 	return {"ok": true, "reason": ""}
@@ -864,7 +865,8 @@ func _get_guild_data() -> Dictionary:
 	"""Retourne les donnees de guilde pour le recrutement."""
 	var data: Dictionary = {"guild_size": GuildManager.guild_members.size()}
 	if GuildManager.guild:
-		data["reputation"] = GuildManager.guild.reputation
+		# Variante effective : la réputation tient compte des effets actifs (sinon = valeur de base).
+		data["reputation"] = GuildManager.guild.get_effective_reputation()
 		data["recent_raid_success"] = false
 		if GuildRanking:
 			data["recent_raid_success"] = GuildRanking.get_player_recent_clears(7).size() > 0

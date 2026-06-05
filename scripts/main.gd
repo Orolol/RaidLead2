@@ -67,10 +67,15 @@ func _ready() -> void:
 	_setup_system_notifier()
 	_setup_player_systems()
 
-	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts)
+	# Charger la sauvegarde si elle existe (après que tous les systèmes soient prêts).
+	# Sinon, c'est une NOUVELLE partie : on initialise le RNG global depuis l'entropie
+	# système une seule fois ici (jamais lors d'un chargement de save — l'état chargé
+	# fait foi — ni en mode test, où le harnais fixe lui-même la graine via seed_rng()).
 	get_tree().create_timer(0.2).timeout.connect(func():
 		if _should_auto_load_save() and SaveManager.has_save():
 			SaveManager.load_game()
+		elif _should_auto_load_save():
+			_initialize_new_game_rng()
 	)
 	
 
@@ -265,6 +270,16 @@ func _should_auto_load_save() -> bool:
 	var args: PackedStringArray = OS.get_cmdline_args()
 	var user_args: PackedStringArray = OS.get_cmdline_user_args()
 	return not args.has(NO_SAVE_AUTOLOAD_ARG) and not user_args.has(NO_SAVE_AUTOLOAD_ARG)
+
+func _initialize_new_game_rng() -> void:
+	"""Démarrage d'une NOUVELLE partie : initialise le générateur global depuis
+	l'entropie système. Ne pas appeler lors d'un chargement de save (l'état chargé fait
+	foi) ni pendant les tests (le harnais fixe la graine via GameRandom.seed_rng()).
+	Garde : si une graine déterministe a déjà été fixée (ex. scénario rejouable), on la
+	respecte au lieu de la réécraser."""
+	if GameRandom.is_seeded():
+		return
+	GameRandom.randomize_rng()
 
 func _connect_menu_signals() -> void:
 	menu_bar.guild_hub_button_pressed.connect(_on_guild_hub_button_pressed)
@@ -866,6 +881,11 @@ func _rewire_player_after_load() -> void:
 		new_pc.forced_disconnect_requested.connect(_on_player_forced_disconnect)
 	if new_pc.has_signal("player_state_changed") and not new_pc.player_state_changed.is_connected(_on_player_state_changed):
 		new_pc.player_state_changed.connect(_on_player_state_changed)
+	# Reconnecter la fenêtre Personnage (si ouverte) au NOUVEAU personnage joueur :
+	# son garde _state_signal_connected pointait sur l'ancien objet orphelin.
+	var perso_inst: Control = window_manager.get_window_instance("personnage") if window_manager else null
+	if perso_inst and perso_inst.has_method("reconnect_to_current_player"):
+		perso_inst.reconnect_to_current_player()
 	_on_player_state_changed()
 
 func _on_player_disconnect_requested(_return_hour: int, _return_minute: int) -> void:

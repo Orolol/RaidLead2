@@ -444,10 +444,27 @@ func _check_tag_reveals() -> void:
 			"loot_conflicts": loot_conflicts,
 			"reveal_progress": tag_reveal_progress
 		}
-		
+
 		if PlayerTagsScript.can_reveal_tag(tag, player_data):
 			revealed_tags.append(tag)
-	
+
+	# En phase Leveling, on bride DÉTERMINISTEMENT le volume de tags révélés
+	# selon tag_reveal_rate : seuls les tags autorisés par le budget de phase 0
+	# peuvent se révéler. Hors Leveling, la révélation reste inchangée.
+	var phase_manager = Singletons.get_autoload("PhaseManager")
+	if phase_manager and phase_manager.current_phase == phase_manager.GamePhase.LEVELING:
+		var config: Dictionary = phase_manager.get_current_phase_config()
+		var reveal_rate: float = float(config.get("tag_reveal_rate", 1.0))
+		if reveal_rate < 1.0:
+			var total_tags: int = tags_comportement.size() + tags_caches.size()
+			var allowed_phase0: Array = PlayerTagsScript.get_phase0_revealable_tags(
+				total_tags, reveal_rate, tags_comportement.size(), tags_caches)
+			var filtered: Array = []
+			for tag in revealed_tags:
+				if tag in allowed_phase0:
+					filtered.append(tag)
+			revealed_tags = filtered
+
 	# Révèle les tags découverts
 	for tag in revealed_tags:
 		tags_caches.erase(tag)
@@ -506,19 +523,23 @@ func has_tag(tag: String) -> bool:
 	return tag in tags_comportement or tag in tags_caches
 
 func get_revealed_tags_count() -> int:
-	"""Retourne le nombre de tags révélés selon la phase actuelle"""
+	"""Retourne le nombre de tags effectivement révélés (visibles).
+
+	En phase Leveling, le plafond de révélation est borné par tag_reveal_rate :
+	on ne montre jamais plus que le budget de phase 0. Hors Leveling, on retourne
+	simplement le nombre de tags visibles."""
 	var total_tags: int = tags_comportement.size() + tags_caches.size()
 	if total_tags == 0:
 		return 0
-	
-	# En phase leveling, seulement 20% des tags sont révélés
-	# Note: PhaseManager sera accessible depuis les autoloads quand implémenté
-	# Pour l'instant, on retourne tous les tags visibles
-	# if phase_manager and phase_manager.get_current_phase() == phase_manager.GamePhase.LEVELING:
-	#	var config = phase_manager.get_current_phase_config()
-	#	var reveal_rate = config.get("tag_reveal_rate", 1.0)
-	#	return max(1, int(total_tags * reveal_rate))
-	
+
+	var phase_manager = Singletons.get_autoload("PhaseManager")
+	if phase_manager and phase_manager.current_phase == phase_manager.GamePhase.LEVELING:
+		var config: Dictionary = phase_manager.get_current_phase_config()
+		var reveal_rate: float = float(config.get("tag_reveal_rate", 1.0))
+		if reveal_rate < 1.0:
+			var budget: int = maxi(1, int(round(float(total_tags) * clampf(reveal_rate, 0.0, 1.0))))
+			return mini(tags_comportement.size(), budget)
+
 	return tags_comportement.size()
 
 func is_tag_visible(tag: String) -> bool:
@@ -712,17 +733,22 @@ func equip_item(item) -> bool:
 	return true
 
 func get_effective_skill() -> float:
-	"""Retourne le skill effectif avec les modificateurs de phase"""
+	"""Retourne le skill effectif avec les modificateurs de phase.
+
+	SOURCE UNIQUE du malus de phase : c'est ici (et nulle part ailleurs) que le
+	skill_malus de la phase LEVELING est appliqué. get_modified_skill() part de
+	cette valeur comme base pour composer les effets, ce qui garantit que le
+	malus n'est appliqué qu'UNE seule fois (pas de double application)."""
 	var base_skill: float = float(skill)
-	
-	# Appliquer malus de phase leveling
-	# Note: PhaseManager sera accessible depuis les autoloads quand implémenté
-	# Pour l'instant, on retourne le skill sans modification
-	# if phase_manager and phase_manager.get_current_phase() == phase_manager.GamePhase.LEVELING:
-	#	var config = phase_manager.get_current_phase_config()
-	#	var skill_malus = config.get("skill_malus", 0.0)
-	#	base_skill *= (1.0 - skill_malus)
-	
+
+	# Appliquer le malus de la phase Leveling (les joueurs ne maîtrisent pas
+	# encore le contenu). skill_malus est lu depuis la config réelle de la phase.
+	var phase_manager = Singletons.get_autoload("PhaseManager")
+	if phase_manager and phase_manager.current_phase == phase_manager.GamePhase.LEVELING:
+		var config: Dictionary = phase_manager.get_current_phase_config()
+		var skill_malus: float = float(config.get("skill_malus", 0.0))
+		base_skill *= (1.0 - skill_malus)
+
 	return base_skill
 
 func _get_skill_estimate() -> String:
@@ -813,7 +839,10 @@ func get_modified_mood() -> float:
 	return get_modified_stat("mood", mood)
 
 func get_modified_skill() -> int:
-	return int(get_modified_stat("skill", float(skill)))
+	# Base = skill effectif (skill brut + malus de phase appliqué UNE seule fois
+	# dans get_effective_skill). Les effets (flat/percentage) du EffectSystem se
+	# composent ensuite par-dessus. Le malus de phase n'est donc jamais doublé.
+	return int(get_modified_stat("skill", get_effective_skill()))
 
 func get_modified_integration() -> float:
 	return get_modified_stat("integration", integration)

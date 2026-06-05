@@ -16,6 +16,7 @@ func setup(chat_panel) -> void:
 	_connect_national()
 	_connect_esport()
 	_connect_culture()
+	_connect_meta()
 
 # === National (médias, sponsors, dramas) ===
 
@@ -131,3 +132,29 @@ func _on_team_building_done(activity_name: String, _morale_gain: float) -> void:
 func _on_tradition_established(tradition_name: String) -> void:
 	if _chat_panel:
 		_chat_panel.add_message("[Cohésion] Nouvelle tradition établie : %s" % tradition_name, "loot")
+
+# === Méta (équilibrage adaptatif, contenu serveur) ===
+
+func _connect_meta() -> void:
+	if BalanceManager and BalanceManager.has_signal("catchup_applied"):
+		if not BalanceManager.catchup_applied.is_connected(_on_catchup_applied):
+			BalanceManager.catchup_applied.connect(_on_catchup_applied)
+	if ServerVersion and ServerVersion.has_signal("content_unlocked"):
+		if not ServerVersion.content_unlocked.is_connected(_on_content_unlocked):
+			ServerVersion.content_unlocked.connect(_on_content_unlocked)
+
+func _on_catchup_applied(gold: int) -> void:
+	if gold <= 0:
+		return
+	if _chat_panel:
+		_chat_panel.add_message("[Équilibrage] Aide d'équilibrage : +%d or" % gold, "loot")
+	if NotificationManager:
+		NotificationManager.show_info("Aide d'équilibrage : +%d or" % gold, "Équilibrage")
+
+func _on_content_unlocked(content_type: String, content_ids: Array) -> void:
+	var label: String = "raids" if content_type == "raids" else "donjons"
+	var count: int = content_ids.size()
+	if _chat_panel:
+		_chat_panel.add_message("[Serveur] Nouveau contenu débloqué : %d %s" % [count, label], "activity")
+	if NotificationManager:
+		NotificationManager.show_info("%d nouveau(x) %s débloqué(s)" % [count, label], "Nouveau contenu")

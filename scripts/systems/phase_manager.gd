@@ -22,7 +22,8 @@ var phase_unlock_date: Dictionary = {}
 
 # Tracking spécifique des accomplissements
 var heroic_dungeons_completed: int = 0
-var days_at_rank_1: int = 0  # jours consécutifs à la 1ère place du classement
+var server_days_at_rank_1: int = 0  # jours consécutifs au rang 1 du classement serveur (phase SERVEUR)
+var national_days_at_rank_1: int = 0  # jours consécutifs au rang 1 du classement national (phase NATIONAL)
 
 # Configuration des phases et leurs requirements
 const PHASE_CONFIG = {
@@ -193,11 +194,37 @@ func check_phase_progression() -> bool:
 	
 	return false
 
+func can_advance_phase() -> bool:
+	"""Indique si la phase courante peut avancer (méthode PURE, sans effet de bord).
+
+	Retourne true si la phase courante possède une next_phase ET que tous ses
+	requirements sont remplis. Contrairement à check_phase_progression(), cette
+	méthode n'émet aucun signal et n'écrit pas dans phase_progress : elle est sûre
+	à appeler depuis l'UI (ex. état disabled d'un bouton) sans risque de récursion."""
+	var config: Dictionary = get_current_phase_config()
+	var next_phase = config.get("next_phase")
+	if next_phase == null:
+		return false  # Phase finale
+
+	var requirements: Dictionary = get_current_requirements()
+	for req_name in requirements:
+		var required_value = requirements[req_name]
+		var current_value = _get_requirement_current_value(req_name)
+		if not _check_requirement_met(req_name, current_value, required_value):
+			return false
+	return true
+
 func unlock_next_phase() -> bool:
-	"""Débloque la phase suivante si les conditions sont remplies"""
-	if not check_phase_progression():
+	"""Débloque la phase suivante si les conditions sont remplies.
+
+	Garde via can_advance_phase() (PURE) et non check_phase_progression() : cette
+	dernière ré-émet phase_requirements_met(phase_courante) de façon synchrone, ce qui
+	rouvrirait un dialog de confirmation « Voulez-vous passer à la phase suivante ? »
+	pour la phase qu'on est précisément en train de quitter (dialog fantôme à chaque clic
+	sur le bouton d'avance)."""
+	if not can_advance_phase():
 		return false
-	
+
 	var config = get_current_phase_config()
 	var next_phase = config.get("next_phase")
 	
@@ -211,7 +238,11 @@ func unlock_next_phase() -> bool:
 	phase_progress[current_phase]["started_date"] = _get_current_date()
 	phase_progress[current_phase]["days_in_phase"] = 0
 	phase_unlock_date[current_phase] = _get_current_date()
-	
+
+	# Réinitialiser les compteurs de durée au rang 1 (le suivi recommence par phase)
+	server_days_at_rank_1 = 0
+	national_days_at_rank_1 = 0
+
 	# Émettre les signaux
 	phase_unlocked.emit(current_phase)
 	phase_changed.emit(current_phase, old_phase)
@@ -303,8 +334,8 @@ func _get_requirement_current_value(req_name: String) -> Variant:
 			return 0
 
 		"server_rank_duration":
-			return days_at_rank_1
-			
+			return server_days_at_rank_1
+
 		"active_members_min":
 			if GuildManager:
 				return GuildManager.get_online_members().size()
@@ -332,8 +363,8 @@ func _get_requirement_current_value(req_name: String) -> Variant:
 			return 0
 
 		"national_rank_duration":
-			return days_at_rank_1
-			
+			return national_days_at_rank_1
+
 		"max_dramas_per_year":
 			if DramaManager and DramaManager.has_method("get_dramas_this_year"):
 				return DramaManager.get_dramas_this_year()
@@ -425,13 +456,22 @@ func _on_day_changed(day: int, _week: int, _year: int) -> void:
 		check_phase_progression()
 
 func _update_rank_duration() -> void:
-	"""Compte les jours consécutifs à la 1ère place du classement."""
+	"""Compte les jours consécutifs au rang 1, séparément pour le serveur et le national.
+
+	Le comptage est gardé par la phase courante : on n'incrémente que le compteur
+	pertinent (serveur en phase SERVEUR, national en phase NATIONAL). Aucun comptage
+	en LEVELING ou ESPORT. Le compteur est remis à zéro si le rang n'est pas 1.
+	"""
 	if not GuildRanking:
 		return
-	if GuildRanking.get_player_guild_position() == 1:
-		days_at_rank_1 += 1
-	else:
-		days_at_rank_1 = 0
+	var at_rank_1: bool = GuildRanking.get_player_guild_position() == 1
+	match current_phase:
+		GamePhase.SERVEUR:
+			server_days_at_rank_1 = server_days_at_rank_1 + 1 if at_rank_1 else 0
+		GamePhase.NATIONAL:
+			national_days_at_rank_1 = national_days_at_rank_1 + 1 if at_rank_1 else 0
+		_:
+			pass
 
 func _count_player_world_firsts() -> int:
 	"""Nombre de premiers clears réalisés par la guilde du joueur (= world firsts ici)."""
@@ -508,10 +548,14 @@ func force_phase_change(target_phase: GamePhase) -> bool:
 	phase_progress[current_phase]["started_date"] = _get_current_date()
 	phase_progress[current_phase]["days_in_phase"] = 0
 	phase_unlock_date[current_phase] = _get_current_date()
-	
+
+	# Réinitialiser les compteurs de durée au rang 1 (le suivi recommence par phase)
+	server_days_at_rank_1 = 0
+	national_days_at_rank_1 = 0
+
 	# Émettre les signaux
 	phase_changed.emit(current_phase, old_phase)
-	
+
 	GameLog.d("Phase forcée vers: %s" % get_phase_name(current_phase))
 	return true
 
@@ -534,18 +578,79 @@ func save_phase_data() -> Dictionary:
 		"phase_progress": phase_progress,
 		"phase_unlock_date": phase_unlock_date,
 		"heroic_dungeons_completed": heroic_dungeons_completed,
-		"days_at_rank_1": days_at_rank_1
+		"server_days_at_rank_1": server_days_at_rank_1,
+		"national_days_at_rank_1": national_days_at_rank_1
 	}
 
 func load_phase_data(data: Dictionary) -> void:
-	"""Charge les données de progression des phases"""
-	current_phase = data.get("current_phase", GamePhase.LEVELING)
-	phase_progress = data.get("phase_progress", {})
-	phase_unlock_date = data.get("phase_unlock_date", {})
-	heroic_dungeons_completed = data.get("heroic_dungeons_completed", 0)
-	days_at_rank_1 = data.get("days_at_rank_1", 0)
-	
-	# S'assurer que toutes les phases ont des données de progression
-	_initialize_phase_progress()
-	
+	"""Charge les données de progression des phases (MERGE NON DESTRUCTIF).
+
+	Le JSON convertit les clés de dictionnaire (les valeurs de l'enum GamePhase) en
+	String et les nombres en float. On normalise donc les clés en int et on FUSIONNE
+	la progression chargée avec les défauts, sans jamais écraser les achievements,
+	milestones, requirements_progress ni days_in_phase déjà sauvegardés."""
+	# current_phase peut arriver en float depuis le JSON : on le ramène à un int d'enum.
+	current_phase = int(data.get("current_phase", GamePhase.LEVELING)) as GamePhase
+	heroic_dungeons_completed = int(data.get("heroic_dungeons_completed", 0))
+	# Compat best-effort : les anciennes saves n'avaient qu'un compteur unique
+	# "days_at_rank_1" partagé. On l'utilise comme valeur de repli pour amorcer
+	# les nouveaux compteurs séparés sans planter.
+	var legacy_days_at_rank_1: int = int(data.get("days_at_rank_1", 0))
+	server_days_at_rank_1 = int(data.get("server_days_at_rank_1", legacy_days_at_rank_1))
+	national_days_at_rank_1 = int(data.get("national_days_at_rank_1", legacy_days_at_rank_1))
+
+	# phase_unlock_date : clés normalisées en int (GamePhase) après le JSON.
+	phase_unlock_date = _normalize_phase_keys(data.get("phase_unlock_date", {}))
+
+	# Fusion non destructive de la progression chargée par-dessus les défauts.
+	_merge_phase_progress(data.get("phase_progress", {}))
+
 	GameLog.d("Données de phases chargées - Phase actuelle: %s" % get_phase_name(current_phase))
+
+func _normalize_phase_keys(raw: Dictionary) -> Dictionary:
+	"""Reconvertit les clés de phase (String issues du JSON) en int d'enum GamePhase.
+	Les clés non numériques sont conservées telles quelles (robustesse)."""
+	var out: Dictionary = {}
+	for key in raw.keys():
+		var normalized_key = key
+		if key is float:
+			normalized_key = int(key)
+		elif key is String and key.is_valid_int():
+			normalized_key = key.to_int()
+		out[normalized_key] = raw[key]
+	return out
+
+func _default_phase_entry() -> Dictionary:
+	"""Structure par défaut d'une entrée de progression de phase."""
+	return {
+		"started_date": null,
+		"requirements_progress": {},
+		"achievements": [],
+		"milestones_reached": [],
+		"days_in_phase": 0,
+	}
+
+func _merge_phase_progress(loaded_raw: Dictionary) -> void:
+	"""Fusionne la progression chargée par-dessus les défauts SANS rien écraser.
+
+	- Garantit que chaque phase de l'enum possède une entrée complète.
+	- Pour les entrées chargées, on conserve toutes les valeurs sauvegardées
+	  (achievements, milestones_reached, requirements_progress, days_in_phase,
+	  started_date) ; on n'ajoute QUE les sous-clés manquantes avec leur défaut."""
+	var loaded: Dictionary = _normalize_phase_keys(loaded_raw)
+	phase_progress = {}
+	for phase in GamePhase.values():
+		var entry: Dictionary = _default_phase_entry()
+		if loaded.has(phase) and loaded[phase] is Dictionary:
+			var saved: Dictionary = loaded[phase]
+			# Conserver toutes les sous-clés sauvegardées (non destructif).
+			for sub_key in saved.keys():
+				entry[sub_key] = saved[sub_key]
+			# Normaliser days_in_phase en int (peut arriver en float depuis le JSON).
+			if entry.has("days_in_phase"):
+				entry["days_in_phase"] = int(entry["days_in_phase"])
+		phase_progress[phase] = entry
+
+	# La phase de leveling doit avoir une date de début même pour une save minimale.
+	if phase_progress[GamePhase.LEVELING].get("started_date", null) == null:
+		phase_progress[GamePhase.LEVELING]["started_date"] = _get_current_date()

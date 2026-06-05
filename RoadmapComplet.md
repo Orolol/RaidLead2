@@ -12,6 +12,18 @@
 - ✅ **Refactoring majeur** : WindowManager, GuildManager, autoloads, save/load
 - 🎯 **Progression** : ~55% du projet total terminé
 
+### Mise a jour - Correctifs audit cohesion & branchement (5 juin 2026)
+Implementation des correctifs de l'audit `docs/audit/2026-06-04-cohesion-branchement.md` (plan : `docs/audit/2026-06-04-plan-implementation.md`), en 3 lots + revue de coherence adversariale, valides en headless (Godot 4.6.2). Branche `feat/audit-cohesion-fixes`. **Etat final : 107 scripts compilent (CheckScripts), 319/319 tests verts (264 -> +55), Main.tscn boote sans erreur.**
+- 🔴 **Soft-lock de progression de phase corrige (CRITIQUE)** : Serveur->National->Esport etait impossible en partie normale (aucun chemin n'appelait `unlock_next_phase()` au-dela de la Phase 0). Ajout de `PhaseManager.can_advance_phase()` (pur) + bouton manuel « Passer a la phase suivante » (popup + onglet Progression). National & Esport sont desormais reellement atteignables. Test E2E sans `force_phase_change`. (Revue : suppression du dialog de confirmation fantome qui apparaissait au clic d'avance.)
+- 🟠 **2 crashes runtime latents** : drag&drop d'organisation (`item.get_drag_data()` inexistant -> `item.drag_data`) ; `Object.get()` a 2 args dans l'eval d'activite (-> `set_meta`/`get_meta`).
+- 🟠 **Boucles de gameplay rebranchees** : reputation PvE (`on_raid_success`/`on_raid_failure`/`on_server_first` appelees, guildes IA exclues) ; effets/bonus de guilde et de joueur reellement consommes (routage vers `get_effective_*`/`get_modified_*`, zero regression hors effet actif) ; effet `injured` applique (branche `TargetType.PLAYER`) + blocage des blesses en compo ; debauchage/contre-offre rendu jouable (retrait differe apres decision joueur, chemin de mutation unique idempotent).
+- 🟠 **Garde `is_player`** : le personnage joueur ne peut plus etre retire (`remove_member` + redirection drama « exclusion » -> sanctions).
+- 🟠 **Save/load** : merge non destructif de `phase_progress` (achievements/milestones preserves), serialisation de `scheduled_absences` + `active_effects`, autosave differee si run de donjon en cours (plus de run tue silencieusement), re-wiring de `fenetre_personnage` apres load.
+- 🟡 **Rang & equilibrage** : compteurs `server_days_at_rank_1` / `national_days_at_rank_1` separes + reset au changement de phase ; `TOTAL_GUILDS` au runtime ; cap `gold_storage` (200000) et `max_members` (20) en `max` (plus d'addition entre paliers) ; gardes de phase Esport sur tournois/transferts/salaires staff.
+- 🟡 **Signaux & coherence** : `gold_changed` emis/consomme, `catchup_applied`/`content_unlocked` branches (toast/chat) ; chat recalibre (`loot_epic` EPIC strict, `ninja` reserve aux tagges reveles) ; comportement (bonus_session_active arme, jours absolus) ; RNG `randomize_rng()` au boot d'une nouvelle partie.
+- 🧹 **Code mort supprime** (14 fichiers, ~3000 lignes) : `fast_forward_manager`/`fast_forward_dialog` (~852 l.), suite `scripts/ui/dialogs/` (doublon de `components/confirm_dialog.gd`), `tooltip.gd`, `_simulate_dungeon_run` + fonctions/signaux orphelins (re-confirmes zero-appelant ; items reactives par les lots et `chat_backend.gd`/`singletons.gd` preserves). Palette alignee sur `UITheme`. Typage statique renforce. CI : etape d'import durcie.
+- 📋 **Reporte (decision a arbitrer)** : modificateurs Phase 0 (`skill_malus`/`tag_reveal_rate`/`connection_bonus`) — les cabler change l'equilibrage de la phase de depart (et le test PvE reproductible) ; a trancher : cabler vs retirer la config morte.
+
 ### Mise a jour - HUD gameplay persistant (4 juin 2026)
 - ✅ **ResourceBar** : or, reputation, moral, membres en ligne, serveur/hype, date/heure et vitesse sont visibles en permanence dans une top bar reactive.
 - ✅ **ObjectiveTracker** : objectif de phase et progression globale visibles en HUD, recalcules au chargement et sur les signaux de progression/roster/ranking.
@@ -22,6 +34,7 @@
 - ✅ **Inspecteur contextuel** : selection partagee via `GuildManager.member_selected`, panneau `MemberInspector` persistant, actions directes roster/cohesion/equipement/PvE.
 - ✅ **Deep-links UI** : ResourceBar, ObjectiveTracker, AlertRail et anciens raccourcis routent vers hub + section ; les alertes burnout/recrutement transmettent le membre ou candidat concerne.
 - ✅ **Polish hubs** : sections non embarquees converties en syntheses jouables (roster, equipement, profil joueur, groupe PvE, progression, besoins roster), raccourcis internes Tab/1-9 et refresh reactif.
+- ✅ **Correction layout hubs** : contenus d'onglets ancres plein panneau, clipping actif, chrome et sous-onglets legacy masques dans les sections embarquees pour eviter debordements et doublons visuels.
 - 📋 **Reste a faire** : extraction complete des dernieres fenetres legacy lourdes en composants dedies et screenshots MCP quand l'editeur est connecte.
 
 ---

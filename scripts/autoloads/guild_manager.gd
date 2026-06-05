@@ -239,8 +239,11 @@ func unequip_to_bank(member, slot: int) -> bool:
 
 func add_member(player: SimulatedPlayer) -> bool:
 	if player not in guild_members:
-		# Vérifier la limite de membres
-		if guild_members.size() >= guild.get_max_members():
+		# Vérifier la limite de membres. Utiliser le cap EFFECTIF (effets inclus) pour
+		# rester cohérent avec le pré-check de recrutement (recruitment_pool
+		# _can_finalize_recruitment), sinon une recrue « acceptée » pourrait être rejetée
+		# ici dès qu'un effet relève max_members. Identique au cap de base aujourd'hui.
+		if guild_members.size() >= guild.get_effective_max_members():
 			return false
 			
 		guild_members.append(player)
@@ -259,6 +262,9 @@ func add_member(player: SimulatedPlayer) -> bool:
 	return false
 
 func remove_member(player, was_voluntary: bool = true) -> void:
+	# Garde absolue : le personnage joueur ne doit JAMAIS etre retire de la guilde.
+	if player and player.get_meta("is_player", false):
+		return
 	if player in guild_members:
 		if player.is_online:
 			_disconnect_member(player)

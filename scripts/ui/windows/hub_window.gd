@@ -67,6 +67,8 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", _panel_style())
 
 	var root := VBoxContainer.new()
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 10)
 	add_child(root)
 
@@ -155,9 +157,14 @@ func _make_section_content(section: Dictionary) -> Control:
 		return _make_embedded_section_content(section)
 
 	var panel := PanelContainer.new()
+	panel.clip_contents = true
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", _content_style())
 
 	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)
 	margin.add_theme_constant_override("margin_top", 16)
@@ -165,6 +172,8 @@ func _make_section_content(section: Dictionary) -> Control:
 	panel.add_child(margin)
 
 	var root := VBoxContainer.new()
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
 
@@ -299,6 +308,7 @@ func _populate_roster_needs_summary(parent: VBoxContainer) -> void:
 func _make_metric_grid(parent: VBoxContainer) -> GridContainer:
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 8)
 	parent.add_child(grid)
@@ -307,11 +317,17 @@ func _make_metric_grid(parent: VBoxContainer) -> GridContainer:
 func _add_metric(parent: GridContainer, label_text: String, value_text: String) -> void:
 	var label := Label.new()
 	label.text = label_text
+	label.custom_minimum_size = Vector2(112, 0)
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
 	parent.add_child(label)
 	var value := Label.new()
 	value.text = value_text
-	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	value.custom_minimum_size = Vector2(170, 0)
+	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	value.clip_text = true
+	value.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	value.add_theme_color_override("font_color", UITheme.TEXT)
 	parent.add_child(value)
 
@@ -500,9 +516,14 @@ func _requirement_label(req_name: String) -> String:
 
 func _make_embedded_section_content(section: Dictionary) -> Control:
 	var panel := PanelContainer.new()
+	panel.clip_contents = true
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", _content_style())
 
 	var root := VBoxContainer.new()
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 8)
 	panel.add_child(root)
 
@@ -529,6 +550,7 @@ func _make_embedded_section_content(section: Dictionary) -> Control:
 
 	var embedded := _instantiate_embedded_window(section)
 	if embedded:
+		embedded.clip_contents = true
 		root.add_child(embedded)
 		panel.set_meta("embedded_window", embedded)
 	else:
@@ -550,6 +572,7 @@ func _instantiate_embedded_window(section: Dictionary) -> Control:
 	embedded.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	embedded.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	embedded.custom_minimum_size = Vector2.ZERO
+	embedded.clip_contents = true
 	embedded.visibility_changed.connect(func() -> void:
 		if is_instance_valid(embedded) and not embedded.visible:
 			embedded.show()
@@ -565,8 +588,8 @@ func _prepare_embedded_window(embedded: Control, section: Dictionary) -> void:
 	embedded.custom_minimum_size = Vector2.ZERO
 	embedded.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	embedded.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_strip_embedded_chrome(embedded)
 	_focus_embedded_tab(embedded, int(section.get("legacy_tab", 0)))
+	_strip_embedded_chrome(embedded)
 	if embedded.has_method("set_guild_members") and GuildManager:
 		embedded.call("set_guild_members", GuildManager.guild_members)
 	if embedded.has_signal("player_recruited") and not embedded.player_recruited.is_connected(_on_embedded_player_recruited):
@@ -583,6 +606,18 @@ func _strip_embedded_chrome(embedded: Control) -> void:
 		var header := first_child.get_child(0)
 		if header is HBoxContainer:
 			header.visible = false
+	var tabs: AdvancedTabs = embedded.get("advanced_tabs") as AdvancedTabs
+	if tabs:
+		_hide_embedded_tab_bar(tabs)
+
+func _hide_embedded_tab_bar(tabs: AdvancedTabs) -> void:
+	if not is_instance_valid(tabs) or not is_instance_valid(tabs.tab_bar):
+		return
+	var tab_bar_container := tabs.tab_bar.get_parent() as Control
+	if not tab_bar_container:
+		return
+	tab_bar_container.visible = false
+	tab_bar_container.custom_minimum_size = Vector2.ZERO
 
 func _focus_embedded_tab(embedded: Control, tab_index: int) -> void:
 	if not embedded.get("advanced_tabs"):

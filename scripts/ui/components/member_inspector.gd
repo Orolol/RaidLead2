@@ -71,6 +71,7 @@ func _build_ui() -> void:
 
 	var detail_grid := GridContainer.new()
 	detail_grid.columns = 2
+	detail_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail_grid.add_theme_constant_override("h_separation", 12)
 	detail_grid.add_theme_constant_override("v_separation", 4)
 	root.add_child(detail_grid)
@@ -205,7 +206,14 @@ func _make_metric_bar(label_text: String, value: float, max_value: float, color:
 func _add_static_row(parent: GridContainer, text: String, is_label: bool) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if is_label:
+		label.custom_minimum_size = Vector2(86, 0)
+		label.clip_text = true
+		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	else:
+		label.custom_minimum_size = Vector2(176, 0)
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_font_size_override("font_size", UITheme.FONT_SMALL)
 	label.add_theme_color_override("font_color", UITheme.TEXT_DIM if is_label else UITheme.TEXT)
 	parent.add_child(label)

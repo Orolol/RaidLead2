@@ -193,13 +193,25 @@ func _simulate_boss_fight() -> void:
 
 	# Calculer les chances de succès du groupe
 	var success_chance: float = _calculate_boss_success_chance(boss_difficulty)
-	
-	# Appliquer une pénalité basée sur le nombre de wipes
-	success_chance *= pow(0.95, wipe_count)  # -5% par wipe
 
-	# Bonus de coordination de guilde (perks Ventrilo / Teamspeak).
+	# Pénalité de wipe — DEUX effets DISTINCTS (volontairement, pas un double comptage du
+	# même malus), de portée différente :
+	#  (A) ici : pénalité par BOSS, multiplicative et temporaire (-5% par tentative ratée
+	#      sur CE boss). wipe_count est remis à 0 dès que le boss tombe (_on_boss_defeated),
+	#      donc cette pénalité ne « suit » pas le groupe sur les boss suivants. Elle modélise
+	#      l'enlisement sur une rencontre précise.
+	#  (B) dans _on_boss_failed : ponction de moral/énergie, PERSISTANTE (reste sur les
+	#      membres après le run) et GLOBALE (alimente member_score donc baisse la base de
+	#      _tous_ les boss restants). Elle modélise l'usure/démoralisation durable.
+	# Les deux se cumulent sur le boss courant, ce qui est l'intention : un wipe frustre la
+	# tentative en cours ET épuise l'équipe. Atténuer l'un casserait la sémantique de l'autre.
+	# (Non exercé par le test PvE reproductible, qui ne simule pas de wipe — cf. _suite_pve_loop.)
+	success_chance *= pow(0.95, wipe_count)  # (A) -5% par tentative ratée sur ce boss
+
+	# Bonus de coordination de guilde (perks Ventrilo / Teamspeak),
+	# routé via la variante effective pour prendre en compte les effets actifs.
 	if GuildManager and GuildManager.guild:
-		success_chance *= (1.0 + GuildManager.guild.get_raid_success_bonus())
+		success_chance *= (1.0 + GuildManager.guild.get_effective_raid_success_bonus())
 	success_chance = clampf(success_chance, 0.05, 0.98)
 
 	# Résoudre le combat
@@ -223,8 +235,8 @@ func _calculate_boss_success_chance(boss_difficulty: float) -> float:
 		var level_diff = member.personnage_niveau - dungeon_data.level_recommended
 		member_score += 0.3 * (1.0 + level_diff / 10.0)
 
-		# Skill
-		member_score += 0.3 * (member.skill / 100.0)
+		# Skill (lecture via la variante modifiée pour les effets actifs)
+		member_score += 0.3 * (member.get_modified_skill() / 100.0)
 
 		# Équipement
 		var expected_equipment = dungeon_data.level_recommended * 3
@@ -387,8 +399,10 @@ func _on_boss_failed() -> void:
 	
 	# Ajouter la pénalité de temps
 	time_lost_to_wipes += WIPE_TIME_PENALTY
-	
-	# Réduire le moral du groupe
+
+	# Réduire le moral du groupe — pénalité de wipe (B), PERSISTANTE et GLOBALE.
+	# Voir le bloc explicatif dans _simulate_boss_fight : c'est l'effet d'usure durable,
+	# complémentaire (et non redondant) de la pénalité par-boss (A) pow(0.95, wipe_count).
 	for member in group_members:
 		member.mood = max(0, member.mood - MORALE_LOSS_PER_WIPE)
 		member.energy = max(0, member.energy - 5)
@@ -443,6 +457,8 @@ func _complete_dungeon() -> void:
 		if DungeonDataScript.is_heroic_dungeon(dungeon_id):
 			guild_xp += 100
 		GuildManager.guild.gain_xp(guild_xp, "Contenu complété : " + str(dungeon_data.get("name", "")))
+		# Réputation : ce run représente la guilde JOUEUR. Boucle de réputation PvE branchée.
+		GuildManager.guild.on_raid_success(str(dungeon_data.get("name", "")), _get_run_difficulty_label())
 
 	# Part personnelle (flavor) + bonus de moral pour les participants.
 	var member_count: int = max(1, group_members.size())
@@ -487,11 +503,16 @@ func _complete_dungeon() -> void:
 
 func _abandon_dungeon(reason: String) -> void:
 	is_active = false
-	
+
 	# Pénalité de moral pour abandon
 	for member in group_members:
 		member.mood = max(0, member.mood - 20)
-		
+
+	# Réputation : ce run représente la guilde JOUEUR. Un abandon (wipes répétés ou
+	# moral effondré) entame la réputation selon le nombre total de wipes.
+	if GuildManager and GuildManager.guild:
+		GuildManager.guild.on_raid_failure(str(dungeon_data.get("name", "")), total_wipes)
+
 	dungeon_abandoned.emit(reason)
 
 func get_current_boss_name() -> String:
@@ -518,6 +539,16 @@ func _grant_knowledge(amount: float) -> void:
 	for member in group_members:
 		var k: float = float(member.connaissance_donjons.get(dungeon_id, 0.0))
 		member.connaissance_donjons[dungeon_id] = minf(100.0, k + amount)
+
+func _get_run_difficulty_label() -> String:
+	"""Libellé de difficulté attendu par Guild.on_raid_success (Normal/Héroïque/Mythique).
+	Les raids (contenu le plus exigeant) valent « Mythique », les donjons héroïques
+	« Héroïque », tout le reste « Normal »."""
+	if int(dungeon_data.get("type", -1)) == DungeonDataScript.InstanceType.RAID:
+		return "Mythique"
+	if DungeonDataScript.is_heroic_dungeon(dungeon_id):
+		return "Héroïque"
+	return "Normal"
 
 func _pick_loot_winner(item: Item) -> SimulatedPlayer:
 	"""Attribue le loot au membre éligible (upgrade) le moins équipé ; à défaut au plus bas iLvl."""

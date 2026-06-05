@@ -12,7 +12,6 @@ const Singletons = preload("res://scripts/utils/singletons.gd")
 # Système d'effets
 @export var active_effects: Array = []  # Array[EffectInstance] - duck typing pour éviter dépendance circulaire
 
-signal xp_gained(amount: int, source: String)
 signal level_up(new_level: int)
 signal perk_unlocked(perk_name: String, level: int)
 signal gold_changed(old_gold: int, new_gold: int)
@@ -29,7 +28,6 @@ func _init() -> void:
 func gain_xp(amount: int, source: String = "") -> void:
 	var old_level: int = get_level()
 	xp += amount
-	xp_gained.emit(amount, source)
 
 	var new_level: int = get_level()
 	if new_level > old_level:
@@ -166,12 +164,6 @@ func get_modified_stat(stat_name: String, base_value: float) -> float:
 	modified_value *= (1.0 + percentage_modifier / 100.0)
 	
 	return modified_value
-
-func get_modified_gold() -> int:
-	return int(get_modified_stat("gold", float(gold)))
-
-func get_modified_xp() -> int:
-	return int(get_modified_stat("xp", float(xp)))
 
 func has_effect(effect_id: String) -> bool:
 	var effect_system = Singletons.get_autoload("EffectSystem")

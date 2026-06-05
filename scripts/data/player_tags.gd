@@ -235,6 +235,40 @@ static func get_tag_description(tag: String) -> String:
 		return TAG_DATABASE[tag].description
 	return "Tag inconnu"
 
+# Détermine, de façon DÉTERMINISTE, le sous-ensemble de tags cachés dont la
+# révélation est autorisée en phase 0 (Leveling) selon tag_reveal_rate.
+#
+# Principe : en Leveling on ne révèle qu'une fraction (reveal_rate) des tags
+# *totaux* du joueur. On calcule un budget de révélations et on autorise les
+# tags par ordre fixe (position dans TAG_DATABASE.keys()), de sorte que le même
+# joueur révèle toujours les mêmes tags dans le même ordre — aucun hasard.
+#
+# - total_tags : nombre total de tags du joueur (visibles + cachés).
+# - already_revealed : nombre de tags déjà visibles (consomment le budget).
+# - hidden_tags : tags encore cachés candidats à la révélation.
+# Retourne la liste des tags cachés autorisés à se révéler (au plus le budget restant).
+static func get_phase0_revealable_tags(total_tags: int, reveal_rate: float, already_revealed: int, hidden_tags: Array) -> Array:
+	var allowed: Array = []
+	if total_tags <= 0 or hidden_tags.is_empty():
+		return allowed
+
+	# Budget total de tags révélés autorisé en Leveling (au moins 1 pour ne pas
+	# bloquer totalement la révélation).
+	var budget: int = maxi(1, int(round(float(total_tags) * clampf(reveal_rate, 0.0, 1.0))))
+	var remaining: int = budget - already_revealed
+	if remaining <= 0:
+		return allowed
+
+	# Ordre déterministe : on suit l'ordre fixe de TAG_DATABASE.keys().
+	for tag in TAG_DATABASE.keys():
+		if remaining <= 0:
+			break
+		if tag in hidden_tags:
+			allowed.append(tag)
+			remaining -= 1
+
+	return allowed
+
 # Obtient les tags qui pourraient être révélés prochainement
 static func get_potential_reveals(player_data: Dictionary) -> Array:
 	var potential: Array = []

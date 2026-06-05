@@ -7,7 +7,7 @@ const SAVE_PATH := "user://savegame.json"
 const BACKUP_PATH := "user://savegame_backup.json"
 ## Version du format de sauvegarde écrite par ce build. À incrémenter à chaque
 ## changement de format, en ajoutant la migration correspondante dans _build_migrations().
-const CURRENT_SAVE_VERSION := 3
+const CURRENT_SAVE_VERSION := 4
 const AUTOSAVE_WEEK_INTERVAL := 4  # auto-sauvegarde périodique (toutes les 4 semaines de jeu)
 
 ## Blocs systèmes (clés de save) — utilisés par les migrations pour normaliser
@@ -15,12 +15,16 @@ const AUTOSAVE_WEEK_INTERVAL := 4  # auto-sauvegarde périodique (toutes les 4 s
 const _DICT_SYSTEM_BLOCKS := [
 	"game_time", "server_version", "phase", "ranking", "ai_guilds", "guild",
 	"media", "sponsors", "dramas", "staff", "tournaments", "transfers",
-	"legacy", "culture", "balance", "events", "social",
+	"legacy", "culture", "balance", "events", "social", "effects",
 ]
 const _ARRAY_SYSTEM_BLOCKS := ["members", "loot_history"]
 
 signal save_completed(success: bool)
 signal load_completed(success: bool)
+
+## Sauvegarde auto différée parce qu'un run de donjon était en cours au moment du
+## déclencheur : réessayée au prochain tick de semaine une fois le run terminé.
+var _autosave_pending: bool = false
 
 func _ready() -> void:
 	# Connexion différée : garantit que PhaseManager et GameTime existent (ordre des autoloads).
@@ -37,22 +41,45 @@ func _setup_autosave() -> void:
 
 func _on_phase_changed_autosave(_new_phase, _old_phase) -> void:
 	"""Moment critique : on sauvegarde et on le signale au joueur."""
+	# Ne pas couper un run de donjon en cours : on diffère la sauvegarde auto.
+	if _has_active_dungeon_run():
+		_autosave_pending = true
+		return
 	if save_game():
 		var nm: Node = NotificationManager
 		if nm:
 			nm.show_success("Progression sauvegardée (nouvelle phase)", "Sauvegarde auto")
 
 func _on_week_changed_autosave(week: int, _year: int) -> void:
-	"""Sauvegarde périodique silencieuse."""
-	if week % AUTOSAVE_WEEK_INTERVAL == 0:
+	"""Sauvegarde périodique silencieuse. Réessaie aussi une sauvegarde auto différée."""
+	# Un run de donjon vivant n'est pas sérialisé : on diffère plutôt que de le couper.
+	if _has_active_dungeon_run():
+		if week % AUTOSAVE_WEEK_INTERVAL == 0:
+			_autosave_pending = true
+		return
+	if week % AUTOSAVE_WEEK_INTERVAL == 0 or _autosave_pending:
+		_autosave_pending = false
 		save_game()
+
+func _has_active_dungeon_run() -> bool:
+	"""Vrai si un run de donjon est en cours (état non sérialisable)."""
+	var am = ActivityManager
+	return am != null and am.active_dungeons is Array and not am.active_dungeons.is_empty()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		save_game()
 
 func save_game() -> bool:
-	"""Sauvegarde l'ensemble de la progression dans un fichier JSON."""
+	"""Sauvegarde l'ensemble de la progression dans un fichier JSON.
+
+	Note : l'état d'un run de donjon en cours n'est PAS sérialisé. Les sauvegardes
+	automatiques (semaine/phase) sont différées tant qu'un run est vivant
+	(voir _on_*_autosave + _autosave_pending) afin de ne jamais le couper en silence.
+	Le run n'est jamais neutralisé ici : un load ne se produit qu'au démarrage d'une
+	nouvelle session (ActivityManager.active_dungeons est alors vide), donc aucune
+	fenêtre orpheline ne peut survivre au chargement."""
+
 	var data: Dictionary = {
 		"save_version": CURRENT_SAVE_VERSION,
 		"timestamp": Time.get_unix_time_from_system(),
@@ -75,6 +102,7 @@ func save_game() -> bool:
 		"balance": BalanceManager.serialize(),
 		"events": EventManager.serialize(),
 		"social": _serialize_social(),
+		"effects": _serialize_effects(),
 	}
 
 	var json_string: String = JSON.stringify(data, "\t")
@@ -158,6 +186,7 @@ func _build_migrations() -> Dictionary:
 	return {
 		1: _migrate_v1_to_v2,
 		2: _migrate_v2_to_v3,
+		3: _migrate_v3_to_v4,
 	}
 
 func _migrate_save_data(data: Dictionary) -> Dictionary:
@@ -199,6 +228,15 @@ func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
 	for key in ["events", "social"]:
 		if not data.has(key) or not (data[key] is Dictionary):
 			data[key] = {}
+	return data
+
+func _migrate_v3_to_v4(data: Dictionary) -> Dictionary:
+	"""v3 -> v4 : ajoute la persistance du système d'effets (active_effects). Les
+	absences planifiées des membres (scheduled_absences) sont intégrées aux blocs
+	membres déjà présents et prennent leur défaut [] à la désérialisation, donc
+	aucune action sur les membres ici. Non destructif."""
+	if not data.has("effects") or not (data["effects"] is Dictionary):
+		data["effects"] = {}
 	return data
 
 func _apply_save_data(data: Dictionary) -> void:
@@ -244,6 +282,9 @@ func _apply_save_data(data: Dictionary) -> void:
 		EventManager.deserialize(data.events)
 	if data.has("social"):
 		_deserialize_social(data.social)
+	# Effets actifs (après les membres et la guilde : ils ciblent ces objets).
+	if data.has("effects"):
+		_deserialize_effects(data.effects)
 
 func has_save() -> bool:
 	"""Vérifie si une sauvegarde existe."""
@@ -351,7 +392,10 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		"personnage_role": player.personnage_role,
 		"personnage_niveau": player.personnage_niveau,
 		"personnage_xp": player.personnage_xp,
-		"or_actuel": player.or_actuel,
+		# NB : on ne sérialise plus "or_actuel". La seule source de vérité de l'or
+		# est Guild.gold (sérialisée à part). or_actuel était un champ mort jamais lu
+		# pour une décision gameplay. Les vieilles saves contenant la clé chargent
+		# sans erreur : la clé est simplement ignorée au load.
 		"skill": player.skill,
 		"energy": player.energy,
 		"mood": player.mood,
@@ -388,6 +432,7 @@ func _serialize_player(player: SimulatedPlayer) -> Dictionary:
 		"is_international": player.get_meta("is_international", false),
 		"region": player.get_meta("region", ""),
 		"adaptation_weeks": player.get_meta("adaptation_weeks", 0),
+		"scheduled_absences": _serialize_scheduled_absences(player.scheduled_absences),
 		"equipment": _serialize_equipment(player.equipment),
 	}
 
@@ -414,7 +459,8 @@ func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 	player.personnage_role = data.get("personnage_role", "")
 	player.personnage_niveau = data.get("personnage_niveau", 1)
 	player.personnage_xp = data.get("personnage_xp", 0)
-	player.or_actuel = data.get("or_actuel", 0)
+	# "or_actuel" volontairement non désérialisé (champ mort, cf. _serialize_player).
+	# Rétro-compat : une vieille save peut contenir la clé, elle est simplement ignorée.
 	player.skill = data.get("skill", 50)
 	player.energy = data.get("energy", 100.0)
 	player.mood = data.get("mood", 75.0)
@@ -457,6 +503,9 @@ func _deserialize_player(player: SimulatedPlayer, data: Dictionary) -> void:
 		player.set_meta("region", data.get("region", ""))
 	if data.get("adaptation_weeks", 0) > 0:
 		player.set_meta("adaptation_weeks", data.get("adaptation_weeks", 0))
+
+	# Absences planifiées (événements personnels). Défaut sûr [] pour les vieilles saves.
+	player.scheduled_absences = _deserialize_scheduled_absences(data.get("scheduled_absences", []))
 
 	# Équipement
 	if data.has("equipment"):
@@ -545,3 +594,151 @@ func _deserialize_loot_history(data: Array) -> void:
 		if entry_data.has("item") and entry_data.item is Dictionary:
 			entry["item"] = _deserialize_item(entry_data.item)
 		GuildManager.loot_history.append(entry)
+
+# --- Sérialisation des absences planifiées (événements personnels) ---
+
+func _serialize_scheduled_absences(absences) -> Array:
+	"""Sérialise scheduled_absences : liste de dicts {event, start_day, duration_days}."""
+	var out: Array = []
+	if not (absences is Array):
+		return out
+	for a in absences:
+		if a is Dictionary:
+			out.append({
+				"event": a.get("event", ""),
+				"start_day": int(a.get("start_day", 0)),
+				"duration_days": int(a.get("duration_days", 1)),
+			})
+	return out
+
+func _deserialize_scheduled_absences(data) -> Array:
+	"""Reconstruit scheduled_absences ; tolère une vieille save sans la clé (-> [])."""
+	var out: Array = []
+	if not (data is Array):
+		return out
+	for a in data:
+		if a is Dictionary:
+			out.append({
+				"event": a.get("event", ""),
+				"start_day": int(a.get("start_day", 0)),
+				"duration_days": int(a.get("duration_days", 1)),
+			})
+	return out
+
+# --- Sérialisation du système d'effets (EffectSystem.active_effects) ---
+
+func _serialize_effects() -> Dictionary:
+	"""Sérialise les effets actifs. Aucun registre central d'Effect n'existe (les
+	effets sont construits ad hoc par les événements) : on embarque donc la définition
+	complète de chaque Effect pour pouvoir le reconstruire fidèlement au chargement.
+	Format : { instances: Array[Dictionary] }."""
+	var out: Dictionary = {"instances": []}
+	var es = EffectSystem
+	if not es:
+		return out
+	for target_id in es.active_effects.keys():
+		var effects_list = es.active_effects[target_id]
+		if not (effects_list is Array):
+			continue
+		for inst in effects_list:
+			if inst == null or inst.effect == null:
+				continue
+			var target_kind: String = ""
+			var target_name: String = ""
+			if inst.target and inst.target.has_method("get_role"):
+				target_kind = "player"
+				target_name = inst.target.nom
+			elif inst.target and inst.target.has_method("get_level"):
+				target_kind = "guild"
+				target_name = inst.target.name
+			else:
+				continue  # cible inconnue/disparue : on ne sérialise pas
+			out["instances"].append({
+				"effect": _serialize_effect_definition(inst.effect),
+				"remaining_duration": inst.remaining_duration,
+				"stack_count": inst.stack_count,
+				"source": inst.source,
+				"target_kind": target_kind,
+				"target_name": target_name,
+			})
+	return out
+
+func _serialize_effect_definition(effect) -> Dictionary:
+	"""Sérialise la définition complète d'un Effect (hors icône Texture)."""
+	return {
+		"id": effect.id,
+		"name": effect.name,
+		"description": effect.description,
+		"duration": effect.duration,
+		"effect_type": int(effect.effect_type),
+		"target_type": int(effect.target_type),
+		"can_stack": effect.can_stack,
+		"max_stacks": effect.max_stacks,
+		"stat_modifiers": effect.stat_modifiers.duplicate(true),
+		"percentage_modifiers": effect.percentage_modifiers.duplicate(true),
+		"maintain_conditions": effect.maintain_conditions.duplicate(true),
+		"blocks_actions": effect.blocks_actions.duplicate(true),
+		"enables_actions": effect.enables_actions.duplicate(true),
+	}
+
+func _deserialize_effect_definition(data: Dictionary):
+	"""Reconstruit un Effect depuis sa définition sérialisée."""
+	var EffectScript = load("res://scripts/resources/effect.gd")
+	var effect = EffectScript.new()
+	effect.id = data.get("id", "")
+	effect.name = data.get("name", "")
+	effect.description = data.get("description", "")
+	effect.duration = float(data.get("duration", 0.0))
+	effect.effect_type = int(data.get("effect_type", 0))
+	effect.target_type = int(data.get("target_type", 0))
+	effect.can_stack = bool(data.get("can_stack", false))
+	effect.max_stacks = int(data.get("max_stacks", 1))
+	effect.stat_modifiers = data.get("stat_modifiers", {})
+	effect.percentage_modifiers = data.get("percentage_modifiers", {})
+	effect.maintain_conditions = data.get("maintain_conditions", [])
+	effect.blocks_actions = data.get("blocks_actions", [])
+	effect.enables_actions = data.get("enables_actions", [])
+	return effect
+
+func _deserialize_effects(data: Dictionary) -> void:
+	"""Ré-applique les effets actifs après reconstruction des membres et de la guilde.
+	Tolère une vieille save sans la clé (rien à faire)."""
+	var es = EffectSystem
+	if not es:
+		return
+	# Repartir d'un état propre : les effets éventuellement créés au boot sont remplacés.
+	# reset_all() déconnecte aussi les signaux et purge _effect_callables (un simple
+	# active_effects.clear() laisserait ces Callables orphelins).
+	if es.has_method("reset_all"):
+		es.reset_all()
+	elif es.active_effects is Dictionary:
+		es.active_effects.clear()
+	var instances = data.get("instances", [])
+	if not (instances is Array):
+		return
+	# Index des membres par nom pour résoudre les cibles joueur.
+	var members_by_name: Dictionary = {}
+	if GuildManager:
+		for m in GuildManager.guild_members:
+			members_by_name[m.nom] = m
+	for entry in instances:
+		if not (entry is Dictionary) or not entry.has("effect"):
+			continue
+		var target = null
+		var kind: String = entry.get("target_kind", "")
+		var tname: String = entry.get("target_name", "")
+		if kind == "player":
+			target = members_by_name.get(tname, null)
+		elif kind == "guild":
+			if GuildManager and GuildManager.guild and GuildManager.guild.name == tname:
+				target = GuildManager.guild
+		if target == null:
+			continue  # cible disparue : on ignore l'effet
+		var effect = _deserialize_effect_definition(entry.get("effect", {}))
+		var source: String = entry.get("source", "")
+		var inst = es.apply_effect(target, effect, source)
+		if inst:
+			# Restaurer la durée restante et le cumul (apply_effect repart à plein).
+			inst.remaining_duration = float(entry.get("remaining_duration", inst.remaining_duration))
+			inst.stack_count = int(entry.get("stack_count", inst.stack_count))
+

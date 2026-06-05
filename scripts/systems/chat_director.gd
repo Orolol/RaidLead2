@@ -564,12 +564,30 @@ func _on_member_recruited(player: Variant) -> void:
 	_push_stimulus("recruit", 0.5, player, {"subject": String(player.nom)})
 
 func _on_loot_conflict(conflict: Variant) -> void:
+	if not (conflict is Dictionary):
+		return
 	var vars: Dictionary = {}
-	if conflict is Dictionary and conflict.has("item"):
+	if conflict.has("item"):
 		var it: Variant = conflict["item"]
 		if it is Resource and "name" in it:
 			vars["item"] = String(it.name)
-	_push_stimulus("ninja", 0.9, null, vars)
+	# Un conflit de loot légitime (plusieurs joueurs éligibles au même item) n'est PAS
+	# une accusation de vol. On ne pousse le stimulus accusatoire "ninja" que si un
+	# membre réellement taggé ninja_looter est impliqué. Sinon, pas de stimulus
+	# accusatoire (aucune clé "loot_dispute" n'existe dans le corpus res://data/chat/).
+	# Important : on ne regarde QUE les tags RÉVÉLÉS (tags_comportement), pas les tags
+	# cachés — accuser publiquement révélerait de facto un ninja_looter encore secret et
+	# court-circuiterait la révélation progressive (même convention que
+	# drama_manager._has_revealed_tag).
+	var has_ninja: bool = false
+	if conflict.has("candidates") and conflict["candidates"] is Array:
+		for candidate: Variant in conflict["candidates"]:
+			if candidate != null and "tags_comportement" in candidate \
+					and "ninja_looter" in candidate.tags_comportement:
+				has_ninja = true
+				break
+	if has_ninja:
+		_push_stimulus("ninja", 0.9, null, vars)
 
 func _on_member_left(player: Variant) -> void:
 	_push_stimulus("member_left", 0.8, player, {"subject": String(player.nom)})
@@ -588,7 +606,7 @@ func _on_loot_distributed(member: Variant, item: Variant) -> void:
 	var item_name: String = str(item)
 	if item is Resource:
 		if "rarity" in item:
-			is_epic = int(item.rarity) >= 2   # >= RARE (COMMON0, UNCOMMON1, RARE2, EPIC3)
+			is_epic = int(item.rarity) >= 3   # EPIC strict (COMMON0, UNCOMMON1, RARE2, EPIC3)
 		if "name" in item:
 			item_name = String(item.name)
 	var kind: String = "loot_epic" if is_epic else "loot"
